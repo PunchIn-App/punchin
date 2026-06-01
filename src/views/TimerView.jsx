@@ -22,8 +22,8 @@ export default function TimerView() {
         {/* Header row */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="font-display font-bold text-white text-2xl leading-none">Active</h1>
-            <p className="text-[#4B5563] text-sm mt-0.5">
+            <h1 className="font-display font-bold text-appText text-2xl leading-none">Active</h1>
+            <p className="text-appTextMuted text-sm mt-0.5">
               {active?.length
                 ? `${active.length} timer${active.length !== 1 ? 's' : ''} running`
                 : 'No active timers'}
@@ -43,11 +43,11 @@ export default function TimerView() {
         {/* Empty state */}
         {active?.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-[#161923] border border-[#1E2232] flex items-center justify-center mb-5">
-              <Clock className="w-9 h-9 text-[#2D3148]" />
+            <div className="w-20 h-20 rounded-2xl bg-appCard border border-appBorderLight flex items-center justify-center mb-5">
+              <Clock className="w-9 h-9 text-appTextDisabled" />
             </div>
-            <p className="font-display font-semibold text-[#6B7280] text-xl">Nothing running</p>
-            <p className="text-[#374151] text-sm mt-1.5">Tap Punch In to start tracking time</p>
+            <p className="font-display font-semibold text-appTextMuted text-xl">Nothing running</p>
+            <p className="text-appTextDisabled text-sm mt-1.5">Tap Punch In to start tracking time</p>
           </div>
         )}
 

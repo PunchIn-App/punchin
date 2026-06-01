@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Square } from 'lucide-react'
+import { Square, Pencil, AlertTriangle } from 'lucide-react'
 import { db } from '../db'
 import { formatElapsed, formatTime } from '../utils/time'
+import EditEntryModal from './EditEntryModal'
 
 export default function TimerCard({ entry, job, laborType }) {
   const [elapsed, setElapsed] = useState(Date.now() - new Date(entry.punchIn).getTime())
+  const [showEditModal, setShowEditModal] = useState(false)
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -18,16 +20,27 @@ export default function TimerCard({ entry, job, laborType }) {
   }
 
   const color = laborType?.color || '#6366F1'
+  const isOvernight = elapsed > 43200000 // 12 hours in milliseconds
 
   return (
-    <div className="relative rounded-xl border border-[#2A2F45] bg-[#161923] overflow-hidden">
+    <div className={`relative rounded-xl border bg-appCard overflow-hidden transition-all duration-300 ${
+      isOvernight ? 'border-amber-500/40 shadow-lg shadow-amber-500/5 animate-pulse' : 'border-appBorder'
+    }`}>
       {/* Color accent bar */}
       <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
 
       <div className="pl-5 pr-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="font-display font-semibold text-white truncate">{job?.name || 'Unknown Job'}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-display font-semibold text-appText truncate">{job?.name || 'Unknown Job'}</p>
+              {isOvernight && (
+                <div className="flex items-center gap-1 text-amber-500 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 px-2 py-0.5 rounded-full animate-bounce">
+                  <AlertTriangle className="w-3 h-3" />
+                  Overnight Run?
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2 mt-1">
               {laborType && (
                 <span
@@ -37,21 +50,28 @@ export default function TimerCard({ entry, job, laborType }) {
                   {laborType.name}
                 </span>
               )}
-              <span className="text-[#4B5563] text-xs font-mono">
-                since {formatTime(entry.punchIn)}
-              </span>
+              <div className="flex items-center gap-1 text-appTextDarker text-xs font-mono">
+                <span>since {formatTime(entry.punchIn)}</span>
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="p-1 rounded hover:bg-appInput text-appTextDarker hover:text-appTextMuted transition-colors"
+                  title="Adjust start time / notes"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
             </div>
             {entry.notes && (
-              <p className="mt-1.5 text-xs text-[#6B7280] truncate">{entry.notes}</p>
+              <p className="mt-1.5 text-xs text-appTextMuted truncate">{entry.notes}</p>
             )}
           </div>
 
           <button
             onClick={punchOut}
             className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                       bg-[#1E2232] border border-[#2A2F45]
+                       bg-appInput border border-appBorder
                        hover:bg-red-500/15 hover:border-red-500/30 hover:text-red-400
-                       text-[#6B7280] transition-all text-sm font-medium"
+                       text-appTextMuted transition-all text-sm font-medium"
           >
             <Square className="w-3.5 h-3.5 fill-current" />
             Out
@@ -63,6 +83,10 @@ export default function TimerCard({ entry, job, laborType }) {
           {formatElapsed(elapsed)}
         </div>
       </div>
+
+      {showEditModal && (
+        <EditEntryModal entry={entry} onClose={() => setShowEditModal(false)} />
+      )}
     </div>
   )
 }

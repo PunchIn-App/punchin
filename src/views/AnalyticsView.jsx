@@ -6,10 +6,10 @@ import { db } from '../db'
 import { getEntryDuration, formatDurationHM, sumDurations } from '../utils/time'
 
 const TOOLTIP = {
-  backgroundColor: '#1E2232',
-  border: '1px solid #2A2F45',
+  backgroundColor: 'var(--bg-tertiary)',
+  border: '1px solid var(--border-color)',
   borderRadius: '8px',
-  color: '#E2E8F0',
+  color: 'var(--text-secondary)',
   fontSize: '12px',
 }
 
@@ -24,7 +24,7 @@ export default function AnalyticsView() {
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
 
   if (!entries || !jobs || !laborTypes) {
-    return <div className="flex items-center justify-center h-full text-[#4B5563] text-sm">Loading...</div>
+    return <div className="flex items-center justify-center h-full text-appTextDisabled text-sm">Loading...</div>
   }
 
   const total = sumDurations(entries)
@@ -61,7 +61,7 @@ export default function AnalyticsView() {
         {['7d', '30d'].map(p => (
           <button key={p} onClick={() => setPeriod(p)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-              ${period === p ? 'bg-amber-500 text-[#0F1117]' : 'bg-[#161923] border border-[#2A2F45] text-[#6B7280]'}`}>
+              ${period === p ? 'bg-amber-500 text-[#0F1117]' : 'bg-appCard border border-appBorder text-appTextMuted'}`}>
             Last {p === '7d' ? '7 days' : '30 days'}
           </button>
         ))}
@@ -69,26 +69,26 @@ export default function AnalyticsView() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-[#161923] border border-[#2A2F45] p-4">
-          <p className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1">Total logged</p>
-          <p className="font-mono text-2xl font-semibold text-white">{formatDurationHM(total)}</p>
+        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+          <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-1">Total logged</p>
+          <p className="font-mono text-2xl font-semibold text-appText">{formatDurationHM(total)}</p>
         </div>
-        <div className="rounded-xl bg-[#161923] border border-[#2A2F45] p-4">
-          <p className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-1">Avg / day</p>
-          <p className="font-mono text-2xl font-semibold text-white">
+        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+          <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-1">Avg / day</p>
+          <p className="font-mono text-2xl font-semibold text-appText">
             {formatDurationHM((total / days) || 0)}
           </p>
         </div>
       </div>
 
       {/* Daily chart */}
-      <div className="rounded-xl bg-[#161923] border border-[#2A2F45] p-4">
-        <p className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-4">Hours per day</p>
+      <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+        <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4">Hours per day</p>
         <ResponsiveContainer width="100%" height={130}>
           <BarChart data={dailyData} barCategoryGap="30%">
-            <XAxis dataKey="date" tick={{ fill: '#4B5563', fontSize: 10 }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="date" tick={{ fill: 'var(--text-darker)', fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis hide />
-            <Tooltip contentStyle={TOOLTIP} cursor={{ fill: '#1E2232' }}
+            <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
               formatter={(v) => [`${v}h`, 'Hours']} />
             <Bar dataKey="hours" fill="#F59E0B" radius={[3,3,0,0]} />
           </BarChart>
@@ -97,14 +97,14 @@ export default function AnalyticsView() {
 
       {/* Hours by job */}
       {jobData.length > 0 && (
-        <div className="rounded-xl bg-[#161923] border border-[#2A2F45] p-4">
-          <p className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-4">Hours by job</p>
+        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+          <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4">Hours by job</p>
           <ResponsiveContainer width="100%" height={Math.max(80, jobData.length * 44)}>
             <BarChart data={jobData} layout="vertical" barCategoryGap="30%">
               <XAxis type="number" hide />
               <YAxis type="category" dataKey="name"
-                tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} width={110} />
-              <Tooltip contentStyle={TOOLTIP} cursor={{ fill: '#1E2232' }}
+                tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={110} />
+              <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
                 formatter={(v) => [`${v}h`, 'Hours']} />
               <Bar dataKey="hours" fill="#6366F1" radius={[0,3,3,0]} />
             </BarChart>
@@ -114,8 +114,8 @@ export default function AnalyticsView() {
 
       {/* Labor type donut */}
       {ltData.length > 1 && (
-        <div className="rounded-xl bg-[#161923] border border-[#2A2F45] p-4">
-          <p className="text-[10px] text-[#6B7280] uppercase tracking-widest mb-4">By labor type</p>
+        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+          <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4">By labor type</p>
           <div className="flex items-center gap-5">
             <PieChart width={100} height={100}>
               <Pie data={ltData} cx={45} cy={45} innerRadius={28} outerRadius={44}
@@ -128,9 +128,9 @@ export default function AnalyticsView() {
                 <div key={lt.name} className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
-                    <span className="text-xs text-[#9CA3AF] truncate">{lt.name}</span>
+                    <span className="text-xs text-appTextMuted truncate">{lt.name}</span>
                   </div>
-                  <span className="font-mono text-xs text-white flex-shrink-0">{formatDurationHM(lt.value)}</span>
+                  <span className="font-mono text-xs text-appText flex-shrink-0">{formatDurationHM(lt.value)}</span>
                 </div>
               ))}
             </div>
@@ -139,7 +139,7 @@ export default function AnalyticsView() {
       )}
 
       {entries.length === 0 && (
-        <div className="flex flex-col items-center py-10 text-[#374151]">
+        <div className="flex flex-col items-center py-10 text-appTextDisabled">
           <p className="text-sm">No completed entries in this period.</p>
           <p className="text-xs mt-1">Punch in and out to see analytics.</p>
         </div>

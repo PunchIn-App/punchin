@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase } from 'lucide-react'
+import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, Trash2 } from 'lucide-react'
 import { db } from '../db'
 
 const PRESET_COLORS = [
@@ -29,11 +29,11 @@ function JobForm({ job, laborTypes, onDone }) {
     onDone()
   }
 
-  const inputCls = `w-full bg-[#0F1117] border border-[#2A2F45] text-white rounded-lg px-3 py-2 text-sm
-                    placeholder-[#374151] focus:outline-none focus:border-amber-500/60 transition-colors`
+  const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
+                    placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors`
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-[#1A1D27] p-4 space-y-3">
+    <div className="rounded-xl border border-amber-500/30 bg-appCard p-4 space-y-3 shadow-md">
       <input autoFocus value={name} onChange={e => setName(e.target.value)}
         placeholder="Job name *" className={inputCls} onKeyDown={e => e.key === 'Enter' && save()} />
       <input value={clientName} onChange={e => setClientName(e.target.value)}
@@ -48,7 +48,7 @@ function JobForm({ job, laborTypes, onDone }) {
           {job ? 'Save' : 'Add Job'}
         </button>
         <button onClick={onDone}
-          className="flex-1 py-2 rounded-lg bg-[#0F1117] hover:bg-[#2A2F45] text-[#9CA3AF] text-sm transition-colors border border-[#2A2F45]">
+          className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
           Cancel
         </button>
       </div>
@@ -71,12 +71,12 @@ function LaborTypeForm({ lt, onDone }) {
   }
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-[#1A1D27] p-4 space-y-3">
+    <div className="rounded-xl border border-amber-500/30 bg-appCard p-4 space-y-3 shadow-md">
       <input autoFocus value={name} onChange={e => setName(e.target.value)}
         placeholder="Labor type name *"
         onKeyDown={e => e.key === 'Enter' && save()}
-        className="w-full bg-[#0F1117] border border-[#2A2F45] text-white rounded-lg px-3 py-2 text-sm
-                   placeholder-[#374151] focus:outline-none focus:border-amber-500/60 transition-colors" />
+        className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
+                   placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors" />
       <div className="flex flex-wrap gap-2">
         {PRESET_COLORS.map(c => (
           <button key={c} onClick={() => setColor(c)}
@@ -90,7 +90,7 @@ function LaborTypeForm({ lt, onDone }) {
           {lt ? 'Save' : 'Add Type'}
         </button>
         <button onClick={onDone}
-          className="flex-1 py-2 rounded-lg bg-[#0F1117] hover:bg-[#2A2F45] text-[#9CA3AF] text-sm transition-colors border border-[#2A2F45]">
+          className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
           Cancel
         </button>
       </div>
@@ -105,21 +105,30 @@ export default function JobsView() {
   const [addingLT, setAddingLT]    = useState(false)
   const [editingLT, setEditingLT]   = useState(null)
 
-  const jobs       = useLiveQuery(() => db.jobs.orderBy('name').toArray(), [])
+  const jobs       = useLiveQuery(async () => {
+    const all = await db.jobs.toArray()
+    return all.filter(j => j.isDeleted !== true).sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
   const laborTypes = useLiveQuery(() => db.laborTypes.orderBy('name').toArray(), [])
 
   const toggleArchive = async (job) => {
     await db.jobs.update(job.id, { isActive: job.isActive === false ? true : false })
   }
 
+  const deleteJob = async (job) => {
+    if (window.confirm(`Are you sure you want to delete the job "${job.name}"?\n\nThis will hide it from active list, but all historical time entries logged under it will be safely preserved.`)) {
+      await db.jobs.update(job.id, { isDeleted: true })
+    }
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Tabs */}
-      <div className="flex-shrink-0 flex border-b border-[#1E2232]">
+      <div className="flex-shrink-0 flex border-b border-appBorderLight">
         {['jobs','labor'].map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-3 text-sm font-medium capitalize transition-colors
-              ${tab === t ? 'text-amber-400 border-b-2 border-amber-400' : 'text-[#4B5563]'}`}>
+              ${tab === t ? 'text-amber-400 border-b-2 border-amber-400' : 'text-appTextMuted'}`}>
             {t === 'labor' ? 'Labor Types' : 'Jobs'}
           </button>
         ))}
@@ -132,8 +141,8 @@ export default function JobsView() {
             {!addingJob && !editingJob && (
               <button onClick={() => setAddingJob(true)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-                           border border-dashed border-[#2A2F45] hover:border-amber-500/40
-                           text-[#4B5563] hover:text-amber-400 transition-colors text-sm">
+                           border border-dashed border-appBorder hover:border-amber-500/40
+                           text-appTextMuted hover:text-amber-400 transition-colors text-sm">
                 <Plus className="w-4 h-4" /> Add Job
               </button>
             )}
@@ -143,7 +152,7 @@ export default function JobsView() {
             )}
 
             {jobs?.length === 0 && !addingJob && (
-              <div className="flex flex-col items-center py-14 text-[#374151]">
+              <div className="flex flex-col items-center py-14 text-appTextDisabled">
                 <Briefcase className="w-10 h-10 mb-3 opacity-40" />
                 <p className="text-sm">No jobs yet. Add one above.</p>
               </div>
@@ -155,13 +164,13 @@ export default function JobsView() {
                 return <JobForm key={job.id} job={job} laborTypes={laborTypes} onDone={() => setEditingJob(null)} />
               return (
                 <div key={job.id}
-                  className={`rounded-xl border bg-[#161923] p-4 transition-opacity
-                    ${job.isActive === false ? 'border-[#1E2232] opacity-50' : 'border-[#2A2F45]'}`}>
+                  className={`rounded-xl border bg-appCard p-4 transition-all duration-200
+                    ${job.isActive === false ? 'border-appBorderLight opacity-50' : 'border-appBorder'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-display font-semibold text-white truncate">{job.name}</p>
+                      <p className="font-display font-semibold text-appText truncate">{job.name}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {job.clientName && <span className="text-xs text-[#6B7280]">{job.clientName}</span>}
+                        {job.clientName && <span className="text-xs text-appTextMuted">{job.clientName}</span>}
                         {lt && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded"
                             style={{ backgroundColor: `${lt.color}25`, color: lt.color }}>
@@ -172,14 +181,21 @@ export default function JobsView() {
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button onClick={() => setEditingJob(job)}
-                        className="p-1.5 rounded-lg hover:bg-[#1E2232] text-[#374151] hover:text-[#9CA3AF] transition-colors">
+                        className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
+                        title="Edit Job">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button onClick={() => toggleArchive(job)}
-                        className="p-1.5 rounded-lg hover:bg-[#1E2232] text-[#374151] hover:text-[#9CA3AF] transition-colors">
+                        className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
+                        title={job.isActive === false ? 'Restore Job' : 'Archive Job'}>
                         {job.isActive === false
                           ? <ArchiveRestore className="w-4 h-4" />
                           : <Archive className="w-4 h-4" />}
+                      </button>
+                      <button onClick={() => deleteJob(job)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-appTextDisabled hover:text-red-400 transition-colors"
+                        title="Delete Job & Cascaded Entries">
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -195,8 +211,8 @@ export default function JobsView() {
             {!addingLT && !editingLT && (
               <button onClick={() => setAddingLT(true)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-                           border border-dashed border-[#2A2F45] hover:border-amber-500/40
-                           text-[#4B5563] hover:text-amber-400 transition-colors text-sm">
+                           border border-dashed border-appBorder hover:border-amber-500/40
+                           text-appTextMuted hover:text-amber-400 transition-colors text-sm">
                 <Plus className="w-4 h-4" /> Add Labor Type
               </button>
             )}
@@ -206,7 +222,7 @@ export default function JobsView() {
             )}
 
             {laborTypes?.length === 0 && !addingLT && (
-              <div className="flex flex-col items-center py-14 text-[#374151]">
+              <div className="flex flex-col items-center py-14 text-appTextDisabled">
                 <Tag className="w-10 h-10 mb-3 opacity-40" />
                 <p className="text-sm">No labor types yet.</p>
               </div>
@@ -216,13 +232,14 @@ export default function JobsView() {
               if (editingLT?.id === lt.id)
                 return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
               return (
-                <div key={lt.id} className="flex items-center justify-between rounded-xl border border-[#2A2F45] bg-[#161923] px-4 py-3.5">
+                <div key={lt.id} className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-4 py-3.5">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
-                    <span className="font-medium text-white text-sm">{lt.name}</span>
+                    <span className="font-medium text-appText text-sm">{lt.name}</span>
                   </div>
                   <button onClick={() => setEditingLT(lt)}
-                    className="p-1.5 rounded-lg hover:bg-[#1E2232] text-[#374151] hover:text-[#9CA3AF] transition-colors">
+                    className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
+                    title="Edit Labor Type">
                     <Pencil className="w-4 h-4" />
                   </button>
                 </div>
