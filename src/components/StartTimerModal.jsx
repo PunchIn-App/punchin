@@ -11,7 +11,7 @@ export default function StartTimerModal({ onClose }) {
   const [error, setError]           = useState('')
 
   const { settings } = useSettings()
-  const jobs       = useLiveQuery(() => db.jobs.filter(j => j.isActive !== false).toArray(), [])
+  const jobs       = useLiveQuery(() => db.jobs.filter(j => j.isActive !== false && j.isDeleted !== true).toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.orderBy('name').toArray(), [])
 
   // Pre-fill labor type from job default
@@ -45,17 +45,17 @@ export default function StartTimerModal({ onClose }) {
     onClose()
   }
 
-  const inputCls = `w-full bg-[#1E2232] border border-[#2A2F45] text-white rounded-lg px-3 py-2.5 text-sm
-                    placeholder-[#374151] focus:outline-none focus:border-amber-500/60 transition-colors`
+  const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2.5 text-sm
+                    placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors`
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-      <div className="w-full max-w-md bg-[#161923] rounded-2xl border border-[#2A2F45] overflow-hidden">
+      <div className="w-full max-w-md bg-appCard rounded-2xl border border-appBorder overflow-hidden shadow-xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2F45]">
-          <h2 className="font-display font-semibold text-white text-lg">Start Timer</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#1E2232] text-[#6B7280] transition-colors">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-appBorder">
+          <h2 className="font-display font-semibold text-appText text-lg">Start Timer</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -63,7 +63,7 @@ export default function StartTimerModal({ onClose }) {
         {/* Fields */}
         <div className="px-5 py-4 space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-widest">Job</label>
+            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Job</label>
             <select value={jobId} onChange={e => setJobId(e.target.value)} className={inputCls}>
               <option value="">Select a job...</option>
               {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
@@ -71,7 +71,7 @@ export default function StartTimerModal({ onClose }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-widest">Labor Type</label>
+            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Labor Type</label>
             <select value={laborTypeId} onChange={e => setLaborTypeId(e.target.value)} className={inputCls}>
               <option value="">Select labor type...</option>
               {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
@@ -79,8 +79,8 @@ export default function StartTimerModal({ onClose }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-widest">
-              Notes <span className="text-[#374151] normal-case font-normal">— optional</span>
+            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">
+              Notes <span className="text-appTextDisabled normal-case font-normal">— optional</span>
             </label>
             <input
               type="text"
