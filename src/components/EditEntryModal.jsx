@@ -41,7 +41,8 @@ export default function EditEntryModal({ entry, onClose }) {
   const [laborTypeId, setLaborTypeId] = useState('')
   const [dateStr, setDateStr]       = useState(formatDateToYYYYMMDD(new Date()))
   const [startTime, setStartTime]   = useState(formatTimeToHHMM(new Date()))
-  const [endTime, setEndTime]       = useState(formatTimeToHHMM(new Date(Date.now() + 3600000))) // Default +1 hour
+  const [endDateStr, setEndDateStr] = useState(formatDateToYYYYMMDD(new Date()))
+  const [endTime, setEndTime]       = useState(formatTimeToHHMM(new Date(Date.now() + 3600000)))
   const [notes, setNotes]           = useState('')
   const [error, setError]           = useState('')
 
@@ -53,7 +54,10 @@ export default function EditEntryModal({ entry, onClose }) {
       setDateStr(formatDateToYYYYMMDD(entry.punchIn))
       setStartTime(formatTimeToHHMM(entry.punchIn))
       if (entry.punchOut) {
+        setEndDateStr(formatDateToYYYYMMDD(entry.punchOut))
         setEndTime(formatTimeToHHMM(entry.punchOut))
+      } else {
+        setEndDateStr(formatDateToYYYYMMDD(entry.punchIn))
       }
       setNotes(entry.notes || '')
     }
@@ -78,10 +82,9 @@ export default function EditEntryModal({ entry, onClose }) {
     let punchOutDate = null
 
     if (!isActiveTimer) {
-      punchOutDate = combineDateAndTime(dateStr, endTime)
-      // Check if end time is before start time (assume it spans to next day if so, or show error)
+      punchOutDate = combineDateAndTime(endDateStr, endTime)
       if (punchOutDate.getTime() <= punchInDate.getTime()) {
-        setError('End time must be after start time.');
+        setError('End must be after start.')
         return
       }
     }
@@ -191,16 +194,27 @@ export default function EditEntryModal({ entry, onClose }) {
             </div>
             {!isActiveTimer && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Time</label>
+                <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Date</label>
                 <input
-                  type="time"
-                  value={endTime}
-                  onChange={e => setEndTime(e.target.value)}
+                  type="date"
+                  value={endDateStr}
+                  onChange={e => setEndDateStr(e.target.value)}
                   className={inputCls}
                 />
               </div>
             )}
           </div>
+          {!isActiveTimer && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Time</label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={e => setEndTime(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-1.5">

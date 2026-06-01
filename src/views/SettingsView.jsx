@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor } from 'lucide-react'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
 
@@ -195,14 +195,29 @@ export default function SettingsView() {
         <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Appearance</p>
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <SettingsRow
-            icon={Sun}
-            title="Light mode"
-            subtitle="Enable soft, high-contrast light theme"
+            icon={Monitor}
+            title="Theme"
+            subtitle="Auto follows your device setting"
             right={
-              <Toggle
-                value={settings.theme === 'light'}
-                onChange={v => updateSetting('theme', v ? 'light' : 'dark')}
-              />
+              <div className="flex items-center gap-0.5 bg-appBg rounded-lg p-0.5 border border-appBorder">
+                {[
+                  { value: 'auto',  label: 'Auto',  Icon: Monitor },
+                  { value: 'light', label: 'Light', Icon: Sun     },
+                  { value: 'dark',  label: 'Dark',  Icon: Moon    },
+                ].map(({ value, label, Icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => updateSetting('theme', value)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors
+                      ${(settings.theme || 'auto') === value
+                        ? 'bg-amber-500 text-[#0F1117]'
+                        : 'text-appTextMuted hover:text-appText'}`}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {label}
+                  </button>
+                ))}
+              </div>
             }
           />
         </div>

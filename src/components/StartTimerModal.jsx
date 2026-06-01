@@ -26,23 +26,24 @@ export default function StartTimerModal({ onClose }) {
     if (!jobId)       { setError('Please select a job'); return }
     if (!laborTypeId) { setError('Please select a labor type'); return }
 
-    if (!settings.allowConcurrentTimers) {
-      const running = await db.entries.filter(e => !e.punchOut).count()
-      if (running > 0) {
-        setError('Concurrent timers are off. Punch out first, or enable them in Settings.')
-        return
-      }
+    try {
+      await db.transaction('rw', db.entries, async () => {
+        if (!settings.allowConcurrentTimers) {
+          const running = await db.entries.filter(e => !e.punchOut).count()
+          if (running > 0) throw new Error('Concurrent timers are off. Punch out first, or enable them in Settings.')
+        }
+        await db.entries.add({
+          jobId:       Number(jobId),
+          laborTypeId: Number(laborTypeId),
+          punchIn:     new Date(),
+          punchOut:    null,
+          notes:       notes.trim() || null,
+        })
+      })
+      onClose()
+    } catch (err) {
+      setError(err.message)
     }
-
-    await db.entries.add({
-      jobId:       Number(jobId),
-      laborTypeId: Number(laborTypeId),
-      punchIn:     new Date(),
-      punchOut:    null,
-      notes:       notes.trim() || null,
-    })
-
-    onClose()
   }
 
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2.5 text-sm

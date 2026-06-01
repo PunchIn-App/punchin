@@ -344,7 +344,7 @@ export default function TimesheetsView() {
               searchQuery={searchQuery}
               filterJobId={filterJobId}
               filterLaborTypeId={filterLaborTypeId}
-              onEdit={handleEdit}
+              onEdit={setEditingEntry}
               onDelete={handleDelete}
             />
           : <WeeklySheet
@@ -354,7 +354,7 @@ export default function TimesheetsView() {
               searchQuery={searchQuery}
               filterJobId={filterJobId}
               filterLaborTypeId={filterLaborTypeId}
-              onEdit={handleEdit}
+              onEdit={setEditingEntry}
               onDelete={handleDelete}
             />
         }

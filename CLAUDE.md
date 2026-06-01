@@ -25,9 +25,10 @@ punchin/
 │   ├── db.js               # Dexie schema, seed data, migrations
 │   ├── components/
 │   │   ├── Layout.jsx          # Fixed header + bottom nav shell
+│   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
 │   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
 │   │   ├── StartTimerModal.jsx # Punch-in form modal
-│   │   └── EditEntryModal.jsx  # Edit active or completed entry
+│   │   └── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
 │   ├── views/
 │   │   ├── TimerView.jsx       # Active timers list
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD
@@ -89,7 +90,7 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 |-----|------|---------|
 | `allowConcurrentTimers` | boolean | `false` |
 | `weekStartsMonday` | boolean | `true` |
-| `theme` | `"dark"` \| `"light"` | `"dark"` |
+| `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
 
 ### Schema Changes
 
@@ -113,9 +114,10 @@ Parent views fetch data and pass it as props to child components. Components tha
 
 Themes are controlled via CSS custom properties defined in `src/index.css`.
 
-- **Dark mode (default):** variables set on `:root`
+- **Dark mode:** variables set on `:root`
 - **Light mode:** variables overridden under the `.light` class on `<html>`
-- Theme class is applied in `App.jsx` based on the `theme` setting from Dexie
+- Theme is resolved in `App.jsx`: `"auto"` tracks `prefers-color-scheme` via a `matchMedia` listener; `"light"` / `"dark"` override explicitly
+- Default theme is `"auto"` — new installs follow the OS without any user action
 - Use `var(--text-primary)`, `var(--bg-secondary)`, etc. in custom CSS; use Tailwind for layout and spacing
 
 ### Color Conventions
@@ -151,10 +153,7 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 
 ## Known Issues & Pitfalls
 
-- **`TimesheetsView.jsx` lines ~347, ~357:** References an undefined `handleEdit` function. The correct function is `setEditingEntry`. Fix before extending timesheet editing logic.
-- **No cross-day time validation:** `EditEntryModal` does not handle entries that span midnight. If adding cross-day support, update time parsing in the modal and consider how `getDayRange` is used for filtering.
-- **No error boundaries:** Dexie errors will crash the UI silently in production. Consider wrapping views in React error boundaries for robustness.
-- **Concurrent timer guard:** The check runs in `StartTimerModal` before creating an entry. If implementing bulk operations, enforce the constraint at the DB level too.
+- **No cross-day filtering:** `isEntryInRange` checks `punchIn` only. An entry that starts before midnight and ends after midnight will appear on the start day but not the end day in timesheets. Acceptable for now but worth revisiting if users report missing time.
 
 ---
 
