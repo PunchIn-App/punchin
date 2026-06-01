@@ -3,8 +3,8 @@ import { X, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 
-// Helper helpers for date/time controls
-function formatDateToYYYYMMDD(date) {
+// Helper helpers for date/time controls — exported for unit testing
+export function formatDateToYYYYMMDD(date) {
   const d = new Date(date)
   if (isNaN(d.getTime())) return ''
   const y = d.getFullYear()
@@ -13,7 +13,7 @@ function formatDateToYYYYMMDD(date) {
   return `${y}-${m}-${r}`
 }
 
-function formatTimeToHHMM(date) {
+export function formatTimeToHHMM(date) {
   const d = new Date(date)
   if (isNaN(d.getTime())) return ''
   const h = String(d.getHours()).padStart(2, '0')
@@ -21,7 +21,7 @@ function formatTimeToHHMM(date) {
   return `${h}:${m}`
 }
 
-function combineDateAndTime(dateStr, timeStr) {
+export function combineDateAndTime(dateStr, timeStr) {
   if (!dateStr || !timeStr) return null
   const [y, m, d] = dateStr.split('-').map(Number)
   const [h, min] = timeStr.split(':').map(Number)

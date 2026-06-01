@@ -31,6 +31,18 @@ function SettingsRow({ icon: Icon, title, subtitle, right }) {
   )
 }
 
+// Exported for unit testing — pure predicate with no DB dependency
+export function isEntryDuplicate(backupEntry, existingEntries, newJobId, newLtId) {
+  return existingEntries.some(e =>
+    e.jobId === newJobId &&
+    e.laborTypeId === newLtId &&
+    new Date(e.punchIn).getTime() === new Date(backupEntry.punchIn).getTime() &&
+    (e.punchOut && backupEntry.punchOut
+      ? new Date(e.punchOut).getTime() === new Date(backupEntry.punchOut).getTime()
+      : e.punchOut === backupEntry.punchOut)
+  )
+}
+
 export default function SettingsView() {
   const { settings, updateSetting } = useSettings()
   const fileInputRef = useRef(null)
@@ -115,13 +127,7 @@ export default function SettingsView() {
 
           if (!newJobId) continue
 
-          // Deduplicate: check if exact entry already exists
-          const isDuplicate = existingEntries.some(e => 
-            e.jobId === newJobId &&
-            e.laborTypeId === newLtId &&
-            new Date(e.punchIn).getTime() === new Date(backupEntry.punchIn).getTime() &&
-            (e.punchOut && backupEntry.punchOut ? new Date(e.punchOut).getTime() === new Date(backupEntry.punchOut).getTime() : e.punchOut === backupEntry.punchOut)
-          )
+          const isDuplicate = isEntryDuplicate(backupEntry, existingEntries, newJobId, newLtId)
 
           if (!isDuplicate) {
             await db.entries.add({

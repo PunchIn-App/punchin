@@ -1,0 +1,315 @@
+import {
+  formatElapsed,
+  formatDurationHM,
+  getEntryDuration,
+  formatTime,
+  formatDate,
+  getDayRange,
+  getWeekRange,
+  getWeekDays,
+  isEntryInRange,
+  sumDurations,
+} from './time'
+
+// ---------------------------------------------------------------------------
+// formatElapsed
+// ---------------------------------------------------------------------------
+describe('formatElapsed', () => {
+  it('formats zero as 00:00:00', () => {
+    expect(formatElapsed(0)).toBe('00:00:00')
+  })
+  it('formats 1 second', () => {
+    expect(formatElapsed(1000)).toBe('00:00:01')
+  })
+  it('formats 1 minute', () => {
+    expect(formatElapsed(60_000)).toBe('00:01:00')
+  })
+  it('formats 1 hour', () => {
+    expect(formatElapsed(3_600_000)).toBe('01:00:00')
+  })
+  it('pads all segments with zeros', () => {
+    expect(formatElapsed(3_661_000)).toBe('01:01:01')
+  })
+  it('handles negative ms (uses absolute value)', () => {
+    expect(formatElapsed(-1000)).toBe('00:00:01')
+  })
+  it('handles 10 hours', () => {
+    expect(formatElapsed(36_000_000)).toBe('10:00:00')
+  })
+  it('sub-second ms rounds down to 0 seconds', () => {
+    expect(formatElapsed(999)).toBe('00:00:00')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatDurationHM
+// ---------------------------------------------------------------------------
+describe('formatDurationHM', () => {
+  it('formats 0ms as 0m', () => {
+    expect(formatDurationHM(0)).toBe('0m')
+  })
+  it('sub-minute ms rounds down to 0m', () => {
+    expect(formatDurationHM(59_999)).toBe('0m')
+  })
+  it('formats exactly 1 minute', () => {
+    expect(formatDurationHM(60_000)).toBe('1m')
+  })
+  it('formats 45 minutes (no hours)', () => {
+    expect(formatDurationHM(2_700_000)).toBe('45m')
+  })
+  it('formats exactly 1 hour with no minutes', () => {
+    expect(formatDurationHM(3_600_000)).toBe('1h')
+  })
+  it('formats 1h 30m', () => {
+    expect(formatDurationHM(5_400_000)).toBe('1h 30m')
+  })
+  it('handles negative ms (uses absolute value)', () => {
+    expect(formatDurationHM(-5_400_000)).toBe('1h 30m')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getEntryDuration
+// ---------------------------------------------------------------------------
+describe('getEntryDuration', () => {
+  it('returns elapsed ms for a completed entry', () => {
+    const punchIn  = new Date('2024-01-15T09:00:00')
+    const punchOut = new Date('2024-01-15T10:00:00')
+    expect(getEntryDuration({ punchIn, punchOut })).toBe(3_600_000)
+  })
+
+  it('uses current time when punchOut is null (active timer)', () => {
+    const now = Date.now()
+    const punchIn = new Date(now - 5_000)
+    const duration = getEntryDuration({ punchIn, punchOut: null })
+    expect(duration).toBeGreaterThanOrEqual(4_900)
+    expect(duration).toBeLessThan(10_000)
+  })
+
+  it('handles string-serialised dates (IndexedDB round-trip)', () => {
+    const punchIn  = '2024-01-15T09:00:00.000Z'
+    const punchOut = '2024-01-15T10:00:00.000Z'
+    expect(getEntryDuration({ punchIn, punchOut })).toBe(3_600_000)
+  })
+
+  it('handles cross-day entries', () => {
+    const punchIn  = new Date('2024-01-15T23:00:00')
+    const punchOut = new Date('2024-01-16T01:00:00')
+    expect(getEntryDuration({ punchIn, punchOut })).toBe(7_200_000)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatTime
+// ---------------------------------------------------------------------------
+describe('formatTime', () => {
+  it('formats morning time in 12-hour format with AM', () => {
+    expect(formatTime(new Date(2024, 0, 15, 9, 30))).toBe('9:30 AM')
+  })
+  it('formats afternoon time with PM', () => {
+    expect(formatTime(new Date(2024, 0, 15, 14, 5))).toBe('2:05 PM')
+  })
+  it('formats midnight as 12:00 AM', () => {
+    expect(formatTime(new Date(2024, 0, 15, 0, 0))).toBe('12:00 AM')
+  })
+  it('formats noon as 12:00 PM', () => {
+    expect(formatTime(new Date(2024, 0, 15, 12, 0))).toBe('12:00 PM')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatDate
+// ---------------------------------------------------------------------------
+describe('formatDate', () => {
+  it('formats a Monday date', () => {
+    expect(formatDate(new Date(2024, 0, 15))).toBe('Mon, Jan 15')
+  })
+  it('formats a Friday date', () => {
+    expect(formatDate(new Date(2024, 0, 19))).toBe('Fri, Jan 19')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getDayRange
+// ---------------------------------------------------------------------------
+describe('getDayRange', () => {
+  it('start is midnight (00:00:00.000)', () => {
+    const { start } = getDayRange(new Date(2024, 0, 15, 14, 30))
+    expect(start.getHours()).toBe(0)
+    expect(start.getMinutes()).toBe(0)
+    expect(start.getSeconds()).toBe(0)
+    expect(start.getMilliseconds()).toBe(0)
+  })
+
+  it('end is 23:59:59.999', () => {
+    const { end } = getDayRange(new Date(2024, 0, 15, 14, 30))
+    expect(end.getHours()).toBe(23)
+    expect(end.getMinutes()).toBe(59)
+    expect(end.getSeconds()).toBe(59)
+    expect(end.getMilliseconds()).toBe(999)
+  })
+
+  it('start and end are on the same calendar day', () => {
+    const date = new Date(2024, 5, 1, 8, 0)
+    const { start, end } = getDayRange(date)
+    expect(start.getDate()).toBe(end.getDate())
+    expect(start.getMonth()).toBe(end.getMonth())
+    expect(start.getFullYear()).toBe(end.getFullYear())
+  })
+
+  it('start is strictly before end', () => {
+    const { start, end } = getDayRange(new Date())
+    expect(start.getTime()).toBeLessThan(end.getTime())
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getWeekRange
+// ---------------------------------------------------------------------------
+describe('getWeekRange', () => {
+  // Wednesday 2024-01-17
+  const wednesday = new Date(2024, 0, 17)
+
+  it('week starts Monday when weekStartsMonday=true', () => {
+    const { start } = getWeekRange(wednesday, true)
+    expect(start.getDay()).toBe(1) // Monday
+  })
+
+  it('week ends Sunday when weekStartsMonday=true', () => {
+    const { end } = getWeekRange(wednesday, true)
+    expect(end.getDay()).toBe(0) // Sunday
+  })
+
+  it('week starts Sunday when weekStartsMonday=false', () => {
+    const { start } = getWeekRange(wednesday, false)
+    expect(start.getDay()).toBe(0) // Sunday
+  })
+
+  it('week ends Saturday when weekStartsMonday=false', () => {
+    const { end } = getWeekRange(wednesday, false)
+    expect(end.getDay()).toBe(6) // Saturday
+  })
+
+  it('range covers exactly 7 calendar days', () => {
+    // start = Monday 00:00:00.000, end = Sunday 23:59:59.999 → ~7 day window
+    const { start, end } = getWeekRange(wednesday, true)
+    const diffMs = end.getTime() - start.getTime()
+    const diffDays = Math.round(diffMs / 86_400_000)
+    expect(diffDays).toBe(7)
+  })
+
+  it('start is strictly before end', () => {
+    const { start, end } = getWeekRange(new Date(), true)
+    expect(start.getTime()).toBeLessThan(end.getTime())
+  })
+
+  it('input date falls within returned range', () => {
+    const { start, end } = getWeekRange(wednesday, true)
+    expect(wednesday.getTime()).toBeGreaterThanOrEqual(start.getTime())
+    expect(wednesday.getTime()).toBeLessThanOrEqual(end.getTime())
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getWeekDays
+// ---------------------------------------------------------------------------
+describe('getWeekDays', () => {
+  it('always returns exactly 7 days', () => {
+    expect(getWeekDays(new Date(2024, 0, 17))).toHaveLength(7)
+  })
+
+  it('first day is Monday when weekStartsMonday=true', () => {
+    const days = getWeekDays(new Date(2024, 0, 17), true)
+    expect(days[0].getDay()).toBe(1)
+  })
+
+  it('first day is Sunday when weekStartsMonday=false', () => {
+    const days = getWeekDays(new Date(2024, 0, 17), false)
+    expect(days[0].getDay()).toBe(0)
+  })
+
+  it('days are in ascending chronological order', () => {
+    const days = getWeekDays(new Date(2024, 0, 17))
+    for (let i = 1; i < days.length; i++) {
+      expect(days[i].getTime()).toBeGreaterThan(days[i - 1].getTime())
+    }
+  })
+
+  it('consecutive days differ by exactly 1 day', () => {
+    const days = getWeekDays(new Date(2024, 0, 17))
+    for (let i = 1; i < days.length; i++) {
+      const diff = days[i].getTime() - days[i - 1].getTime()
+      expect(diff).toBe(86_400_000)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isEntryInRange
+// ---------------------------------------------------------------------------
+describe('isEntryInRange', () => {
+  const start = new Date(2024, 0, 15, 0, 0, 0, 0)
+  const end   = new Date(2024, 0, 15, 23, 59, 59, 999)
+
+  it('includes entry whose punchIn falls within range', () => {
+    expect(isEntryInRange({ punchIn: new Date(2024, 0, 15, 10, 0) }, start, end)).toBe(true)
+  })
+
+  it('excludes entry whose punchIn is before range', () => {
+    expect(isEntryInRange({ punchIn: new Date(2024, 0, 14, 23, 59, 59) }, start, end)).toBe(false)
+  })
+
+  it('excludes entry whose punchIn is after range', () => {
+    expect(isEntryInRange({ punchIn: new Date(2024, 0, 16, 0, 0, 1) }, start, end)).toBe(false)
+  })
+
+  it('includes entry at the exact start boundary', () => {
+    expect(isEntryInRange({ punchIn: start }, start, end)).toBe(true)
+  })
+
+  it('includes entry at the exact end boundary', () => {
+    expect(isEntryInRange({ punchIn: end }, start, end)).toBe(true)
+  })
+
+  it('punchIn-only check: cross-day entry appears on start day, not end day', () => {
+    // Starts Jan 15 23:00 (in range), ends Jan 16 01:00 (out of range)
+    // Known limitation: only punchIn is checked
+    const crossDay = { punchIn: new Date(2024, 0, 15, 23, 0), punchOut: new Date(2024, 0, 16, 1, 0) }
+    expect(isEntryInRange(crossDay, start, end)).toBe(true)
+
+    const nextDayRange = { start: new Date(2024, 0, 16, 0, 0), end: new Date(2024, 0, 16, 23, 59, 59, 999) }
+    expect(isEntryInRange(crossDay, nextDayRange.start, nextDayRange.end)).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// sumDurations
+// ---------------------------------------------------------------------------
+describe('sumDurations', () => {
+  it('returns 0 for an empty array', () => {
+    expect(sumDurations([])).toBe(0)
+  })
+
+  it('returns the duration of a single completed entry', () => {
+    const entries = [
+      { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 9, 1) },
+    ]
+    expect(sumDurations(entries)).toBe(60_000)
+  })
+
+  it('sums durations across multiple entries', () => {
+    const entries = [
+      { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 10, 0) }, // 1h
+      { punchIn: new Date(2024, 0, 15, 11, 0), punchOut: new Date(2024, 0, 15, 11, 30) }, // 30m
+    ]
+    expect(sumDurations(entries)).toBe(5_400_000)
+  })
+
+  it('includes active timers (punchOut = null) using current time', () => {
+    const now = Date.now()
+    const entries = [
+      { punchIn: new Date(now - 1_000), punchOut: null },
+    ]
+    expect(sumDurations(entries)).toBeGreaterThan(0)
+  })
+})
