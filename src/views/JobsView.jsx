@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { db } from '../db'
 
 const PRESET_COLORS = [
@@ -106,6 +106,10 @@ export default function JobsView() {
   const [editingJob, setEditingJob]  = useState(null)
   const [addingLT, setAddingLT]    = useState(false)
   const [editingLT, setEditingLT]   = useState(null)
+  const [showArchivedJobs, setShowArchivedJobs] = useState(false)
+  const [showArchivedLT, setShowArchivedLT]     = useState(false)
+  const [archiveJobSearch, setArchiveJobSearch] = useState('')
+  const [archiveLTSearch, setArchiveLTSearch]   = useState('')
 
   const jobs       = useLiveQuery(async () => {
     const all = await db.jobs.toArray()
@@ -119,12 +123,6 @@ export default function JobsView() {
 
   const toggleArchive = async (job) => {
     await db.jobs.update(job.id, { isActive: job.isActive === false ? true : false })
-  }
-
-  const deleteJob = async (job) => {
-    if (window.confirm(`Are you sure you want to delete the job "${job.name}"?\n\nThis will hide it from active list, but all historical time entries logged under it will be safely preserved.`)) {
-      await db.jobs.update(job.id, { isDeleted: true })
-    }
   }
 
   return (
@@ -157,21 +155,20 @@ export default function JobsView() {
               <JobForm laborTypes={laborTypes} onDone={() => setAddingJob(false)} />
             )}
 
-            {jobs?.length === 0 && !addingJob && (
+            {jobs?.filter(j => j.isActive !== false).length === 0 && !addingJob && (
               <div className="flex flex-col items-center py-14 text-appTextDisabled">
                 <Briefcase className="w-10 h-10 mb-3 opacity-40" />
                 <p className="text-sm">No jobs yet. Add one above.</p>
               </div>
             )}
 
-            {jobs?.map(job => {
+            {jobs?.filter(j => j.isActive !== false).map(job => {
               const lt = laborTypes?.find(l => l.id === job.laborTypeId)
               if (editingJob?.id === job.id)
                 return <JobForm key={job.id} job={job} laborTypes={laborTypes} onDone={() => setEditingJob(null)} />
               return (
                 <div key={job.id}
-                  className={`rounded-xl border bg-appCard p-4 transition-all duration-200
-                    ${job.isActive === false ? 'border-appBorderLight opacity-50' : 'border-appBorder'}`}>
+                  className="rounded-xl border border-appBorder bg-appCard p-4 transition-all duration-200">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-display font-semibold text-appText truncate">{job.name}</p>
@@ -193,21 +190,77 @@ export default function JobsView() {
                       </button>
                       <button onClick={() => toggleArchive(job)}
                         className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                        title={job.isActive === false ? 'Restore Job' : 'Archive Job'}>
-                        {job.isActive === false
-                          ? <ArchiveRestore className="w-4 h-4" />
-                          : <Archive className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => deleteJob(job)}
-                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-appTextDisabled hover:text-red-400 transition-colors"
-                        title="Delete Job">
-                        <Trash2 className="w-4 h-4" />
+                        title="Archive Job">
+                        <Archive className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                 </div>
               )
             })}
+
+            {(() => {
+              const archived = jobs?.filter(j => j.isActive === false) ?? []
+              if (archived.length === 0) return null
+              return (
+                <>
+                  <button
+                    onClick={() => setShowArchivedJobs(v => !v)}
+                    className="w-full flex items-center gap-2 py-2 px-1 text-xs text-appTextDisabled hover:text-appTextMuted transition-colors">
+                    {showArchivedJobs
+                      ? <ChevronDown className="w-3.5 h-3.5" />
+                      : <ChevronRight className="w-3.5 h-3.5" />}
+                    Archived ({archived.length})
+                  </button>
+                  {showArchivedJobs && (
+                    <div className="relative mb-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-appTextDisabled pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search archived…"
+                        value={archiveJobSearch}
+                        onChange={e => setArchiveJobSearch(e.target.value)}
+                        className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-sm
+                                   placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors"
+                      />
+                    </div>
+                  )}
+                  {showArchivedJobs && archived
+                    .filter(j => !archiveJobSearch || j.name.toLowerCase().includes(archiveJobSearch.toLowerCase()))
+                    .map(job => {
+                    const lt = laborTypes?.find(l => l.id === job.laborTypeId)
+                    if (editingJob?.id === job.id)
+                      return <JobForm key={job.id} job={job} laborTypes={laborTypes} onDone={() => setEditingJob(null)} />
+                    return (
+                      <div key={job.id}
+                        className="rounded-xl border border-appBorderLight bg-appCard p-4 opacity-60 transition-all duration-200">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-display font-semibold text-appText truncate">{job.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {job.clientName && <span className="text-xs text-appTextMuted">{job.clientName}</span>}
+                              {lt && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded"
+                                  style={{ backgroundColor: `${lt.color}25`, color: lt.color }}>
+                                  {lt.name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button onClick={() => toggleArchive(job)}
+                              className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
+                              title="Restore Job">
+                              <ArchiveRestore className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )
+            })()}
           </>
         )}
 
@@ -227,43 +280,90 @@ export default function JobsView() {
               <LaborTypeForm onDone={() => setAddingLT(false)} />
             )}
 
-            {laborTypes?.length === 0 && !addingLT && (
+            {laborTypes?.filter(lt => !lt.isArchived).length === 0 && !addingLT && (
               <div className="flex flex-col items-center py-14 text-appTextDisabled">
                 <Tag className="w-10 h-10 mb-3 opacity-40" />
                 <p className="text-sm">No labor types yet.</p>
               </div>
             )}
 
-            {laborTypes?.map(lt => {
+            {laborTypes?.filter(lt => !lt.isArchived).map(lt => {
               if (editingLT?.id === lt.id)
                 return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
               return (
                 <div key={lt.id}
-                  className={`flex items-center justify-between rounded-xl border bg-appCard px-4 py-3.5 transition-all duration-200
-                    ${lt.isArchived ? 'border-appBorderLight opacity-50' : 'border-appBorder'}`}>
+                  className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-4 py-3.5 transition-all duration-200">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
                     <span className="font-medium text-appText text-sm">{lt.name}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    {!lt.isArchived && (
-                      <button onClick={() => setEditingLT(lt)}
-                        className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                        title="Edit Labor Type">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button onClick={() => setEditingLT(lt)}
+                      className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
+                      title="Edit Labor Type">
+                      <Pencil className="w-4 h-4" />
+                    </button>
                     <button onClick={() => toggleArchiveLaborType(lt)}
                       className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                      title={lt.isArchived ? 'Restore Labor Type' : 'Archive Labor Type'}>
-                      {lt.isArchived
-                        ? <ArchiveRestore className="w-4 h-4" />
-                        : <Archive className="w-4 h-4" />}
+                      title="Archive Labor Type">
+                      <Archive className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               )
             })}
+
+            {(() => {
+              const archived = laborTypes?.filter(lt => lt.isArchived) ?? []
+              if (archived.length === 0) return null
+              return (
+                <>
+                  <button
+                    onClick={() => setShowArchivedLT(v => !v)}
+                    className="w-full flex items-center gap-2 py-2 px-1 text-xs text-appTextDisabled hover:text-appTextMuted transition-colors">
+                    {showArchivedLT
+                      ? <ChevronDown className="w-3.5 h-3.5" />
+                      : <ChevronRight className="w-3.5 h-3.5" />}
+                    Archived ({archived.length})
+                  </button>
+                  {showArchivedLT && (
+                    <div className="relative mb-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-appTextDisabled pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search archived…"
+                        value={archiveLTSearch}
+                        onChange={e => setArchiveLTSearch(e.target.value)}
+                        className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-sm
+                                   placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors"
+                      />
+                    </div>
+                  )}
+                  {showArchivedLT && archived
+                    .filter(lt => !archiveLTSearch || lt.name.toLowerCase().includes(archiveLTSearch.toLowerCase()))
+                    .map(lt => {
+                    if (editingLT?.id === lt.id)
+                      return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
+                    return (
+                      <div key={lt.id}
+                        className="flex items-center justify-between rounded-xl border border-appBorderLight bg-appCard px-4 py-3.5 opacity-60 transition-all duration-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+                          <span className="font-medium text-appText text-sm">{lt.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => toggleArchiveLaborType(lt)}
+                            className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
+                            title="Restore Labor Type">
+                            <ArchiveRestore className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )
+            })()}
           </>
         )}
       </div>

@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: dark;
   --bg-primary: #0F1117;
   --bg-secondary: #161923;
   --bg-tertiary: #1E2232;
@@ -18,6 +19,7 @@
 }
 
 .light {
+  color-scheme: light;
   --bg-primary: #F3F4F6;
   --bg-secondary: #FFFFFF;
   --bg-tertiary: #E5E7EB;

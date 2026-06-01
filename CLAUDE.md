@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 ---
 
@@ -18,7 +18,7 @@ punchin/
 ├── index.html              # App shell (viewport, fonts, theme color)
 ├── vite.config.js          # Vite + PWA plugin config
 ├── wrangler.jsonc          # Cloudflare Workers deployment
-├── tailwind.config.js      # Custom fonts (Syne, DM Sans, JetBrains Mono)
+├── tailwind.config.js      # Custom fonts (Syne, DM Sans, JetBrains Mono) + CSS-variable-backed color tokens
 ├── docs/
 │   └── screenshots/
 │       ├── phone/          # Pixel 10 Pro XL default (1080×2404 @486 PPI, 412×916 CSS px @2.625×) — 7 views
@@ -96,11 +96,16 @@ Both `jobs` and `laborTypes` use soft-deletion — records are never hard-delete
 
 | Table | Field | Meaning |
 |-------|-------|---------|
-| `jobs` | `isActive: false` | Archived — dimmed in list, restorable; hidden from punch-in dropdowns |
-| `jobs` | `isDeleted: true` | Hidden entirely from the jobs list (but entries still reference the job) |
-| `laborTypes` | `isArchived: true` | Archived — dimmed in list, restorable; hidden from all labor-type dropdowns |
+| `jobs` | `isActive: false` | Archived — moved to collapsed "Archived" folder below active jobs; restorable; hidden from punch-in dropdowns |
+| `jobs` | `isDeleted: true` | Schema field exists but is **not exposed in the UI** — reserved for future use or data migration |
+| `laborTypes` | `isArchived: true` | Archived — moved to collapsed "Archived" folder below active types; restorable; hidden from all labor-type dropdowns |
 
 Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archived/deleted records. `EditEntryModal` still includes a record's own archived labor type so existing entries can be saved without data loss.
+
+#### Archive UX (v0.3.0+)
+- Active jobs show in the main list with **Edit** and **Archive** buttons only — there is no Delete button in the UI.
+- Archived items appear under a collapsible **"Archived (N)"** row at the bottom of each tab. The folder is collapsed by default and has a live search input when expanded.
+- Archived items show only a **Restore** button.
 
 ### Settings Keys
 
@@ -109,6 +114,10 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `allowConcurrentTimers` | boolean | `false` |
 | `weekStartsMonday` | boolean | `true` |
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
+
+### Fresh Install / Zero State
+
+As of v0.3.0 the `populate` event in `db.js` seeds **only settings** — no default jobs or labor types are created. New users see empty lists and are prompted to add their own. The factory reset in Settings restores this same zero state.
 
 ### Schema Changes
 
@@ -141,8 +150,26 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 ### Color Conventions
 
 - **Accent:** amber (`amber-400`, `amber-500`) — active nav, buttons, highlights
-- **Destructive:** red (`red-500`, `red-600`) — punch out, delete actions
+- **Destructive:** red (`red-500`, `red-600`) — punch out actions
 - **Labor type colors:** 10 preset hex values defined in `JobsView.jsx`; stored as hex strings in the `laborTypes` table
+
+### Tailwind Custom Color Tokens
+
+`tailwind.config.js` maps semantic token names to CSS custom properties so both Tailwind utilities and CSS variables stay in sync:
+
+| Tailwind class | CSS variable | Dark | Light |
+|---|---|---|---|
+| `bg-appBg` | `--bg-primary` | `#0F1117` | `#F3F4F6` |
+| `bg-appCard` | `--bg-secondary` | `#161923` | `#FFFFFF` |
+| `bg-appInput` | `--bg-tertiary` | `#1E2232` | `#E5E7EB` |
+| `bg-appNav` | `--bg-nav` | `#0C0E14` | `#FFFFFF` |
+| `border-appBorder` | `--border-color` | `#2A2F45` | `#E5E7EB` |
+| `border-appBorderLight` | `--border-light` | `#1E2232` | `#E5E7EB` |
+| `text-appText` | `--text-primary` | `#FFFFFF` | `#111827` |
+| `text-appTextMuted` | `--text-muted` | `#6B7280` | `#6B7280` |
+| `text-appTextDisabled` | `--text-disabled` | `#374151` | `#D1D5DB` |
+
+Always use these token classes rather than raw hex values or inline `var()` calls in JSX. `color-scheme: dark/light` is set on `:root`/`.light` in `index.css` so browser-native controls (date/time pickers, caret, scrollbars) render in the correct scheme.
 
 ---
 
@@ -205,6 +232,7 @@ Phone shots use the Pixel's **default** 1080×2404 resolution. At 486 PPI physic
 
 ```bash
 node /tmp/screenshots-full.mjs   # script seeds demo data via raw IndexedDB API
+# Note: the script hardcodes ROOT='/home/user/punchin' — update if the project path changes
 ```
 
 The script:
@@ -212,17 +240,14 @@ The script:
 - Injects demo data directly into IndexedDB after Dexie's `populate` seed runs (so labor type IDs are known)
 - Injects 2 active timers (`punchOut: null`) so the Timer view is populated
 - Captures 7 views per context: `timer`, `jobs`, `labor-types`, `timesheets-daily`, `timesheets-weekly`, `analytics`, `settings`
-
-### Nav label gotcha
-
-The bottom-nav label for the Timesheets tab is `"Sheets"` (not `"Timesheets"`). When driving the app with Playwright or in any automated test, use `.filter({ hasText: 'Sheets' })` to click that tab.
+- When selecting the Timesheets tab via Playwright use `.filter({ hasText: 'Timesheets' })` — the nav label matches the view name exactly as of v0.3.0
 
 ---
 
 ## Adding Features — Checklist
 
 1. **New data type?** Add table/indexes in `db.js`, bump version, add seed data if needed
-2. **New setting?** Add key to `db.js` initializer and document it in the settings table above
+2. **New setting?** Add key to `db.js` initializer, document it in the settings table above, and add it to the `factoryReset` function in `SettingsView.jsx` so it resets correctly
 3. **New view?** Add to `App.jsx` tab switch and `Layout.jsx` nav bar (keep it to 5 nav items max for mobile)
 4. **Editing time?** Always go through `utils/time.js` helpers; never use raw `Date` arithmetic inline
 5. **Charts?** Follow `AnalyticsView.jsx` — use Recharts, reference CSS variables for colors (`var(--text-secondary)` etc.)

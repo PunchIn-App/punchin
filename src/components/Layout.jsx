@@ -3,7 +3,7 @@ import { Clock, Briefcase, Calendar, BarChart2, Settings } from 'lucide-react'
 const NAV = [
   { id: 'timer',      label: 'Timer',     Icon: Clock      },
   { id: 'jobs',       label: 'Jobs',      Icon: Briefcase  },
-  { id: 'timesheets', label: 'Sheets',    Icon: Calendar   },
+  { id: 'timesheets', label: 'Timesheets', Icon: Calendar   },
   { id: 'analytics',  label: 'Analytics', Icon: BarChart2  },
   { id: 'settings',   label: 'Settings',  Icon: Settings   },
 ]

@@ -82,7 +82,7 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
 Start one or more timers across different jobs simultaneously. Each running timer shows the job, labor type, start time, optional notes, and a live elapsed-time counter updated every second. Punch out with a single tap.
 
 ### Job & Labor Type Management
-Organize your work into **jobs** (client projects) and **labor types** (billable categories like Design, Development, Consulting). Both support color-coded badges for fast visual identification. Archived jobs and types are preserved for historical accuracy — nothing is permanently deleted while entries reference it.
+Organize your work into **jobs** (client projects) and **labor types** (billable categories like Design, Development, Consulting). Both support color-coded badges for fast visual identification. Archiving a job or labor type hides it from active dropdowns and groups it under a collapsible **Archived** section at the bottom of the list — searchable and restorable any time. Historical entries are never broken; archived records are always preserved.
 
 ### Timesheets
 Review your logged time by **day** or **week**. The weekly view shows a per-job breakdown with proportional bars so you can see at a glance where your time went. Full-text search filters entries by job name, client, labor type, or notes. Navigate between periods with arrows, log past entries manually, and edit or delete any record.
@@ -101,6 +101,10 @@ Charts powered by [Recharts](https://recharts.org) give you a visual overview of
 - **Export** a full JSON backup of all your data
 - **Import** a backup (smart deduplication prevents duplicates)
 - **Clear entries** to reset logged time while keeping your jobs and labor types
+- **Check for updates** to force the PWA to apply any pending service-worker update
+- Tap the **PunchIn** row in About to open the GitHub repository
+- View the **Changelog** directly from the About section
+- **Factory Reset** wipes all data and restores the app to a clean slate (two confirmation steps required)
 
 ---
 
@@ -158,7 +162,7 @@ punchin/
 ├── index.html              # App shell, fonts, theme-color meta
 ├── vite.config.js          # Vite + PWA plugin config
 ├── wrangler.jsonc          # Cloudflare Workers deployment
-├── tailwind.config.js      # Custom font families
+├── tailwind.config.js      # Custom font families + CSS-variable-backed color tokens
 └── src/
     ├── App.jsx             # Root: tab state, theme application
     ├── db.js               # Dexie schema, seed data, migrations

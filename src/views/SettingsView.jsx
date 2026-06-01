@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle } from 'lucide-react'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
 
@@ -7,8 +7,8 @@ function Toggle({ value, onChange }) {
   return (
     <button
       onClick={() => onChange(!value)}
-      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0
-        ${value ? 'bg-amber-500' : 'bg-appInput'}`}
+      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 border
+        ${value ? 'bg-amber-500 border-amber-500' : 'bg-appInput border-appBorder'}`}
     >
       <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform
         ${value ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -46,6 +46,7 @@ export function isEntryDuplicate(backupEntry, existingEntries, newJobId, newLtId
 export default function SettingsView() {
   const { settings, updateSetting } = useSettings()
   const fileInputRef = useRef(null)
+  const [resetStage, setResetStage] = useState(null) // null | 'warn' | 'final'
 
   const exportData = async () => {
     const [jobs, entries, laborTypes] = await Promise.all([
@@ -151,10 +152,32 @@ export default function SettingsView() {
     }
   }
 
+  const checkForUpdates = async () => {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration()
+      if (reg) await reg.update()
+    }
+    window.location.reload()
+  }
+
   const clearEntries = async () => {
     if (window.confirm('Permanently delete ALL time entries? Jobs and labor types are kept.')) {
       await db.entries.clear()
     }
+  }
+
+  const factoryReset = async () => {
+    await db.transaction('rw', [db.entries, db.jobs, db.laborTypes, db.settings], async () => {
+      await db.entries.clear()
+      await db.jobs.clear()
+      await db.laborTypes.clear()
+      await db.settings.clear()
+      await db.settings.bulkPut([
+        { key: 'allowConcurrentTimers', value: false },
+        { key: 'weekStartsMonday',      value: true  },
+      ])
+    })
+    setResetStage(null)
   }
 
   return (
@@ -267,16 +290,113 @@ export default function SettingsView() {
         </div>
       </section>
 
+      {/* Danger Zone */}
+      <section>
+        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Danger Zone</p>
+        <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
+          {resetStage === null && (
+            <button
+              onClick={() => setResetStage('warn')}
+              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group">
+              <AlertTriangle className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-appText font-medium group-hover:text-red-400">Factory Reset</p>
+                <p className="text-xs text-appTextMuted mt-0.5">Erase all data and restore app to default state</p>
+              </div>
+            </button>
+          )}
+
+          {resetStage === 'warn' && (
+            <div className="px-4 py-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-appText font-medium">Reset to factory defaults?</p>
+                  <p className="text-xs text-appTextMuted mt-1">This will permanently delete all time entries, jobs, and labor types. Settings will be reset. This action cannot be undone.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setResetStage('final')}
+                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors">
+                  Continue
+                </button>
+                <button
+                  onClick={() => setResetStage(null)}
+                  className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {resetStage === 'final' && (
+            <div className="px-4 py-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-400">There is no going back.</p>
+                  <p className="text-xs text-appTextMuted mt-1">Every entry, job, and labor type will be permanently erased. Are you absolutely sure?</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={factoryReset}
+                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
+                  Yes, wipe everything
+                </button>
+                <button
+                  onClick={() => setResetStage(null)}
+                  className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* About */}
       <section>
         <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">About</p>
-        <div className="rounded-xl border border-appBorder bg-appCard">
-          <SettingsRow
-            icon={Info}
-            title="PunchIn"
-            subtitle={`v${__APP_VERSION__} · Phase 1 · Data stored on this device`}
-            right={null}
-          />
+        <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
+          <a
+            href="https://github.com/PunchIn-App/punchin"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between px-4 py-4 gap-3 hover:bg-appInput transition-colors rounded-t-xl">
+            <div className="flex items-center gap-3 min-w-0">
+              <Info className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm text-appText font-medium">PunchIn</p>
+                <p className="text-xs text-appTextMuted mt-0.5">{`v${__APP_VERSION__} · Data stored on this device`}</p>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-appTextDisabled flex-shrink-0" />
+          </a>
+          <a
+            href="https://github.com/PunchIn-App/punchin/blob/main/CHANGELOG.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between px-4 py-4 gap-3 hover:bg-appInput transition-colors">
+            <div className="flex items-center gap-3 min-w-0">
+              <ScrollText className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm text-appText font-medium">Changelog</p>
+                <p className="text-xs text-appTextMuted mt-0.5">See what's new in each release</p>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-appTextDisabled flex-shrink-0" />
+          </a>
+          <button
+            onClick={checkForUpdates}
+            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-b-xl">
+            <RefreshCw className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+            <div>
+              <p className="text-sm text-appText font-medium">Check for updates</p>
+              <p className="text-xs text-appTextMuted mt-0.5">Reload to apply any pending app update</p>
+            </div>
+          </button>
         </div>
       </section>
     </div>

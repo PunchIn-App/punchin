@@ -153,7 +153,7 @@ export default function EditEntryModal({ entry, onClose }) {
         </div>
 
         {/* Fields */}
-        <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[70vh]">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[85vh]">
           {/* Job Selection */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Job</label>
@@ -172,9 +172,9 @@ export default function EditEntryModal({ entry, onClose }) {
             </select>
           </div>
 
-          {/* Date Picker */}
+          {/* Start Date */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Date</label>
+            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Date</label>
             <input
               type="date"
               value={dateStr}
@@ -183,29 +183,31 @@ export default function EditEntryModal({ entry, onClose }) {
             />
           </div>
 
-          {/* Times */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Start Time */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Time</label>
+            <input
+              type="time"
+              value={startTime}
+              onChange={e => setStartTime(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+
+          {/* End Date */}
+          {!isActiveTimer && (
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Time</label>
+              <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Date</label>
               <input
-                type="time"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
+                type="date"
+                value={endDateStr}
+                onChange={e => setEndDateStr(e.target.value)}
                 className={inputCls}
               />
             </div>
-            {!isActiveTimer && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Date</label>
-                <input
-                  type="date"
-                  value={endDateStr}
-                  onChange={e => setEndDateStr(e.target.value)}
-                  className={inputCls}
-                />
-              </div>
-            )}
-          </div>
+          )}
+
+          {/* End Time */}
           {!isActiveTimer && (
             <div className="space-y-1.5">
               <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Time</label>
