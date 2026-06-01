@@ -12,7 +12,7 @@ export default function StartTimerModal({ onClose }) {
 
   const { settings } = useSettings()
   const jobs       = useLiveQuery(() => db.jobs.filter(j => j.isActive !== false && j.isDeleted !== true).toArray(), [])
-  const laborTypes = useLiveQuery(() => db.laborTypes.orderBy('name').toArray(), [])
+  const laborTypes = useLiveQuery(() => db.laborTypes.orderBy('name').filter(lt => !lt.isArchived).toArray(), [])
 
   // Pre-fill labor type from job default
   useEffect(() => {

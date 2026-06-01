@@ -40,7 +40,9 @@ function JobForm({ job, laborTypes, onDone }) {
         placeholder="Client name (optional)" className={inputCls} />
       <select value={laborTypeId} onChange={e => setLaborTypeId(e.target.value)} className={inputCls}>
         <option value="">Default labor type (optional)...</option>
-        {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
+        {laborTypes?.filter(lt => !lt.isArchived || String(lt.id) === laborTypeId).map(lt => (
+          <option key={lt.id} value={lt.id}>{lt.name}{lt.isArchived ? ' (archived)' : ''}</option>
+        ))}
       </select>
       <div className="flex gap-2 pt-1">
         <button onClick={save}
@@ -111,6 +113,10 @@ export default function JobsView() {
   }, [])
   const laborTypes = useLiveQuery(() => db.laborTypes.orderBy('name').toArray(), [])
 
+  const toggleArchiveLaborType = async (lt) => {
+    await db.laborTypes.update(lt.id, { isArchived: !lt.isArchived })
+  }
+
   const toggleArchive = async (job) => {
     await db.jobs.update(job.id, { isActive: job.isActive === false ? true : false })
   }
@@ -118,14 +124,6 @@ export default function JobsView() {
   const deleteJob = async (job) => {
     if (window.confirm(`Are you sure you want to delete the job "${job.name}"?\n\nThis will hide it from active list, but all historical time entries logged under it will be safely preserved.`)) {
       await db.jobs.update(job.id, { isDeleted: true })
-    }
-  }
-
-  const deleteLaborType = async (ltId) => {
-    if (window.confirm('Are you sure you want to permanently delete this labor type? Jobs and time entries using it will keep their records but will no longer have an associated labor type.')) {
-      await db.laborTypes.delete(ltId)
-      await db.jobs.where('laborTypeId').equals(ltId).modify({ laborTypeId: null })
-      await db.entries.where('laborTypeId').equals(ltId).modify({ laborTypeId: null })
     }
   }
 
@@ -240,21 +238,27 @@ export default function JobsView() {
               if (editingLT?.id === lt.id)
                 return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
               return (
-                <div key={lt.id} className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-4 py-3.5">
+                <div key={lt.id}
+                  className={`flex items-center justify-between rounded-xl border bg-appCard px-4 py-3.5 transition-all duration-200
+                    ${lt.isArchived ? 'border-appBorderLight opacity-50' : 'border-appBorder'}`}>
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
                     <span className="font-medium text-appText text-sm">{lt.name}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setEditingLT(lt)}
+                    {!lt.isArchived && (
+                      <button onClick={() => setEditingLT(lt)}
+                        className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
+                        title="Edit Labor Type">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button onClick={() => toggleArchiveLaborType(lt)}
                       className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                      title="Edit Labor Type">
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => deleteLaborType(lt.id)}
-                      className="p-1.5 rounded-lg hover:bg-red-500/10 text-appTextDisabled hover:text-red-400 transition-colors"
-                      title="Delete Labor Type">
-                      <Trash2 className="w-4 h-4" />
+                      title={lt.isArchived ? 'Restore Labor Type' : 'Archive Labor Type'}>
+                      {lt.isArchived
+                        ? <ArchiveRestore className="w-4 h-4" />
+                        : <Archive className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>

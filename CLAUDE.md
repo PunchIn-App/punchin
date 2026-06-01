@@ -74,15 +74,27 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 | Table | Indexes | Purpose |
 |-------|---------|---------|
 | `settings` | `key` | KV store for app preferences |
-| `laborTypes` | `id, name` | Billable categories with color |
+| `laborTypes` | `id, name` | Billable categories with color; soft-archived via `isArchived` |
 | `jobs` | `id, name, laborTypeId, isActive` | Client work items |
 | `entries` | `id, jobId, laborTypeId, punchIn` | Time records |
 
-### Entry Lifecycle
+### Record Lifecycle
 
 - **Active timer:** `punchOut = null`
 - **Completed entry:** `punchOut = <Date>`
 - Analytics and timesheets only show completed entries (must have `punchOut`)
+
+### Soft-Delete / Archive Pattern
+
+Both `jobs` and `laborTypes` use soft-deletion — records are never hard-deleted so historical entries always retain their references.
+
+| Table | Field | Meaning |
+|-------|-------|---------|
+| `jobs` | `isActive: false` | Archived — dimmed in list, restorable; hidden from punch-in dropdowns |
+| `jobs` | `isDeleted: true` | Hidden entirely from the jobs list (but entries still reference the job) |
+| `laborTypes` | `isArchived: true` | Archived — dimmed in list, restorable; hidden from all labor-type dropdowns |
+
+Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archived/deleted records. `EditEntryModal` still includes a record's own archived labor type so existing entries can be saved without data loss.
 
 ### Settings Keys
 
