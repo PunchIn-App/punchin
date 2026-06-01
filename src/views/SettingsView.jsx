@@ -253,7 +253,7 @@ export default function SettingsView() {
           <SettingsRow
             icon={Info}
             title="PunchIn"
-            subtitle="v0.1.0 · Phase 1 · Data stored on this device"
+            subtitle={`v${__APP_VERSION__} · Phase 1 · Data stored on this device`}
             right={null}
           />
         </div>

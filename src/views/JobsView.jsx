@@ -121,6 +121,14 @@ export default function JobsView() {
     }
   }
 
+  const deleteLaborType = async (ltId) => {
+    if (window.confirm('Are you sure you want to permanently delete this labor type? Jobs and time entries using it will keep their records but will no longer have an associated labor type.')) {
+      await db.laborTypes.delete(ltId)
+      await db.jobs.where('laborTypeId').equals(ltId).modify({ laborTypeId: null })
+      await db.entries.where('laborTypeId').equals(ltId).modify({ laborTypeId: null })
+    }
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Tabs */}
@@ -194,7 +202,7 @@ export default function JobsView() {
                       </button>
                       <button onClick={() => deleteJob(job)}
                         className="p-1.5 rounded-lg hover:bg-red-500/10 text-appTextDisabled hover:text-red-400 transition-colors"
-                        title="Delete Job & Cascaded Entries">
+                        title="Delete Job">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -237,11 +245,18 @@ export default function JobsView() {
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
                     <span className="font-medium text-appText text-sm">{lt.name}</span>
                   </div>
-                  <button onClick={() => setEditingLT(lt)}
-                    className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                    title="Edit Labor Type">
-                    <Pencil className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setEditingLT(lt)}
+                      className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
+                      title="Edit Labor Type">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => deleteLaborType(lt.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-500/10 text-appTextDisabled hover:text-red-400 transition-colors"
+                      title="Delete Labor Type">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )
             })}

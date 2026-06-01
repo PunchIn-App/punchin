@@ -19,7 +19,7 @@ export default function Layout({ activeView, onNavigate, children }) {
           </div>
           <span className="font-display font-bold text-appText tracking-tight text-xl">PunchIn</span>
         </div>
-        <span className="font-mono text-[10px] text-appTextDisabled select-none">v0.1</span>
+        <span className="font-mono text-[10px] text-appTextDisabled select-none">v{__APP_VERSION__}</span>
       </header>
 
       {/* Main content */}
