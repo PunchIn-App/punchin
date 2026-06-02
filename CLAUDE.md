@@ -36,13 +36,15 @@ punchin/
 │   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
 │   │   ├── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
 │   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
-│   │   └── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
+│   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
+│   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
+│   │   └── ChangelogModal.jsx  # Parses CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets
 │   ├── views/
 │   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
-│   │   └── SettingsView.jsx    # Settings toggles + JSON/CSV backup + accent color picker
+│   │   └── SettingsView.jsx    # Settings: theme/accent, JSON/CSV backup, changelog, check-for-updates, Danger Zone
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web)
@@ -78,7 +80,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 
 | File | What's tested |
 |------|---------------|
-| `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `getEntryDuration`, `formatDate`, `getDayRange`, `getWeekRange`, `isEntryInRange`, `sumDurations` |
+| `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `getEntryDuration`, `formatTime`, `formatDate`, `getDayRange`, `getWeekRange`, `getWeekDays`, `isEntryInRange`, `sumDurations` |
 | `src/components/StartTimerModal.test.jsx` | Render, form validation, concurrent-timer guard |
 | `src/components/EditEntryModal.helpers.test.js` | `formatDateToYYYYMMDD`, `formatTimeToHHMM`, `combineDateAndTime` |
 | `src/views/SettingsView.dedup.test.js` | `isEntryDuplicate` (backup import dedup logic) |
@@ -88,7 +90,8 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 - `src/db.js` — schema migrations, seed logic
 - `src/hooks/useSettings.js`, `usePlatformContext.js`, `useHapticFeedback.jsx`
 - `src/views/TimesheetsView.jsx`, `JobsView.jsx`, `AnalyticsView.jsx`, `TimerView.jsx`
-- `src/components/InvoiceModal.jsx`, `EditEntryModal.jsx` (full component, not just helpers)
+- `src/components/InvoiceModal.jsx`, `ChangelogModal.jsx`, `ColorPicker.jsx`
+- `src/components/EditEntryModal.jsx` (full component, not just helpers)
 
 When adding new behaviour to any of the above, add a test file alongside it.
 
@@ -136,8 +139,8 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 |-------|---------|---------|
 | `settings` | `key` | KV store for app preferences |
 | `laborTypes` | `id, name` | Billable categories with color; soft-archived via `isArchived` |
-| `jobs` | `id, name, laborTypeId, isActive` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`) |
-| `entries` | `id, jobId, laborTypeId, punchIn` | Time records |
+| `jobs` | `id, name, laborTypeId, isActive` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field |
+| `entries` | `id, jobId, laborTypeId, punchIn, punchOut` | Time records; optional `notes` (string) field |
 
 ### Record Lifecycle
 
@@ -208,7 +211,7 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 
 - **Accent:** `appAccent` / `text-appAccent` tokens — active nav, buttons, highlights (user-configurable; defaults to amber `#F59E0B`)
 - **Stop/end actions:** red (`red-500`, `red-600`) — punch-out buttons and other irreversible-but-non-destructive actions; also used for destructive confirmations
-- **Labor type colors:** 10 preset hex values defined in `JobsView.jsx`; stored as hex strings in the `laborTypes` table
+- **Labor type colors:** 9 preset hex values defined in `JobsView.jsx` (`#6366F1 #F59E0B #22C55E #3B82F6 #EF4444 #EC4899 #8B5CF6 #14B8A6 #F97316`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
 
 ### Tailwind Custom Color Tokens
 
@@ -265,7 +268,10 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `formatElapsed(ms)` → `"HH:MM:SS"` for live timers
 - `formatDurationHM(ms)` → `"Xh Ym"` for summaries
 - `getEntryDuration(entry)` → milliseconds (handles active entries)
-- `getDayRange(date)` / `getWeekRange(date, weekStartsMonday)` → `{start, end}`
+- `formatTime(date)` → `"h:mm a"` time-only string (date-fns)
+- `formatDate(date)` → `"EEE, MMM d"` date-only string (date-fns)
+- `getDayRange(date?)` / `getWeekRange(date?, weekStartsMonday?)` → `{start, end}`
+- `getWeekDays(date?, weekStartsMonday?)` → `Date[]` all days in the week
 - `isEntryInRange(entry, start, end)` → boolean
 - `sumDurations(entries)` → total ms
 
