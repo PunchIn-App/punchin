@@ -5,8 +5,6 @@
       <stop offset="100%" stop-color="#1f6feb" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <!-- Background -->
-  <rect width="1280" height="640" fill="#0F1117"/>
   <!-- Subtle blue glow behind icon -->
   <rect width="1280" height="640" fill="url(#glow)"/>
   <!-- Icon: blue rounded square (logo icon scaled 48→140, factor ≈2.917) -->
@@ -15,7 +13,7 @@
   <circle cx="640" cy="250" r="41" fill="none" stroke="#0F1117" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
   <!-- Clock hands -->
   <polyline points="640,225.5 640,250 656.3,258.2" fill="none" stroke="#0F1117" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Wordmark -->
+  <!-- Wordmark (white — for dark backgrounds) -->
   <text x="640" y="415" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-weight="700" font-size="96" fill="#FFFFFF" text-anchor="middle" letter-spacing="-2">PunchIn</text>
   <!-- Tagline -->
   <text x="640" y="460" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-weight="400" font-size="26" fill="#6B7280" text-anchor="middle">Precision time tracking for freelancers</text>
