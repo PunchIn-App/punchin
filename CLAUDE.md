@@ -19,6 +19,8 @@ punchin/
 ├── vite.config.js          # Vite + PWA plugin config
 ├── wrangler.jsonc          # Cloudflare Workers deployment
 ├── tailwind.config.js      # Custom fonts (Syne, DM Sans, JetBrains Mono) + CSS-variable-backed color tokens
+├── scripts/
+│   └── screenshots.mjs     # Playwright script: seeds demo data + captures 21 screenshots (7 views × 3 devices)
 ├── docs/
 │   └── screenshots/
 │       ├── phone/          # Pixel 10 Pro XL default (1080×2404 @486 PPI, 412×916 CSS px @2.625×) — 7 views
@@ -422,19 +424,27 @@ Phone shots use the Pixel's **default** 1080×2404 resolution. At 486 PPI physic
 ### Regenerating
 
 1. Start the dev server: `npm run dev`
-2. Run the Playwright script (Node ESM, no extra deps beyond `playwright` which is available globally at `/opt/node22/bin/playwright`):
+2. Run the script from the project root:
 
 ```bash
-node /tmp/screenshots-full.mjs   # script seeds demo data via raw IndexedDB API
-# Note: the script hardcodes a ROOT path — update it to match the actual project location before running
+node scripts/screenshots.mjs
 ```
 
-The script:
+Playwright must be available — it ships with the cloud environment at `/opt/node22/lib/node_modules/playwright/index.mjs`. For local runs where it isn't globally installed:
+
+```bash
+npm install --save-dev playwright && npx playwright install chromium
+node scripts/screenshots.mjs
+```
+
+The script (`scripts/screenshots.mjs`):
+- Checks that the dev server is reachable before starting
 - Opens three browser contexts (phone 412×916 @2.625×, tablet 1194×834 @2× landscape, desktop 1920×1080 @1×)
-- Injects demo data directly into IndexedDB after Dexie's `populate` seed runs (so labor type IDs are known)
+- Seeds demo data directly into IndexedDB and forces dark theme, then reloads so the app picks it up
 - Injects 2 active timers (`punchOut: null`) so the Timer view is populated
-- Captures 7 views per context: `timer`, `jobs`, `labor-types`, `timesheets-daily`, `timesheets-weekly`, `analytics`, `settings`
-- When selecting the Timesheets tab via Playwright use `.filter({ hasText: 'Timesheets' })` — the nav label matches the view name exactly as of v0.3.0
+- Captures 7 views per context (21 total): `timer`, `jobs`, `labor-types`, `timesheets-daily`, `timesheets-weekly`, `analytics`, `settings`
+- Is idempotent — clears existing data before seeding, so re-runs always produce consistent output
+- Accepts `SCREENSHOT_URL` env var to target a different server (default: `http://localhost:5173`)
 
 ---
 
