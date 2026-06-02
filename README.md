@@ -34,9 +34,9 @@ Most time tracking tools are bloated, require an account, or bill you monthly fo
 
 ---
 
-### Scales to every screen size
+### Scales to every screen size — and every platform
 
-PunchIn adapts from pocket to desktop without a separate codebase. The bottom-nav shell and card layout reflow naturally across breakpoints.
+PunchIn adapts from pocket to desktop without a separate codebase. The bottom-nav shell and card layout reflow naturally across breakpoints. When installed as a PWA, it goes further: the app detects the host OS and applies platform-native behaviors automatically — iOS safe-area insets, Apple-style bottom sheets with swipe-to-dismiss and Taptic Engine feedback, and Material Design 3 sheets on Android with hardware back-button support.
 
 <table align="center">
   <thead>
@@ -153,6 +153,14 @@ No Redux, no global Context. Dexie's `useLiveQuery` hook makes the database reac
 
 Dark and light themes are implemented as CSS custom properties. The default `"auto"` setting tracks `prefers-color-scheme` via a `matchMedia` listener; users can override to force light or dark.
 
+### Adaptive platform shell
+
+A `usePlatformContext()` hook detects standalone mode and the host OS at runtime. When the app is installed:
+
+- **iOS** — `env(safe-area-inset-top/bottom)` pads the header and nav bar so nothing clips into the notch or home indicator. Modals render as Apple-style bottom sheets with a grabber pill, swipe-down-to-dismiss, and Taptic Engine haptic feedback via the WebKit `<input switch>` polyfill.
+- **Android** — Modals follow Material Design 3 (28 px top radius, 48 dp drag handle). The hardware back button closes open modals instead of exiting the app, implemented via `history.pushState` + `popstate`. Dismiss fires `navigator.vibrate(40)` for a crisp tick.
+- **Browser tab** — All of the above is bypassed; the original layout and modal behavior is unchanged.
+
 ---
 
 ## Project Structure
@@ -179,7 +187,9 @@ punchin/
     │   ├── AnalyticsView.jsx   # Charts
     │   └── SettingsView.jsx    # Preferences + data management
     ├── hooks/
-    │   └── useSettings.js      # Reactive settings hook
+    │   ├── useSettings.js          # Reactive settings hook
+    │   ├── usePlatformContext.js   # Standalone + OS detection
+    │   └── useHapticFeedback.jsx  # Platform-routed haptic trigger
     └── utils/
         └── time.js             # Date/time helpers
 ```

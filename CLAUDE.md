@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ---
 
@@ -42,7 +42,9 @@ punchin/
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
 │   │   └── SettingsView.jsx    # Settings toggles + JSON backup/restore
 │   ├── hooks/
-│   │   └── useSettings.js      # Reactive Dexie KV settings hook
+│   │   ├── useSettings.js          # Reactive Dexie KV settings hook
+│   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web)
+│   │   └── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
 │   └── utils/
 │       └── time.js             # Date/time helpers (format, range, sum)
 ```
@@ -177,7 +179,15 @@ Always use these token classes rather than raw hex values or inline `var()` call
 
 ### Modals
 
-Modals are full-screen overlays that behave as bottom sheets on mobile and centered dialogs on `sm:` breakpoint and above. Follow `StartTimerModal.jsx` and `EditEntryModal.jsx` as reference patterns.
+Modals are full-screen overlays. On desktop (`sm:` breakpoint and above) they are always centered dialogs. On mobile, the sheet style branches by platform:
+
+| Context | Scrim | Corner radius | Extra behavior |
+|---|---|---|---|
+| iOS standalone | `bg-black/40 backdrop-blur-md` | `rounded-2xl` | Grabber pill, swipe-down-to-dismiss, Taptic Engine haptic |
+| Android standalone | `bg-black/70 backdrop-blur-sm` | `rounded-t-[28px]` (MD3) | 48 dp drag handle, `popstate` back-button dismiss, `vibrate(40)` haptic |
+| Web / browser tab | `bg-black/70 backdrop-blur-sm` | `rounded-2xl` | None |
+
+Use `usePlatformContext()` to get `{ isStandalone, os }` and branch accordingly. Follow `StartTimerModal.jsx` as the reference pattern; apply the same treatment to any new modal.
 
 ### Navigation
 
@@ -199,6 +209,12 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 ## Known Issues & Pitfalls
 
 - **No cross-day filtering:** `isEntryInRange` checks `punchIn` only. An entry that starts before midnight and ends after midnight will appear on the start day but not the end day in timesheets. Acceptable for now but worth revisiting if users report missing time.
+
+- **iOS haptic polyfill requires user gesture context:** The WebKit `<input switch>` approach fires the Taptic Engine reliably when invoked in direct response to a touch event (swipe release). It will silently no-op if called outside a user-gesture context (e.g., from a `setTimeout`). Keep haptic calls synchronous within gesture handlers.
+
+- **`useHapticFeedback` must be `.jsx`:** The hook returns a JSX fragment for the hidden iOS switch element. Vite/Rollup only runs the JSX transform on `.jsx`/`.tsx` files. Do not rename it to `.js`.
+
+- **`viewport-fit=cover` is required for safe-area insets:** Without it `env(safe-area-inset-*)` always resolves to `0` regardless of device notch geometry. It is set in `index.html` — do not remove it.
 
 ---
 
@@ -252,6 +268,8 @@ The script:
 4. **Editing time?** Always go through `utils/time.js` helpers; never use raw `Date` arithmetic inline
 5. **Charts?** Follow `AnalyticsView.jsx` — use Recharts, reference CSS variables for colors (`var(--text-secondary)` etc.)
 6. **Theming?** New colors should use existing CSS variable conventions or Tailwind amber/red/neutral palette
+7. **New modal?** Apply the platform-native bottom-sheet pattern from `StartTimerModal.jsx` — use `usePlatformContext()` to branch scrim/sheet/handle styles and wire up `useSwipeDismiss` (iOS) and `useAndroidBackDismiss` (Android). Do not add a new modal that only uses the old `items-end sm:items-center` toggle.
+8. **Haptic feedback?** Use `useHapticFeedback(os)` — never call `navigator.vibrate()` directly in a component, and never attempt iOS haptics via any method other than the WebKit switch polyfill.
 
 ---
 

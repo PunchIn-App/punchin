@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.0] — 2026-06-02
+
+### Added
+- **Platform detection** — New `usePlatformContext()` hook detects whether the app is running as an installed PWA (`display-mode: standalone` / iOS `navigator.standalone`) and the host OS (`ios` | `android` | `web`).
+- **iOS safe-area insets** — When installed on iPhone/iPad, `env(safe-area-inset-top)` and `env(safe-area-inset-bottom)` are applied to the header and bottom nav so the UI never clips into the Dynamic Island, notch, or home indicator. `viewport-fit=cover` added to `index.html` as the required prerequisite.
+- **Platform-native bottom sheets** — `StartTimerModal` branches its mobile sheet style based on OS:
+  - *iOS standalone*: translucent scrim (`backdrop-blur-md`), grabber pill, swipe-down-to-dismiss gesture (80 px threshold).
+  - *Android standalone*: Material Design 3 28 px top corner radius, 48 dp accessible drag handle, hardware back-button dismiss via `popstate` listener (prevents exiting the PWA on back press).
+  - *Browser tab / desktop*: original behavior unchanged; `sm:` centered-dialog layout preserved on all platforms.
+- **Haptic feedback** — New `useHapticFeedback(os)` hook routes to the correct engine per platform: Android uses `navigator.vibrate(40)`; iOS uses the WebKit switch polyfill (hidden `<input switch>` toggled via label click to fire the Taptic Engine); web is a no-op. Haptic fires exactly at gesture-dismissal threshold on swipe and on `popstate` for back-button.
+
+---
+
 ## [0.3.0] — 2026-06-01
 
 ### Added
