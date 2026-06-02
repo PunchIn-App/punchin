@@ -6,10 +6,11 @@ import StartTimerModal from './StartTimerModal'
 // Hoist-safe variables (names must start with "mock" for Vitest hoisting)
 // --------------------------------------------------------------------------
 
-const mockEntriesCount  = vi.fn().mockResolvedValue(0)
-const mockEntriesFilter = vi.fn(() => ({ count: mockEntriesCount }))
-const mockEntriesAdd    = vi.fn().mockResolvedValue(1)
-const mockTransaction   = vi.fn(async (_mode, _tables, fn) => fn())
+const mockEntriesToArray = vi.fn().mockResolvedValue([])
+const mockEntriesFilter  = vi.fn(() => ({ toArray: mockEntriesToArray }))
+const mockEntriesUpdate  = vi.fn().mockResolvedValue(1)
+const mockEntriesAdd     = vi.fn().mockResolvedValue(1)
+const mockTransaction    = vi.fn(async (_mode, _tables, fn) => fn())
 
 // --------------------------------------------------------------------------
 // Module mocks
@@ -23,6 +24,7 @@ vi.mock('../db', () => ({
   db: {
     entries: {
       get filter() { return mockEntriesFilter },
+      get update() { return mockEntriesUpdate },
       get add()    { return mockEntriesAdd },
     },
     get transaction() { return mockTransaction },
@@ -110,29 +112,43 @@ describe('StartTimerModal — concurrent timer guard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSettings.allowConcurrentTimers = false
-    mockEntriesCount.mockResolvedValue(0)
+    mockEntriesToArray.mockResolvedValue([])
     mockTransaction.mockImplementation(async (_mode, _tables, fn) => fn())
     useAlternatingMock()
   })
 
-  it('blocks start when a timer is already running and concurrent mode is off', async () => {
-    mockEntriesCount.mockResolvedValue(1) // 1 running timer
+  it('auto-punches-out a running timer and starts a new one when concurrent mode is off', async () => {
+    const runningEntry = { id: 5, punchOut: null }
+    mockEntriesToArray.mockResolvedValue([runningEntry])
 
-    render(<StartTimerModal onClose={vi.fn()} />)
+    const onClose = vi.fn()
+    render(<StartTimerModal onClose={onClose} />)
 
     // Selecting a job auto-fills laborTypeId via useEffect (job.laborTypeId = 1)
     fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } })
     fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
 
-    await waitFor(() =>
-      expect(screen.getByText(/concurrent timers are off/i)).toBeInTheDocument()
-    )
-    expect(mockEntriesAdd).not.toHaveBeenCalled()
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(mockEntriesUpdate).toHaveBeenCalledWith(5, expect.objectContaining({ punchOut: expect.any(Date) }))
+    expect(mockEntriesAdd).toHaveBeenCalled()
+  })
+
+  it('starts a new timer directly when no timers are running and concurrent mode is off', async () => {
+    mockEntriesToArray.mockResolvedValue([]) // no running timers
+
+    const onClose = vi.fn()
+    render(<StartTimerModal onClose={onClose} />)
+
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(mockEntriesUpdate).not.toHaveBeenCalled()
+    expect(mockEntriesAdd).toHaveBeenCalled()
   })
 
   it('allows start when concurrent mode is on, even with a running timer', async () => {
     mockSettings.allowConcurrentTimers = true
-    mockEntriesCount.mockResolvedValue(1)
     mockEntriesAdd.mockResolvedValue(2)
 
     const onClose = vi.fn()
@@ -142,5 +158,7 @@ describe('StartTimerModal — concurrent timer guard', () => {
     fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
 
     await waitFor(() => expect(onClose).toHaveBeenCalled())
+    // filter is never called when concurrent mode is on
+    expect(mockEntriesFilter).not.toHaveBeenCalled()
   })
 })

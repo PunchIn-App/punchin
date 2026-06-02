@@ -64,6 +64,34 @@ npm run build      # Production build → dist/
 npm run preview    # Preview production build locally
 ```
 
+### Test
+
+```bash
+npm run test:run   # Vitest (single run, no watch)
+npm run test       # Vitest (watch mode)
+npm run coverage   # Coverage report via @vitest/coverage-v8
+```
+
+**A build is considered passing when both `npm run build` and `npm run test:run` succeed.** CI enforces this via `.github/workflows/ci.yml` on every push and PR to `main`.
+
+#### Current test coverage
+
+| File | What's tested |
+|------|---------------|
+| `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `getEntryDuration`, `formatDate`, `getDayRange`, `getWeekRange`, `isEntryInRange`, `sumDurations` |
+| `src/components/StartTimerModal.test.jsx` | Render, form validation, concurrent-timer guard |
+| `src/components/EditEntryModal.helpers.test.js` | `formatDateToYYYYMMDD`, `formatTimeToHHMM`, `combineDateAndTime` |
+| `src/views/SettingsView.dedup.test.js` | `isEntryDuplicate` (backup import dedup logic) |
+
+#### Known gaps (no tests yet)
+
+- `src/db.js` — schema migrations, seed logic
+- `src/hooks/useSettings.js`, `usePlatformContext.js`, `useHapticFeedback.jsx`
+- `src/views/TimesheetsView.jsx`, `JobsView.jsx`, `AnalyticsView.jsx`, `TimerView.jsx`
+- `src/components/InvoiceModal.jsx`, `EditEntryModal.jsx` (full component, not just helpers)
+
+When adding new behaviour to any of the above, add a test file alongside it.
+
 ### Deploy
 
 ```bash
