@@ -72,8 +72,8 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
 <table align="center">
   <thead>
     <tr>
-      <th scope="col" align="center">Phone<br><sub>Pixel 10 Pro XL · 412×916 CSS px</sub></th>
-      <th scope="col" align="center">Tablet<br><sub>iPad Air 11" M2 · landscape</sub></th>
+      <th scope="col" align="center">Phone</th>
+      <th scope="col" align="center">Tablet</th>
     </tr>
   </thead>
   <tbody>

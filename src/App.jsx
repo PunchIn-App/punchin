@@ -20,7 +20,7 @@ export default function App() {
   const { settings } = useSettings()
 
   const theme       = settings.theme       || 'auto'
-  const accentColor = settings.accentColor || '#F59E0B'
+  const accentColor = settings.accentColor || '#1f6feb'
 
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches

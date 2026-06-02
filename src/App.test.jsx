@@ -43,10 +43,10 @@ describe('App — accent color CSS variable', () => {
     expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('255 0 0')
   })
 
-  it('falls back to #F59E0B when accentColor is missing', () => {
+  it('falls back to #1f6feb when accentColor is missing', () => {
     mockUseSettings.mockReturnValue({ settings: {}, updateSetting: vi.fn() })
     render(<App />)
-    expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('245 158 11')
+    expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('31 111 235')
   })
 })
 

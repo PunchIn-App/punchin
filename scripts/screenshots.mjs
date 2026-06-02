@@ -86,7 +86,8 @@ async function seedData(theme) {
 
   // Apply requested theme
   { const tx = db.transaction(['settings'], 'readwrite')
-    tx.objectStore('settings').put({ key:'theme', value: theme })
+    tx.objectStore('settings').put({ key:'theme',       value: theme })
+    tx.objectStore('settings').put({ key:'accentColor', value: '#1f6feb' })
     await txDone(tx) }
 
   // Completed entries spread across past 30 days for populated analytics
