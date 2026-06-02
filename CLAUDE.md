@@ -15,15 +15,17 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 ```
 punchin/
 ├── README.md               # Product intro, screenshots, getting started
-├── index.html              # App shell (viewport, fonts, theme color)
-├── vite.config.js          # Vite + PWA plugin config; references config/ for PostCSS path
 ├── wrangler.jsonc          # Cloudflare Workers deployment; deploy via `npm run deploy`
+├── app/
+│   └── index.html          # App shell (viewport, fonts, theme color); Vite root is app/
 ├── config/
-│   ├── postcss.config.js   # PostCSS pipeline (Tailwind + autoprefixer); config path forwarded to tailwind.config.js
+│   ├── vite.config.js      # Vite + Vitest + PWA config; root=app/, outDir=../dist, test.root=..
+│   ├── postcss.config.js   # PostCSS pipeline (Tailwind + autoprefixer)
 │   └── tailwind.config.js  # Custom fonts (Syne, DM Sans, JetBrains Mono) + CSS-variable-backed color tokens
 ├── scripts/
 │   └── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
 ├── docs/
+│   ├── CHANGELOG.md        # Version history; imported at build time by ChangelogModal via ?raw import
 │   └── screenshots/
 │       ├── phone-dark/     # Pixel 10 Pro XL · dark theme (412×916 CSS px @2.625×) — 7 views
 │       ├── phone-light/    # Pixel 10 Pro XL · light theme — 7 views
@@ -45,7 +47,7 @@ punchin/
 │   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
 │   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
 │   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
-│   │   └── ChangelogModal.jsx  # Parses CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets
+│   │   └── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets
 │   ├── views/
 │   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
@@ -158,7 +160,7 @@ Every version bump must update all of the following in the **same commit or PR**
 | `package.json` | `"version"` field — **source of truth** |
 | `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-1f6feb...` |
 | `CLAUDE.md` | `**Version:** {X.Y.Z}` in the Project Overview header |
-| `CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top |
+| `docs/CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top |
 | `docs/screenshots/` | Regenerate if any visible UI changed (see Documentation Maintenance below) |
 
 The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump — update it only when intentionally upgrading the Cloudflare Workers runtime.
@@ -167,7 +169,7 @@ The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump �
 
 1. Decide the new version using the decision guide above
 2. Update `package.json` `"version"`
-3. Add a new section at the top of `CHANGELOG.md` (see format below)
+3. Add a new section at the top of `docs/CHANGELOG.md` (see format below)
 4. Update the version badge URL in `README.md`
 5. Update `**Version:**` in the `CLAUDE.md` Project Overview header
 6. If any visible UI changed, regenerate screenshots (see Documentation Maintenance below)
@@ -176,7 +178,7 @@ The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump �
 
 #### CHANGELOG entry format
 
-Follow [Keep a Changelog](https://keepachangelog.com/) — add a new section at the very top of `CHANGELOG.md`:
+Follow [Keep a Changelog](https://keepachangelog.com/) — add a new section at the very top of `docs/CHANGELOG.md`:
 
 ```markdown
 ## [X.Y.Z] — YYYY-MM-DD
@@ -206,7 +208,7 @@ Rules:
 
 Every PR that changes code must update relevant documentation in the **same commit or PR**. The table below maps change types to required updates:
 
-| What changed | `CLAUDE.md` | `README.md` | `CHANGELOG.md` | Screenshots |
+| What changed | `CLAUDE.md` | `README.md` | `docs/CHANGELOG.md` | Screenshots |
 |---|---|---|---|---|
 | New component | Add to Repository Structure; describe it | — | ✓ if user-visible | ✓ if renders in any view |
 | Component renamed or removed | Update Repository Structure (remove stale entries) | — | ✓ if user-visible | ✓ if renders in any view |
@@ -470,7 +472,7 @@ The script (`scripts/screenshots.mjs`):
 9. **Destructive confirmation?** Use `<ConfirmModal>` (`src/components/ConfirmModal.jsx`) rather than `window.confirm()`. Pass `title`, `message`, `confirmLabel`, `onConfirm`, and `onCancel`.
 10. **New interactive element?** Icon-only buttons need an explicit `aria-label`. Toggle/radio-group buttons need `aria-pressed`. Form inputs need a `<label>` wired via `htmlFor`/`id` (use `useId()` to avoid collisions). Decorative icons inside labeled elements need `aria-hidden="true"`.
 11. **Focus indicators?** Do not use `focus:outline-none` without also adding `focus:ring-*`. The global `:focus-visible` rule in `index.css` handles buttons; inputs need explicit `focus:ring-2 focus:ring-appAccent/50`.
-12. **Documentation?** Apply the Documentation Maintenance rules — update `CLAUDE.md`, `README.md`, `CHANGELOG.md`, and screenshots as required by the change type. See the Documentation Maintenance section for the full lookup table.
+12. **Documentation?** Apply the Documentation Maintenance rules — update `CLAUDE.md`, `README.md`, `docs/CHANGELOG.md`, and screenshots as required by the change type. See the Documentation Maintenance section for the full lookup table.
 
 ---
 

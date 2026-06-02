@@ -77,7 +77,7 @@ A version bump commit must update **all** of the following in the same PR:
 | `package.json` | `"version"` field — source of truth |
 | `README.md` | Version badge URL |
 | `CLAUDE.md` | `**Version:**` in the Project Overview header |
-| `CHANGELOG.md` | New section at the top (see format below) |
+| `docs/CHANGELOG.md` | New section at the top (see format below) |
 | `docs/screenshots/` | Regenerate if any visible UI changed (see below) |
 
 Commit message convention: `chore: bump to vX.Y.Z`
@@ -90,7 +90,7 @@ Every PR that changes code must update the relevant documentation in the **same 
 
 ### What needs updating
 
-| What changed in your PR | `CLAUDE.md` | `README.md` | `CHANGELOG.md` | Screenshots |
+| What changed in your PR | `CLAUDE.md` | `README.md` | `docs/CHANGELOG.md` | Screenshots |
 |---|---|---|---|---|
 | New component | Add to Repository Structure | — | ✓ if user-visible | ✓ if it renders in a view |
 | Renamed or removed component | Update Repository Structure | — | ✓ if user-visible | ✓ if it renders in a view |
@@ -119,7 +119,7 @@ See the Screenshots section of [`CLAUDE.md`](CLAUDE.md) for the Playwright regen
 
 ## CHANGELOG Format
 
-Add a new section at the very top of `CHANGELOG.md`. Follow [Keep a Changelog](https://keepachangelog.com/):
+Add a new section at the very top of `docs/CHANGELOG.md`. Follow [Keep a Changelog](https://keepachangelog.com/):
 
 ```markdown
 ## [X.Y.Z] — YYYY-MM-DD

@@ -6,7 +6,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-1f6feb?style=flat" alt="License" /></a>
   <a href="../../actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/PunchIn-App/punchin/ci.yml?branch=main&style=flat&label=CI&color=1f6feb" alt="CI" /></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.9.0-1f6feb?style=flat" alt="Version 0.9.0" /></a>
+  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.9.0-1f6feb?style=flat" alt="Version 0.9.0" /></a>
 </p>
 
 <p align="center">
@@ -219,10 +219,15 @@ A `usePlatformContext()` hook detects standalone mode and the host OS at runtime
 ```
 punchin/
 ├── package.json            # Version source of truth
-├── index.html              # App shell, fonts, theme-color meta
-├── vite.config.js          # Vite + PWA plugin config
 ├── wrangler.jsonc          # Cloudflare Workers deployment
-├── tailwind.config.js      # Custom font families + CSS-variable-backed color tokens
+├── app/
+│   └── index.html          # App shell, fonts, theme-color meta
+├── config/
+│   ├── vite.config.js      # Vite + Vitest + PWA config
+│   ├── postcss.config.js   # PostCSS pipeline
+│   └── tailwind.config.js  # Custom font families + CSS-variable-backed color tokens
+├── docs/
+│   └── CHANGELOG.md        # Version history
 └── src/
     ├── main.jsx            # React entry point
     ├── App.jsx             # Root: tab state, theme application
@@ -237,7 +242,7 @@ punchin/
     │   ├── InvoiceModal.jsx    # Invoice generator with CSV/print export
     │   ├── ConfirmModal.jsx    # Accessible confirmation dialog
     │   ├── ColorPicker.jsx     # Preset swatches + custom hex input
-    │   └── ChangelogModal.jsx  # Changelog viewer (built from CHANGELOG.md)
+    │   └── ChangelogModal.jsx  # Changelog viewer (built from docs/CHANGELOG.md)
     ├── views/
     │   ├── TimerView.jsx       # Active timers list
     │   ├── JobsView.jsx        # Jobs & Labor Types CRUD

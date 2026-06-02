@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import ChangelogModal from './ChangelogModal'
 
-vi.mock('../../CHANGELOG.md?raw', () => ({
+vi.mock('../../docs/CHANGELOG.md?raw', () => ({
   default: '## [1.0.0] — 2025-01-01\n### Added\n- **Bold feature**: something new\n- Plain bullet\n',
 }))
 

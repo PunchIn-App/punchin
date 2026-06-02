@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
-import changelogRaw from '../../CHANGELOG.md?raw'
+import changelogRaw from '../../docs/CHANGELOG.md?raw'
 
 function renderInline(text) {
   const parts = text.split(/\*\*(.+?)\*\*/g)

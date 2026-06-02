@@ -26,7 +26,7 @@
 
 - [ ] Version bump not required (tests / CI / docs only) **OR**
 - [ ] `package.json` `version` updated
-- [ ] `CHANGELOG.md` new section added at the top
+- [ ] `docs/CHANGELOG.md` new section added at the top
 - [ ] `README.md` version badge URL updated
 - [ ] `CLAUDE.md` `**Version:**` header updated
 
