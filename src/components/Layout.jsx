@@ -1,4 +1,5 @@
 import { Clock, Briefcase, Calendar, BarChart2, Settings } from 'lucide-react'
+import { usePlatformContext } from '../hooks/usePlatformContext'
 
 const NAV = [
   { id: 'timer',      label: 'Timer',     Icon: Clock      },
@@ -8,11 +9,27 @@ const NAV = [
   { id: 'settings',   label: 'Settings',  Icon: Settings   },
 ]
 
+// Builds inline style overrides for iOS standalone mode only.
+// Android's WindowInsets system handles its own bars; no manual padding needed.
+function useAdaptiveStyles(isStandalone, os) {
+  if (!isStandalone || os !== 'ios') return { header: undefined, nav: undefined }
+  return {
+    header: { paddingTop: 'env(safe-area-inset-top)' },
+    nav:    { paddingBottom: 'env(safe-area-inset-bottom)' },
+  }
+}
+
 export default function Layout({ activeView, onNavigate, children }) {
+  const { isStandalone, os } = usePlatformContext()
+  const adaptive = useAdaptiveStyles(isStandalone, os)
+
   return (
     <div className="h-full flex flex-col bg-appBg">
       {/* Header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-appBorderLight">
+      <header
+        style={adaptive.header}
+        className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-appBorderLight"
+      >
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
             <Clock className="w-4 h-4 text-[#0F1117]" strokeWidth={2.5} />
@@ -28,7 +45,10 @@ export default function Layout({ activeView, onNavigate, children }) {
       </main>
 
       {/* Bottom nav */}
-      <nav className="flex-shrink-0 flex border-t border-appBorderLight bg-appNav">
+      <nav
+        style={adaptive.nav}
+        className="flex-shrink-0 flex border-t border-appBorderLight bg-appNav"
+      >
         {NAV.map(({ id, label, Icon }) => {
           const active = activeView === id
           return (
