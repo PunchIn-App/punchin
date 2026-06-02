@@ -1,5 +1,36 @@
 import Dexie from 'dexie'
 
+/**
+ * @typedef {'auto'|'dark'|'light'} Theme
+ *
+ * @typedef {{ key: string, value: boolean|string }} Setting
+ *
+ * @typedef {{
+ *   id?: number,
+ *   name: string,
+ *   color: string,
+ *   isArchived: boolean,
+ * }} LaborType
+ *
+ * @typedef {{
+ *   id?: number,
+ *   name: string,
+ *   laborTypeId: number,
+ *   isActive: boolean,
+ *   isDeleted?: boolean,
+ *   laborRates?: Record<number, number>,
+ * }} Job
+ *
+ * @typedef {{
+ *   id?: number,
+ *   jobId: number,
+ *   laborTypeId: number,
+ *   punchIn: Date,
+ *   punchOut: Date|null,
+ *   note?: string,
+ * }} Entry
+ */
+
 export const db = new Dexie('PunchInDB')
 
 db.version(1).stores({
