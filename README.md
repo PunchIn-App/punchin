@@ -1,25 +1,26 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="PunchIn" width="220" />
+  <img src="docs/logo.svg#gh-dark-mode-only"       alt="PunchIn" width="220" />
+  <img src="docs/logo-light.svg#gh-light-mode-only" alt="PunchIn" width="220" />
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-F59E0B?style=flat&labelColor=161923" alt="License" /></a>
   <a href="../../actions/workflows/ci.yml"><img src="../../actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/version-0.7.0-F59E0B?style=flat&labelColor=161923" alt="Version 0.7.0" />
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.7.0-F59E0B?style=flat&labelColor=161923" alt="Version 0.7.0" /></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/frontend-stack-374151?style=flat" alt="Frontend stack:" />
-  <img src="https://img.shields.io/badge/React-18-F59E0B?style=flat&labelColor=161923&logo=react&logoColor=white" alt="React 18" />
-  <img src="https://img.shields.io/badge/Dexie-3-F59E0B?style=flat&labelColor=161923" alt="Dexie 3" />
-  <img src="https://img.shields.io/badge/Recharts-2-F59E0B?style=flat&labelColor=161923" alt="Recharts 2" />
-  <img src="https://img.shields.io/badge/Vite-6-F59E0B?style=flat&labelColor=161923&logo=vite&logoColor=white" alt="Vite 6" />
-  <img src="https://img.shields.io/badge/Tailwind-3-F59E0B?style=flat&labelColor=161923&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 3" />
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-18-F59E0B?style=flat&labelColor=161923&logo=react&logoColor=white" alt="React 18" /></a>
+  <a href="https://dexie.org"><img src="https://img.shields.io/badge/Dexie-3-F59E0B?style=flat&labelColor=161923" alt="Dexie 3" /></a>
+  <a href="https://recharts.org"><img src="https://img.shields.io/badge/Recharts-2-F59E0B?style=flat&labelColor=161923" alt="Recharts 2" /></a>
+  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-6-F59E0B?style=flat&labelColor=161923&logo=vite&logoColor=white" alt="Vite 6" /></a>
+  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-3-F59E0B?style=flat&labelColor=161923&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 3" /></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/backend-none-374151?style=flat" alt="No backend." />
-  <img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-F59E0B?style=flat&labelColor=161923&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" />
+  <a href="https://workers.cloudflare.com"><img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-F59E0B?style=flat&labelColor=161923&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" /></a>
 </p>
 
 <p align="center"><strong>Precision time tracking for freelancers</strong> — punch in, punch out, get paid accurately.</p>
