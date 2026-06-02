@@ -104,6 +104,15 @@ npx wrangler deploy   # Deploys dist/ to Cloudflare Workers
 
 No `.env` files are needed — the app has no backend secrets. Cloudflare account credentials for deployment are managed via `wrangler login`.
 
+### Pull Requests
+
+When opening a PR via the GitHub API or MCP tools (i.e. not through the GitHub web UI where the template auto-populates), **write the PR body to match `.github/PULL_REQUEST_TEMPLATE.md` exactly**:
+
+- Fill in the **Summary** with 1–3 bullets describing what the PR does and why.
+- Check the correct **Type of change** box.
+- Work through every item in the **Checklist** — check it if done, or check it and append `— N/A` if it genuinely does not apply to this PR. Do not omit sections.
+- Include the **CLA sign-off** line verbatim.
+
 ### Versioning
 
 PunchIn follows **semantic versioning** (`MAJOR.MINOR.PATCH`).
