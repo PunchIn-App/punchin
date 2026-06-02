@@ -4,9 +4,9 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-F59E0B?style=flat&labelColor=161923" alt="License" /></a>
-  <a href="https://libraries.io/github/PunchIn-App/punchin"><img src="https://img.shields.io/librariesio/github/PunchIn-App/punchin?style=flat&labelColor=161923" alt="Dependencies" /></a>
+  <img src="https://img.shields.io/badge/dependencies-none-F59E0B?style=flat&labelColor=161923" alt="No server-side dependencies" />
   <img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-F59E0B?style=flat&labelColor=161923&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" />
-  <img src="https://img.shields.io/github/package-json/v/PunchIn-App/punchin?style=flat&color=F59E0B&labelColor=161923&label=version" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.6.6-F59E0B?style=flat&labelColor=161923" alt="Version 0.6.6" />
 </p>
 
 <p align="center"><strong>Precision time tracking for freelancers</strong> — punch in, punch out, get paid accurately.</p>
