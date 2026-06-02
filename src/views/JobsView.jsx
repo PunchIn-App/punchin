@@ -13,6 +13,20 @@ function JobForm({ job, laborTypes, onDone }) {
   const [name, setName]           = useState(job?.name || '')
   const [clientName, setClientName] = useState(job?.clientName || '')
   const [laborTypeId, setLaborTypeId] = useState(job?.laborTypeId ? String(job.laborTypeId) : '')
+  const [laborRates, setLaborRates]   = useState(job?.laborRates || {})
+  const [showRates, setShowRates]     = useState(false)
+
+  const setRate = (ltId, val) => {
+    setLaborRates(prev => {
+      const next = { ...prev }
+      if (val === '' || val === undefined) {
+        delete next[ltId]
+      } else {
+        next[ltId] = Number(val)
+      }
+      return next
+    })
+  }
 
   const save = async () => {
     if (!name.trim()) return
@@ -20,6 +34,7 @@ function JobForm({ job, laborTypes, onDone }) {
       name: name.trim(),
       clientName: clientName.trim() || null,
       laborTypeId: laborTypeId ? Number(laborTypeId) : null,
+      laborRates,
     }
     if (job?.id) {
       await db.jobs.update(job.id, data)
@@ -30,10 +45,12 @@ function JobForm({ job, laborTypes, onDone }) {
   }
 
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
-                    placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors`
+                    placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors`
+
+  const activeLTs = laborTypes?.filter(lt => !lt.isArchived) ?? []
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-appCard p-4 space-y-3 shadow-md">
+    <div className="rounded-xl border border-appAccent/30 bg-appCard p-4 space-y-3 shadow-md">
       <input autoFocus value={name} onChange={e => setName(e.target.value)}
         placeholder="Job name *" className={inputCls} onKeyDown={e => e.key === 'Enter' && save()} />
       <input value={clientName} onChange={e => setClientName(e.target.value)}
@@ -44,9 +61,46 @@ function JobForm({ job, laborTypes, onDone }) {
           <option key={lt.id} value={lt.id}>{lt.name}{lt.isArchived ? ' (archived)' : ''}</option>
         ))}
       </select>
+
+      {/* Hourly rates per labor type */}
+      {activeLTs.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowRates(v => !v)}
+            className="text-xs text-appTextMuted hover:text-appText transition-colors flex items-center gap-1"
+          >
+            <span>{showRates ? '▾' : '▸'}</span>
+            Hourly rates {Object.keys(laborRates).length > 0 ? `(${Object.keys(laborRates).length} set)` : '(optional)'}
+          </button>
+          {showRates && (
+            <div className="mt-2 space-y-2">
+              {activeLTs.map(lt => (
+                <div key={lt.id} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+                  <span className="text-xs text-appText flex-1 truncate">{lt.name}</span>
+                  <div className="relative w-28 flex-shrink-0">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-appTextMuted pointer-events-none">$/hr</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={laborRates[lt.id] ?? ''}
+                      onChange={e => setRate(lt.id, e.target.value)}
+                      placeholder="—"
+                      className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-2 py-1.5 text-xs focus:outline-none focus:border-appAccent/60 transition-colors"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-2 pt-1">
         <button onClick={save}
-          className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-[#0F1117] font-bold text-sm transition-colors">
+          className="flex-1 py-2 rounded-lg bg-appAccent hover:brightness-110 text-[#0F1117] font-bold text-sm transition-all">
           {job ? 'Save' : 'Add Job'}
         </button>
         <button onClick={onDone}
@@ -73,12 +127,12 @@ function LaborTypeForm({ lt, onDone }) {
   }
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-appCard p-4 space-y-3 shadow-md">
+    <div className="rounded-xl border border-appAccent/30 bg-appCard p-4 space-y-3 shadow-md">
       <input autoFocus value={name} onChange={e => setName(e.target.value)}
         placeholder="Labor type name *"
         onKeyDown={e => e.key === 'Enter' && save()}
         className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
-                   placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors" />
+                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors" />
       <div className="flex flex-wrap gap-2">
         {PRESET_COLORS.map(c => (
           <button key={c} onClick={() => setColor(c)}
@@ -88,7 +142,7 @@ function LaborTypeForm({ lt, onDone }) {
       </div>
       <div className="flex gap-2 pt-1">
         <button onClick={save}
-          className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-[#0F1117] font-bold text-sm transition-colors">
+          className="flex-1 py-2 rounded-lg bg-appAccent hover:brightness-110 text-[#0F1117] font-bold text-sm transition-all">
           {lt ? 'Save' : 'Add Type'}
         </button>
         <button onClick={onDone}
@@ -132,7 +186,7 @@ export default function JobsView() {
         {['jobs','labor'].map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-3 text-sm font-medium capitalize transition-colors
-              ${tab === t ? 'text-amber-400 border-b-2 border-amber-400' : 'text-appTextMuted'}`}>
+              ${tab === t ? 'text-appAccent border-b-2 border-appAccent' : 'text-appTextMuted'}`}>
             {t === 'labor' ? 'Labor Types' : 'Jobs'}
           </button>
         ))}
@@ -145,8 +199,8 @@ export default function JobsView() {
             {!addingJob && !editingJob && (
               <button onClick={() => setAddingJob(true)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-                           border border-dashed border-appBorder hover:border-amber-500/40
-                           text-appTextMuted hover:text-amber-400 transition-colors text-sm">
+                           border border-dashed border-appBorder hover:border-appAccent/40
+                           text-appTextMuted hover:text-appAccent transition-colors text-sm">
                 <Plus className="w-4 h-4" /> Add Job
               </button>
             )}
@@ -221,7 +275,7 @@ export default function JobsView() {
                         value={archiveJobSearch}
                         onChange={e => setArchiveJobSearch(e.target.value)}
                         className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-sm
-                                   placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors"
+                                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors"
                       />
                     </div>
                   )}
@@ -270,8 +324,8 @@ export default function JobsView() {
             {!addingLT && !editingLT && (
               <button onClick={() => setAddingLT(true)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-                           border border-dashed border-appBorder hover:border-amber-500/40
-                           text-appTextMuted hover:text-amber-400 transition-colors text-sm">
+                           border border-dashed border-appBorder hover:border-appAccent/40
+                           text-appTextMuted hover:text-appAccent transition-colors text-sm">
                 <Plus className="w-4 h-4" /> Add Labor Type
               </button>
             )}
@@ -335,7 +389,7 @@ export default function JobsView() {
                         value={archiveLTSearch}
                         onChange={e => setArchiveLTSearch(e.target.value)}
                         className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-sm
-                                   placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors"
+                                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors"
                       />
                     </div>
                   )}

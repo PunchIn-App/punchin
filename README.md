@@ -87,6 +87,8 @@ Organize your work into **jobs** (client projects) and **labor types** (billable
 ### Timesheets
 Review your logged time by **day** or **week**. The weekly view shows a per-job breakdown with proportional bars so you can see at a glance where your time went. Full-text search filters entries by job name, client, labor type, or notes. Navigate between periods with arrows, log past entries manually, and edit or delete any record.
 
+Export the current period as a **CSV** spreadsheet or a **Print / PDF** via the system print dialog — both available directly from the Timesheets toolbar.
+
 ### Analytics
 Charts powered by [Recharts](https://recharts.org) give you a visual overview of your workload over the last **7 or 30 days**:
 
@@ -94,12 +96,17 @@ Charts powered by [Recharts](https://recharts.org) give you a visual overview of
 - **Hours by job** — horizontal bar chart sorted by volume
 - **Labor type donut** — proportion of time by category
 
+### Invoicing
+Set **hourly rates** per labor type on each job (Jobs tab → edit a job → Hourly rates). Then open the **Invoice** modal from the Timesheets toolbar: pick a job and period, and PunchIn builds a line-item invoice showing hours, rate, and amount for every entry. Export as a formatted **CSV** or use **Print / PDF** to send it directly to a client.
+
 ### Settings & Data Portability
 - Toggle concurrent timers on or off — when off, starting a new timer automatically punches out any running one
 - Choose whether your week starts on Monday or Sunday
 - Switch between **Auto / Light / Dark** theme (auto follows your OS preference)
-- **Export** a full JSON backup of all your data
-- **Import** a backup (smart deduplication prevents duplicates)
+- **Accent color** — pick from 6 preset highlight colors (Amber, Orange, Lime, Teal, Sky, Pink); updates the entire app instantly
+- **Export JSON** — full backup of all data (jobs, labor types, entries)
+- **Export CSV** — all completed entries as a spreadsheet ready for import into bookkeeping apps
+- **Import** a JSON backup (smart deduplication prevents duplicates)
 - **Danger Zone** (collapsible) — **Clear entries** resets logged time while keeping jobs and labor types; **Factory Reset** wipes all data and restores the app to a clean slate (two confirmation steps required)
 - **Check for updates** checks for a pending service-worker update and reloads if one is found, or confirms you're already on the latest version
 - Tap the **PunchIn** logo in the header to return to the Timer view from anywhere
@@ -153,6 +160,8 @@ No Redux, no global Context. Dexie's `useLiveQuery` hook makes the database reac
 
 Dark and light themes are implemented as CSS custom properties. The default `"auto"` setting tracks `prefers-color-scheme` via a `matchMedia` listener; users can override to force light or dark.
 
+The **accent color** (nav, buttons, active states) is stored as a hex setting and converted to an `--accent-rgb` CSS variable at runtime. A single `appAccent` Tailwind token wires the entire UI to the user's chosen color.
+
 ### Adaptive platform shell
 
 A `usePlatformContext()` hook detects standalone mode and the host OS at runtime. When the app is installed:
@@ -179,7 +188,8 @@ punchin/
     │   ├── Layout.jsx          # Fixed header + bottom nav
     │   ├── TimerCard.jsx       # Live timer card (1 s interval)
     │   ├── StartTimerModal.jsx # Punch-in form
-    │   └── EditEntryModal.jsx  # Edit active or completed entry
+    │   ├── EditEntryModal.jsx  # Edit active or completed entry
+    │   └── InvoiceModal.jsx    # Invoice generator with CSV/print export
     ├── views/
     │   ├── TimerView.jsx       # Active timers list
     │   ├── JobsView.jsx        # Jobs & labor types CRUD

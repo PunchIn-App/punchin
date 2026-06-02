@@ -1,14 +1,24 @@
 import { useState, useRef } from 'react'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette } from 'lucide-react'
+import { format } from 'date-fns'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
+
+const ACCENT_PRESETS = [
+  { name: 'Amber',   hex: '#F59E0B' },
+  { name: 'Orange',  hex: '#F97316' },
+  { name: 'Lime',    hex: '#84CC16' },
+  { name: 'Teal',    hex: '#2DD4BF' },
+  { name: 'Sky',     hex: '#38BDF8' },
+  { name: 'Pink',    hex: '#F472B6' },
+]
 
 function Toggle({ value, onChange }) {
   return (
     <button
       onClick={() => onChange(!value)}
       className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 border-2
-        ${value ? 'bg-amber-500 border-amber-500' : 'bg-appInput border-gray-500/60'}`}
+        ${value ? 'bg-appAccent border-appAccent' : 'bg-appInput border-gray-500/60'}`}
     >
       <span className={`absolute top-[1px] left-[1px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform
         ${value ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -60,6 +70,38 @@ export default function SettingsView() {
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([json], { type: 'application/json' })),
       download: `punchin-${new Date().toISOString().slice(0,10)}.json`,
+    })
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  const exportCsvAll = async () => {
+    const [jobs, entries, laborTypes] = await Promise.all([
+      db.jobs.toArray(),
+      db.entries.toArray(),
+      db.laborTypes.toArray(),
+    ])
+    const rows = [['Date', 'Job', 'Client', 'Labor Type', 'Start', 'End', 'Duration (h)', 'Notes']]
+    for (const e of entries) {
+      if (!e.punchOut) continue
+      const job = jobs.find(j => j.id === e.jobId)
+      const lt  = laborTypes.find(l => l.id === e.laborTypeId)
+      const dur = (new Date(e.punchOut) - new Date(e.punchIn)) / 3600000
+      rows.push([
+        format(new Date(e.punchIn), 'yyyy-MM-dd'),
+        job?.name || '',
+        job?.clientName || '',
+        lt?.name || '',
+        format(new Date(e.punchIn), 'HH:mm'),
+        format(new Date(e.punchOut), 'HH:mm'),
+        dur.toFixed(2),
+        e.notes || '',
+      ])
+    }
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+      download: `punchin-all-${new Date().toISOString().slice(0,10)}.csv`,
     })
     a.click()
     URL.revokeObjectURL(a.href)
@@ -187,6 +229,8 @@ export default function SettingsView() {
       await db.settings.bulkPut([
         { key: 'allowConcurrentTimers', value: false },
         { key: 'weekStartsMonday',      value: true  },
+        { key: 'theme',                 value: 'auto' },
+        { key: 'accentColor',           value: '#F59E0B' },
       ])
     })
     setResetStage(null)
@@ -251,7 +295,7 @@ export default function SettingsView() {
                     onClick={() => updateSetting('theme', value)}
                     className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors
                       ${(settings.theme || 'auto') === value
-                        ? 'bg-amber-500 text-[#0F1117]'
+                        ? 'bg-appAccent text-[#0F1117]'
                         : 'text-appTextMuted hover:text-appText'}`}
                   >
                     <Icon className="w-3 h-3" />
@@ -261,6 +305,29 @@ export default function SettingsView() {
               </div>
             }
           />
+          <div className="flex items-center justify-between px-4 py-4 gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Palette className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm text-appText font-medium">Accent color</p>
+                <p className="text-xs text-appTextMuted mt-0.5">Highlight color throughout the app</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {ACCENT_PRESETS.map(({ name, hex }) => {
+                const active = (settings.accentColor || '#F59E0B') === hex
+                return (
+                  <button
+                    key={hex}
+                    onClick={() => updateSetting('accentColor', hex)}
+                    title={name}
+                    className={`w-6 h-6 rounded-full border-2 transition-all hover:scale-110 ${active ? 'border-white scale-110' : 'border-transparent'}`}
+                    style={{ backgroundColor: hex }}
+                  />
+                )
+              })}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -274,6 +341,14 @@ export default function SettingsView() {
             <div>
               <p className="text-sm text-appText font-medium">Export data</p>
               <p className="text-xs text-appTextMuted mt-0.5">Download a JSON backup of everything</p>
+            </div>
+          </button>
+          <button onClick={exportCsvAll}
+            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left border-b border-appBorderLight">
+            <Download className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+            <div>
+              <p className="text-sm text-appText font-medium">Export CSV</p>
+              <p className="text-xs text-appTextMuted mt-0.5">Download all completed entries as a spreadsheet</p>
             </div>
           </button>
           <button onClick={triggerImport}

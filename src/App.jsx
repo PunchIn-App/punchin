@@ -8,11 +8,19 @@ import AnalyticsView  from './views/AnalyticsView'
 import SettingsView   from './views/SettingsView'
 import { useSettings } from './hooks/useSettings'
 
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `${r} ${g} ${b}`
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState('timer')
   const { settings } = useSettings()
 
-  const theme = settings.theme || 'auto'
+  const theme       = settings.theme       || 'auto'
+  const accentColor = settings.accentColor || '#F59E0B'
 
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -35,6 +43,10 @@ export default function App() {
       root.classList.remove('light')
     }
   }, [resolvedTheme])
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent-rgb', hexToRgb(accentColor))
+  }, [accentColor])
 
   const views = {
     timer:      <TimerView />,

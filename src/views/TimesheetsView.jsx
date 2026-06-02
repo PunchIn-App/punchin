@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronLeft, ChevronRight, Calendar, Pencil, Trash2, Plus, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, Pencil, Trash2, Plus, Search, FileDown, Receipt, Printer } from 'lucide-react'
 import { format, addDays, subDays, addWeeks, subWeeks } from 'date-fns'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
@@ -10,6 +10,7 @@ import {
   isEntryInRange, sumDurations,
 } from '../utils/time'
 import EditEntryModal from '../components/EditEntryModal'
+import InvoiceModal from '../components/InvoiceModal'
 
 function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { start, end } = getDayRange(date)
@@ -77,7 +78,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
                     {formatTime(entry.punchIn)} → {entry.punchOut ? formatTime(entry.punchOut) : 'running'}
                   </p>
                   <div className="flex items-center gap-1.5 mt-2">
-                    <button onClick={() => onEdit(entry)} className="p-1 rounded hover:bg-appInput text-appTextDarker hover:text-amber-400 transition-colors" title="Edit Entry">
+                    <button onClick={() => onEdit(entry)} className="p-1 rounded hover:bg-appInput text-appTextDarker hover:text-appAccent transition-colors" title="Edit Entry">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => onDelete(entry.id)} className="p-1 rounded hover:bg-appInput text-appTextDarker hover:text-red-400 transition-colors" title="Delete Entry">
@@ -155,7 +156,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                   <span className="font-mono text-sm text-appTextMuted">{formatDurationHM(ms)}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-appBg">
-                  <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${pct}%` }} />
+                  <div className="h-full rounded-full bg-appAccent transition-all" style={{ width: `${pct}%` }} />
                 </div>
               </div>
             )
@@ -173,11 +174,11 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
 
         return (
           <div key={day.toISOString()}
-            className={`rounded-xl border bg-appCard shadow-sm transition-colors duration-200 ${isToday ? 'border-amber-500/30' : 'border-appBorder'}`}>
+            className={`rounded-xl border bg-appCard shadow-sm transition-colors duration-200 ${isToday ? 'border-appAccent/30' : 'border-appBorder'}`}>
             <div className="flex items-center justify-between px-4 py-3">
               <div className="flex items-center gap-2">
-                {isToday && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />}
-                <span className={`text-sm font-medium ${isToday ? 'text-amber-400' : 'text-appTextMuted'}`}>
+                {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
+                <span className={`text-sm font-medium ${isToday ? 'text-appAccent' : 'text-appTextMuted'}`}>
                   {format(day, 'EEE, MMM d')}
                 </span>
               </div>
@@ -199,7 +200,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                         <span className="font-mono text-appTextDarker">{formatDurationHM(getEntryDuration(e))}</span>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => onEdit(e)} className="p-0.5 rounded hover:bg-appInput text-appTextDisabled hover:text-amber-400 transition-colors" title="Edit Entry">
+                          <button onClick={() => onEdit(e)} className="p-0.5 rounded hover:bg-appInput text-appTextDisabled hover:text-appAccent transition-colors" title="Edit Entry">
                             <Pencil className="w-3 h-3" />
                           </button>
                           <button onClick={() => onDelete(e.id)} className="p-0.5 rounded hover:bg-appInput text-appTextDisabled hover:text-red-400 transition-colors" title="Delete Entry">
@@ -228,6 +229,7 @@ export default function TimesheetsView() {
   // Modals state
   const [editingEntry, setEditingEntry] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showInvoice, setShowInvoice]   = useState(false)
 
   // Search & Filter State
   const [searchQuery, setSearchQuery]             = useState('')
@@ -263,6 +265,119 @@ export default function TimesheetsView() {
     }
   }
 
+  const exportCsv = async () => {
+    let entries, rangeLabel
+    if (tab === 'daily') {
+      const { start, end } = getDayRange(currentDate)
+      entries = await db.entries.filter(e => isEntryInRange(e, start, end)).toArray()
+      rangeLabel = format(currentDate, 'yyyy-MM-dd')
+    } else {
+      const { start, end } = getWeekRange(currentDate, wsMon)
+      entries = await db.entries.filter(e => isEntryInRange(e, start, end)).toArray()
+      rangeLabel = `${format(start, 'yyyy-MM-dd')}_${format(end, 'yyyy-MM-dd')}`
+    }
+
+    const rows = [['Date', 'Job', 'Client', 'Labor Type', 'Start', 'End', 'Duration (h)', 'Notes']]
+    for (const e of entries) {
+      if (!e.punchOut) continue
+      const job = jobs?.find(j => j.id === e.jobId)
+      const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
+      const dur = (new Date(e.punchOut) - new Date(e.punchIn)) / 3600000
+      rows.push([
+        format(new Date(e.punchIn), 'yyyy-MM-dd'),
+        job?.name || '',
+        job?.clientName || '',
+        lt?.name || '',
+        format(new Date(e.punchIn), 'HH:mm'),
+        format(new Date(e.punchOut), 'HH:mm'),
+        dur.toFixed(2),
+        e.notes || '',
+      ])
+    }
+
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+      download: `punchin-${rangeLabel}.csv`,
+    })
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  const printTimesheet = async () => {
+    let entries, titleStr
+    if (tab === 'daily') {
+      const { start, end } = getDayRange(currentDate)
+      entries = await db.entries.filter(e => isEntryInRange(e, start, end)).toArray()
+      titleStr = format(currentDate, 'EEEE, MMMM d, yyyy')
+    } else {
+      const { start, end } = getWeekRange(currentDate, wsMon)
+      entries = await db.entries.filter(e => isEntryInRange(e, start, end)).toArray()
+      titleStr = `Week of ${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
+    }
+
+    const completed = entries.filter(e => !!e.punchOut)
+    const totalMs = completed.reduce((s, e) => s + (new Date(e.punchOut) - new Date(e.punchIn)), 0)
+    const totalHrs = (totalMs / 3600000).toFixed(2)
+
+    const rows = completed
+      .sort((a, b) => new Date(a.punchIn) - new Date(b.punchIn))
+      .map(e => {
+        const job = jobs?.find(j => j.id === e.jobId)
+        const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
+        const hrs = ((new Date(e.punchOut) - new Date(e.punchIn)) / 3600000).toFixed(2)
+        return `<tr>
+          <td>${format(new Date(e.punchIn), 'EEE, MMM d')}</td>
+          <td>${job?.name || '—'}${job?.clientName ? `<br><span class="sub">${job.clientName}</span>` : ''}</td>
+          <td>${lt ? `<span class="badge" style="background:${lt.color}22;color:${lt.color}">${lt.name}</span>` : '—'}</td>
+          <td class="mono">${format(new Date(e.punchIn), 'HH:mm')} – ${format(new Date(e.punchOut), 'HH:mm')}</td>
+          <td class="right mono">${hrs}</td>
+          ${e.notes ? `<td class="notes">${e.notes}</td>` : '<td></td>'}
+        </tr>`
+      }).join('')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Timesheet — ${titleStr}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #111; padding: 48px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .sub-title { color: #666; font-size: 13px; margin-bottom: 28px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #888; padding: 6px 8px 6px 0; border-bottom: 2px solid #111; }
+  thead th.right { text-align: right; }
+  tbody td { padding: 7px 8px 7px 0; border-bottom: 1px solid #e5e5e5; vertical-align: middle; }
+  tfoot td { padding: 10px 8px 4px 0; border-top: 2px solid #111; font-weight: 700; }
+  .right { text-align: right; }
+  .mono { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 12px; }
+  .sub { font-size: 11px; color: #888; }
+  .notes { font-size: 11px; color: #666; font-style: italic; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+  .empty { text-align: center; padding: 32px; color: #888; }
+  @media print { @page { margin: 24mm 20mm; } body { padding: 0; } }
+</style></head><body>
+<h1>Timesheet</h1>
+<p class="sub-title">${titleStr}</p>
+<table>
+  <thead><tr>
+    <th>Date</th><th>Job</th><th>Labor Type</th><th>Time</th><th class="right">Hours</th><th>Notes</th>
+  </tr></thead>
+  <tbody>${rows || `<tr><td colspan="6" class="empty">No completed entries.</td></tr>`}</tbody>
+  <tfoot><tr>
+    <td colspan="4"><strong>Total</strong></td>
+    <td class="right mono">${totalHrs}</td>
+    <td></td>
+  </tr></tfoot>
+</table>
+</body></html>`
+
+    const w = window.open('', '_blank', 'width=900,height=700')
+    w.document.write(html)
+    w.document.close()
+    w.focus()
+    setTimeout(() => { w.print() }, 250)
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Tabs */}
@@ -270,7 +385,7 @@ export default function TimesheetsView() {
         {['daily','weekly'].map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-3 text-sm font-medium capitalize transition-colors
-              ${tab === t ? 'text-amber-400 border-b-2 border-amber-400' : 'text-appTextMuted'}`}>
+              ${tab === t ? 'text-appAccent border-b-2 border-appAccent' : 'text-appTextMuted'}`}>
             {t}
           </button>
         ))}
@@ -283,7 +398,7 @@ export default function TimesheetsView() {
         </button>
         <button onClick={() => setDate(new Date())}
           className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors
-            ${isCurrent() ? 'text-amber-400' : 'text-appText hover:bg-appInput'}`}>
+            ${isCurrent() ? 'text-appAccent' : 'text-appText hover:bg-appInput'}`}>
           {title()}
         </button>
         <button onClick={() => go(1)} className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors">
@@ -301,7 +416,7 @@ export default function TimesheetsView() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search logs..."
-            className="w-full bg-appCard border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-amber-500/50 transition-colors placeholder-appTextDisabled"
+            className="w-full bg-appCard border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-appAccent/50 transition-colors placeholder-appTextDisabled"
           />
         </div>
 
@@ -309,7 +424,7 @@ export default function TimesheetsView() {
         <select
           value={filterJobId}
           onChange={e => setFilterJobId(e.target.value)}
-          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-amber-500/50"
+          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-appAccent/50"
         >
           <option value="">All Jobs</option>
           {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
@@ -319,20 +434,46 @@ export default function TimesheetsView() {
         <select
           value={filterLaborTypeId}
           onChange={e => setFilterLaborTypeId(e.target.value)}
-          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-amber-500/50"
+          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-appAccent/50"
         >
           <option value="">All Types</option>
           {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
         </select>
 
-        {/* Log Manual Button */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-[#0F1117] text-xs font-bold transition-colors ml-auto"
-        >
-          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-          Log Manual
-        </button>
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            onClick={exportCsv}
+            className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-appCard border border-appBorder hover:bg-appInput text-appTextMuted text-xs font-medium transition-colors"
+            title="Export CSV"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            CSV
+          </button>
+          <button
+            onClick={printTimesheet}
+            className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-appCard border border-appBorder hover:bg-appInput text-appTextMuted text-xs font-medium transition-colors"
+            title="Print / Save as PDF"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Print
+          </button>
+          <button
+            onClick={() => setShowInvoice(true)}
+            className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-appCard border border-appBorder hover:bg-appInput text-appTextMuted text-xs font-medium transition-colors"
+            title="Generate Invoice"
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            Invoice
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-appAccent hover:brightness-110 active:brightness-90 text-[#0F1117] text-xs font-bold transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+            Log Manual
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 scrollable px-4 pt-4 pb-24">
@@ -368,6 +509,17 @@ export default function TimesheetsView() {
       {/* Edit Existing Entry Modal */}
       {editingEntry && (
         <EditEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} />
+      )}
+
+      {/* Invoice Modal */}
+      {showInvoice && (
+        <InvoiceModal
+          jobs={jobs}
+          laborTypes={laborTypes}
+          currentDate={currentDate}
+          currentTab={tab}
+          onClose={() => setShowInvoice(false)}
+        />
       )}
     </div>
   )

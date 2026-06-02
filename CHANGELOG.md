@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.0] — 2026-06-02
+
+### Added
+- **Accent color theming** — A new color swatch picker in Settings → Appearance lets you choose the app-wide highlight color from 6 presets: Amber (default), Orange, Lime, Teal, Sky, and Pink. The selection takes effect instantly across every component — nav, toggles, buttons, active states, and the analytics bar chart. Implemented via `--accent-rgb` CSS variable and an `appAccent` Tailwind token; hardcoded amber is fully replaced throughout.
+- **Hourly rates on jobs** — Each job now has a collapsible **Hourly rates** section in the job form (Jobs tab → Add/Edit Job). Set a rate per labor type ($/hr). Rates are stored directly on the job record (`laborRates` object) — no schema migration required.
+- **Invoice generator** — A new **Invoice** button in the Timesheets toolbar opens the invoice modal. Select a job and period (This week, Last week, This month, Last month, or Custom date range), then view a line-item table showing date, labor type, time range, hours, rate, and amount per entry. The totals row sums hours and, when rates are configured, the billed amount.
+- **Invoice CSV export** — The invoice modal has an **Export CSV** button that downloads an invoice-formatted spreadsheet (header with job/client/period, line items, totals row).
+- **Invoice print / PDF** — The invoice modal **Print / PDF** button generates a clean invoice document in a new browser window and triggers the system print dialog. Choosing "Save as PDF" in the print dialog produces a PDF without any extra dependencies.
+- **Timesheet CSV export** — A **CSV** button in the Timesheets toolbar exports the current day or week as a spreadsheet (Date, Job, Client, Labor Type, Start, End, Duration, Notes). A separate **Export CSV** button in Settings → Data downloads all completed entries across all time.
+- **Timesheet print / PDF** — A **Print** button in the Timesheets toolbar generates a print-optimized timesheet (with labor type color badges, duration totals) in a new window and triggers the system print dialog.
+
+### Changed
+- **Accent color replaces hardcoded amber** — All `amber-*` Tailwind classes replaced with the `appAccent` token so every UI element responds to the user's chosen accent color.
+- **Factory Reset now restores accent color default** — The reset in Settings → Danger Zone also restores `accentColor` to `#F59E0B` (amber) alongside the other settings defaults.
+
+---
+
 ## [0.5.0] — 2026-06-02
 
 ### Added

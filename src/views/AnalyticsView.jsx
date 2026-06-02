@@ -61,7 +61,7 @@ export default function AnalyticsView() {
         {['7d', '30d'].map(p => (
           <button key={p} onClick={() => setPeriod(p)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-              ${period === p ? 'bg-amber-500 text-[#0F1117]' : 'bg-appCard border border-appBorder text-appTextMuted'}`}>
+              ${period === p ? 'bg-appAccent text-[#0F1117]' : 'bg-appCard border border-appBorder text-appTextMuted'}`}>
             Last {p === '7d' ? '7 days' : '30 days'}
           </button>
         ))}
@@ -90,7 +90,7 @@ export default function AnalyticsView() {
             <YAxis hide />
             <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
               formatter={(v) => [`${v}h`, 'Hours']} />
-            <Bar dataKey="hours" fill="#F59E0B" radius={[3,3,0,0]} />
+            <Bar dataKey="hours" fill="rgb(var(--accent-rgb))" radius={[3,3,0,0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

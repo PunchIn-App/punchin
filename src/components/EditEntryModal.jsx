@@ -126,7 +126,7 @@ export default function EditEntryModal({ entry, onClose }) {
   }
 
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2.5 text-sm
-                    placeholder-appTextDisabled focus:outline-none focus:border-amber-500/60 transition-colors`
+                    placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors`
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
@@ -240,7 +240,7 @@ export default function EditEntryModal({ entry, onClose }) {
         <div className="px-5 pb-5 pt-2">
           <button
             onClick={handleSave}
-            className="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600
+            className="w-full py-3.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90
                        text-[#0F1117] font-display font-bold text-base transition-colors"
           >
             {isEditMode ? 'Save Changes' : 'Add Time Entry'}

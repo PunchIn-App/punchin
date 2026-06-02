@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.5.0
+**Version:** 0.6.0
 
 ---
 
@@ -34,13 +34,14 @@ punchin/
 │   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
 │   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
 │   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
-│   │   └── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
+│   │   ├── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
+│   │   └── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
 │   ├── views/
 │   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
-│   │   ├── JobsView.jsx        # Jobs & labor types CRUD
-│   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search
+│   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
+│   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
-│   │   └── SettingsView.jsx    # Settings toggles + JSON backup/restore
+│   │   └── SettingsView.jsx    # Settings toggles + JSON/CSV backup + accent color picker
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web)
@@ -100,6 +101,7 @@ Both `jobs` and `laborTypes` use soft-deletion — records are never hard-delete
 |-------|-------|---------|
 | `jobs` | `isActive: false` | Archived — moved to collapsed "Archived" folder below active jobs; restorable; hidden from punch-in dropdowns |
 | `jobs` | `isDeleted: true` | Schema field exists but is **not exposed in the UI** — reserved for future use or data migration |
+| `jobs` | `laborRates: { [laborTypeId]: number }` | Per-labor-type hourly rates ($/hr) used by the invoice generator. Stored as a plain JSON object on the job record — no extra table or schema migration required. Missing keys mean "no rate set". |
 | `laborTypes` | `isArchived: true` | Archived — moved to collapsed "Archived" folder below active types; restorable; hidden from all labor-type dropdowns |
 
 Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archived/deleted records. `EditEntryModal` still includes a record's own archived labor type so existing entries can be saved without data loss.
@@ -116,6 +118,7 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `allowConcurrentTimers` | boolean | `false` |
 | `weekStartsMonday` | boolean | `true` |
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
+| `accentColor` | hex string | `"#F59E0B"` |
 
 ### Fresh Install / Zero State
 
@@ -170,6 +173,9 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 | `text-appText` | `--text-primary` | `#FFFFFF` | `#111827` |
 | `text-appTextMuted` | `--text-muted` | `#6B7280` | `#6B7280` |
 | `text-appTextDisabled` | `--text-disabled` | `#374151` | `#D1D5DB` |
+| `bg-appAccent` / `text-appAccent` | `--accent-rgb` | amber `#F59E0B` (user-configurable) | same |
+
+The accent color is stored as a hex string in the `accentColor` setting. `App.jsx` converts it to space-separated RGB values and writes them to `--accent-rgb` on the root element. The Tailwind token uses `rgb(var(--accent-rgb) / <alpha-value>)` so opacity modifiers like `bg-appAccent/30` work correctly. **Never use hardcoded `amber-*` Tailwind classes** — always use `appAccent` so the user's chosen color is respected.
 
 Always use these token classes rather than raw hex values or inline `var()` calls in JSX. `color-scheme: dark/light` is set on `:root`/`.light` in `index.css` so browser-native controls (date/time pickers, caret, scrollbars) render in the correct scheme.
 
@@ -267,7 +273,7 @@ The script:
 3. **New view?** Add to `App.jsx` tab switch and `Layout.jsx` nav bar (keep it to 5 nav items max for mobile)
 4. **Editing time?** Always go through `utils/time.js` helpers; never use raw `Date` arithmetic inline
 5. **Charts?** Follow `AnalyticsView.jsx` — use Recharts, reference CSS variables for colors (`var(--text-secondary)` etc.)
-6. **Theming?** New colors should use existing CSS variable conventions or Tailwind amber/red/neutral palette
+6. **Theming?** New accent-colored elements must use `appAccent` / `text-appAccent` — never hardcode `amber-*` classes. New non-accent colors should use existing CSS variable conventions or Tailwind red/neutral palettes.
 7. **New modal?** Apply the platform-native bottom-sheet pattern from `StartTimerModal.jsx` — use `usePlatformContext()` to branch scrim/sheet/handle styles and wire up `useSwipeDismiss` (iOS) and `useAndroidBackDismiss` (Android). Do not add a new modal that only uses the old `items-end sm:items-center` toggle.
 8. **Haptic feedback?** Use `useHapticFeedback(os)` — never call `navigator.vibrate()` directly in a component, and never attempt iOS haptics via any method other than the WebKit switch polyfill.
 

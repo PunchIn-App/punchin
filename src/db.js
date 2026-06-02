@@ -18,6 +18,8 @@ db.on('populate', async () => {
   await db.settings.bulkPut([
     { key: 'allowConcurrentTimers', value: false },
     { key: 'weekStartsMonday',      value: true  },
+    { key: 'theme',                 value: 'auto' },
+    { key: 'accentColor',           value: '#F59E0B' },
   ])
 })
 

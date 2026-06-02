@@ -34,7 +34,7 @@ export default function Layout({ activeView, onNavigate, children }) {
           onClick={() => onNavigate('timer')}
           className="flex items-center gap-2 rounded-lg transition-opacity active:opacity-70"
         >
-          <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-appAccent flex items-center justify-center">
             <Clock className="w-4 h-4 text-[#0F1117]" strokeWidth={2.5} />
           </div>
           <span className="font-display font-bold text-appText tracking-tight text-xl">PunchIn</span>
@@ -59,7 +59,7 @@ export default function Layout({ activeView, onNavigate, children }) {
               key={id}
               onClick={() => onNavigate(id)}
               className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${
-                active ? 'text-amber-400' : 'text-appTextMuted hover:text-appText'
+                active ? 'text-appAccent' : 'text-appTextMuted hover:text-appText'
               }`}
             >
               <Icon className="w-5 h-5" strokeWidth={active ? 2 : 1.5} />

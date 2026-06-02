@@ -24,7 +24,7 @@ export default function TimerCard({ entry, job, laborType }) {
 
   return (
     <div className={`relative rounded-xl border bg-appCard overflow-hidden transition-all duration-300 ${
-      isOvernight ? 'border-amber-500/40 shadow-lg shadow-amber-500/5 animate-pulse' : 'border-appBorder'
+      isOvernight ? 'border-appAccent/40 shadow-lg shadow-appAccent/5 animate-pulse' : 'border-appBorder'
     }`}>
       {/* Color accent bar */}
       <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
@@ -35,7 +35,7 @@ export default function TimerCard({ entry, job, laborType }) {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-display font-semibold text-appText truncate">{job?.name || 'Unknown Job'}</p>
               {isOvernight && (
-                <div className="flex items-center gap-1 text-amber-500 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 px-2 py-0.5 rounded-full animate-bounce">
+                <div className="flex items-center gap-1 text-appAccent text-[10px] font-bold uppercase tracking-wider bg-appAccent/10 px-2 py-0.5 rounded-full animate-bounce">
                   <AlertTriangle className="w-3 h-3" />
                   Overnight Run?
                 </div>

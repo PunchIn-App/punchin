@@ -4,6 +4,7 @@
 
 :root {
   color-scheme: dark;
+  --accent-rgb: 245 158 11;
   --bg-primary: #0F1117;
   --bg-secondary: #161923;
   --bg-tertiary: #1E2232;
