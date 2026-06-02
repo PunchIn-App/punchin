@@ -27,10 +27,10 @@ punchin/
 ├── docs/
 │   ├── CHANGELOG.md        # Version history; imported at build time by ChangelogModal via ?raw import
 │   └── screenshots/
-│       ├── phone-dark/     # Pixel 10 Pro XL · dark theme (412×916 CSS px @2.625×) — 7 views
-│       ├── phone-light/    # Pixel 10 Pro XL · light theme — 7 views
-│       ├── tablet-dark/    # iPad Air 11" M2 landscape · dark theme (1194×834 CSS px @2×) — 7 views
-│       ├── tablet-light/   # iPad Air 11" M2 landscape · light theme — 7 views
+│       ├── phone-dark/     # Phone · dark theme (412×916 CSS px @2.625×) — 7 views
+│       ├── phone-light/    # Phone · light theme — 7 views
+│       ├── tablet-dark/    # Tablet landscape · dark theme (1194×834 CSS px @2×) — 7 views
+│       ├── tablet-light/   # Tablet landscape · light theme — 7 views
 │       ├── desktop-dark/   # 1920×1080 @1× · dark theme — 7 views
 │       └── desktop-light/  # 1920×1080 @1× · light theme — 7 views
 ├── src/

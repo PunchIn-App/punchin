@@ -43,7 +43,7 @@ Most time tracking tools are bloated, require an account, or bill you monthly fo
 
 ## Screenshots
 
-### Phone — Pixel 10 Pro XL
+### Phone
 
 <p align="center">
   <img src="docs/screenshots/phone-dark/timer.png#gh-dark-mode-only"             width="110" alt="Timer view — two jobs running in parallel, each showing elapsed time ticking live" />
@@ -68,7 +68,7 @@ Most time tracking tools are bloated, require an account, or bill you monthly fo
 
 PunchIn adapts from pocket to desktop without a separate codebase. The bottom-nav shell and card layout reflow naturally across breakpoints. When installed as a PWA, it goes further: the app detects the host OS and applies platform-native behaviors automatically — iOS safe-area insets, Apple-style bottom sheets with swipe-to-dismiss and Taptic Engine feedback, and Material Design 3 sheets on Android with hardware back-button support.
 
-#### Tablet — iPad Air 11" M2 (landscape)
+#### Tablet
 
 <p align="center">
   <img src="docs/screenshots/tablet-dark/timer.png#gh-dark-mode-only"              width="280" alt="Timer view on iPad Air — wide landscape layout with two active timers" />
@@ -80,23 +80,17 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
 </p>
 <p align="center"><sub>Timer &nbsp;·&nbsp; Analytics &nbsp;·&nbsp; Weekly Sheet</sub></p>
 
-#### Desktop — 1920×1080
+#### Desktop
 
 <p align="center">
   <img src="docs/screenshots/desktop-dark/timer.png#gh-dark-mode-only"   width="720" alt="Timer view at 1920×1080 — active timers in a full-width card layout" />
-  <img src="docs/screenshots/desktop-light/timer.png#gh-light-mode-only" width="720" alt="Timer view at 1920×1080 — active timers in a full-width card layout" /><br>
-  <sub>Timer</sub>
-</p>
-<p align="center">
+  <img src="docs/screenshots/desktop-light/timer.png#gh-light-mode-only" width="720" alt="Timer view at 1920×1080 — active timers in a full-width card layout" />
   <img src="docs/screenshots/desktop-dark/analytics.png#gh-dark-mode-only"   width="720" alt="Analytics at 1920×1080 — daily bars, job chart, and labor donut side by side" />
-  <img src="docs/screenshots/desktop-light/analytics.png#gh-light-mode-only" width="720" alt="Analytics at 1920×1080 — daily bars, job chart, and labor donut side by side" /><br>
-  <sub>Analytics</sub>
-</p>
-<p align="center">
+  <img src="docs/screenshots/desktop-light/analytics.png#gh-light-mode-only" width="720" alt="Analytics at 1920×1080 — daily bars, job chart, and labor donut side by side" />
   <img src="docs/screenshots/desktop-dark/timesheets-weekly.png#gh-dark-mode-only"   width="720" alt="Weekly timesheet at 1920×1080 — full-week log with job bars and export toolbar" />
-  <img src="docs/screenshots/desktop-light/timesheets-weekly.png#gh-light-mode-only" width="720" alt="Weekly timesheet at 1920×1080 — full-week log with job bars and export toolbar" /><br>
-  <sub>Weekly timesheets</sub>
+  <img src="docs/screenshots/desktop-light/timesheets-weekly.png#gh-light-mode-only" width="720" alt="Weekly timesheet at 1920×1080 — full-week log with job bars and export toolbar" />
 </p>
+<p align="center"><sub>Timer &nbsp;·&nbsp; Analytics &nbsp;·&nbsp; Weekly Sheet</sub></p>
 
 </details>
 
