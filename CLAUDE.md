@@ -113,19 +113,117 @@ PunchIn follows **semantic versioning** (`MAJOR.MINOR.PATCH`).
 - The canonical version source is `package.json` → `"version"`. `vite.config.js` reads it automatically via `__APP_VERSION__` — no manual sync needed for the in-app display.
 - The BUSL-1.1 **Change Date** of `2030-06-02` is fixed and independent of version — it does not move when the version number changes.
 
+#### Version increment decision guide
+
+| Change type | Increment |
+|---|---|
+| New view, tab, or modal | `MINOR` |
+| New setting exposed in UI | `MINOR` |
+| New export/import format or data capability | `MINOR` |
+| Significant UX or layout change | `MINOR` |
+| New DB table or field that users interact with | `MINOR` |
+| Bug fix visible to users | `PATCH` |
+| Accessibility improvement | `PATCH` |
+| Performance improvement (no visible change) | `PATCH` |
+| Internal refactor (no visible change) | `PATCH` |
+| Dependency update (no visible change) | `PATCH` |
+| Test additions only | no bump |
+| CI / workflow config change only | no bump |
+| Documentation-only change (`CLAUDE.md`, `README.md`) | no bump |
+
+When in doubt between `MINOR` and `PATCH`: if a user would notice the change without being told about it, it's `MINOR`.
+
 ### Release checklist
 
-Every version bump must update all of the following in the same commit or PR:
+Every version bump must update all of the following in the **same commit or PR**:
 
 | File | What to change |
 |------|----------------|
 | `package.json` | `"version"` field — **source of truth** |
 | `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-F59E0B...` |
 | `CLAUDE.md` | `**Version:** {X.Y.Z}` in the Project Overview header |
-| `CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top, following Keep a Changelog format |
-| `docs/screenshots/` | Regenerate with the Playwright script if any visible UI changed (see Screenshots section below) |
+| `CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top |
+| `docs/screenshots/` | Regenerate if any visible UI changed (see Documentation Maintenance below) |
 
 The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump — update it only when intentionally upgrading the Cloudflare Workers runtime.
+
+#### Step-by-step release procedure
+
+1. Decide the new version using the decision guide above
+2. Update `package.json` `"version"`
+3. Add a new section at the top of `CHANGELOG.md` (see format below)
+4. Update the version badge URL in `README.md`
+5. Update `**Version:**` in the `CLAUDE.md` Project Overview header
+6. If any visible UI changed, regenerate screenshots (see Documentation Maintenance below)
+7. Verify `npm run build` and `npm run test:run` both pass
+8. Commit everything in a single commit: `chore: bump to vX.Y.Z`
+
+#### CHANGELOG entry format
+
+Follow [Keep a Changelog](https://keepachangelog.com/) — add a new section at the very top of `CHANGELOG.md`:
+
+```markdown
+## [X.Y.Z] — YYYY-MM-DD
+
+### Added
+- Short description of new capability, written from the user's perspective
+
+### Changed
+- What changed and how it differs from before; internal-only refactors get "(internal)" suffix
+
+### Fixed
+- What was broken and what it does now
+
+### Removed
+- What was removed
+```
+
+Rules:
+- Omit sections that have no entries for that release
+- Write from the user's perspective, not the implementation's: "Timesheets now export..." not "Updated TimesheetsView to..."
+- Start bullets with the feature area for scannability: "Timer — ", "Analytics — ", "Settings — ", etc.
+- Each bullet is one user-observable change; group closely related implementation details into one bullet
+
+---
+
+## Documentation Maintenance
+
+Every PR that changes code must update relevant documentation in the **same commit or PR**. The table below maps change types to required updates:
+
+| What changed | `CLAUDE.md` | `README.md` | `CHANGELOG.md` | Screenshots |
+|---|---|---|---|---|
+| New component | Add to Repository Structure; describe it | — | ✓ if user-visible | ✓ if renders in any view |
+| Component renamed or removed | Update Repository Structure (remove stale entries) | — | ✓ if user-visible | ✓ if renders in any view |
+| New view or tab | Add to Repository Structure + describe it | Consider updating features section | ✓ | ✓ |
+| New or changed hook | Update Repository Structure description | — | — | — |
+| New or changed `time.js` helper | Update Time Utilities list | — | — | — |
+| DB schema change (table, index, or field) | Update Database → Collections table | — | ✓ if user-visible | — |
+| New setting key | Add row to Settings Keys table | — | ✓ | — |
+| New exported helper from any source file | Update the relevant section | — | — | — |
+| Any visible UI change | — | — | — | ✓ regenerate |
+| Version bump | Update `**Version:**` in header | Update version badge | Add new section | ✓ if UI changed |
+
+### What counts as a "visible UI change" for screenshots
+
+**Regenerate** `docs/screenshots/` when any of these change:
+- Layout, spacing, or sizing in any of the 7 captured views
+- New or removed UI element (button, card, badge, section, label)
+- Color, font, or icon change
+- New or revised text content in a view (labels, placeholders, empty states, headings)
+- Any change to: `TimerView`, `JobsView`, `TimesheetsView`, `AnalyticsView`, `SettingsView`
+
+**Do not regenerate** for: logic-only changes, hook/utility changes, DB schema changes with no visible rendering effect, test additions, CI changes, or documentation-only updates.
+
+### Keeping CLAUDE.md accurate
+
+CLAUDE.md documents the *current state* of the codebase — it must stay accurate, not just accumulate additions. Apply these rules when making any code change:
+
+- **Adding** a component, view, hook, or utility: add an entry to the Repository Structure tree and the relevant detail section
+- **Removing** something: delete its entry — do not leave stale references
+- **Renaming** something: update every mention, including the Repository Structure tree and any section that names it
+- **Changing an exported function signature**: update the Time Utilities list or whichever section documents that API
+- **Changing the DB schema**: update the Collections table and, if a new setting is added, the Settings Keys table
+- **Changing a convention** (modal pattern, theming rules, accessibility requirements): update the relevant convention section — a stale convention is worse than no convention
 
 ---
 
@@ -344,6 +442,7 @@ The script:
 9. **Destructive confirmation?** Use `<ConfirmModal>` (`src/components/ConfirmModal.jsx`) rather than `window.confirm()`. Pass `title`, `message`, `confirmLabel`, `onConfirm`, and `onCancel`.
 10. **New interactive element?** Icon-only buttons need an explicit `aria-label`. Toggle/radio-group buttons need `aria-pressed`. Form inputs need a `<label>` wired via `htmlFor`/`id` (use `useId()` to avoid collisions). Decorative icons inside labeled elements need `aria-hidden="true"`.
 11. **Focus indicators?** Do not use `focus:outline-none` without also adding `focus:ring-*`. The global `:focus-visible` rule in `index.css` handles buttons; inputs need explicit `focus:ring-2 focus:ring-appAccent/50`.
+12. **Documentation?** Apply the Documentation Maintenance rules — update `CLAUDE.md`, `README.md`, `CHANGELOG.md`, and screenshots as required by the change type. See the Documentation Maintenance section for the full lookup table.
 
 ---
 
