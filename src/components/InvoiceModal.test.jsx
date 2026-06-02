@@ -1,0 +1,226 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import InvoiceModal from './InvoiceModal'
+
+vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
+
+vi.mock('../db', () => ({
+  db: { entries: { filter: vi.fn(() => ({ toArray: vi.fn() })) } },
+}))
+
+vi.mock('../hooks/usePlatformContext', () => ({
+  usePlatformContext: () => ({ isStandalone: false, os: 'web' }),
+}))
+
+vi.mock('../hooks/useSettings', () => ({
+  useSettings: () => ({ settings: { weekStartsMonday: true }, updateSetting: vi.fn() }),
+}))
+
+// A job with a rate of $100/hr for labor type 1
+const JOBS = [{ id: 1, name: 'Acme Corp', clientName: 'Acme', isActive: true, isDeleted: false, laborRates: { 1: 100 } }]
+const LABOR_TYPES = [{ id: 1, name: 'Design', color: '#6366F1', isArchived: false }]
+// One completed entry: 1 hour
+const ENTRIES = [{
+  id: 1, jobId: 1, laborTypeId: 1,
+  punchIn:  new Date('2025-06-01T09:00:00'),
+  punchOut: new Date('2025-06-01T10:00:00'),
+}]
+
+function renderModal(props = {}) {
+  return render(
+    <InvoiceModal
+      jobs={JOBS}
+      laborTypes={LABOR_TYPES}
+      currentDate={new Date('2025-06-01')}
+      currentTab="weekly"
+      onClose={vi.fn()}
+      {...props}
+    />
+  )
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  // Return [] when no job selected, ENTRIES when selectedJobId is non-empty (deps[2])
+  useLiveQuery.mockImplementation((_fn, deps) => {
+    if (deps?.[2]) return ENTRIES
+    return []
+  })
+})
+
+describe('InvoiceModal — rendering', () => {
+  it('renders the "Generate Invoice" header', () => {
+    renderModal()
+    expect(screen.getByText('Generate Invoice')).toBeInTheDocument()
+  })
+
+  it('renders the job select', () => {
+    renderModal()
+    expect(screen.getByRole('combobox')).toBeInTheDocument()
+  })
+
+  it('renders date-range preset buttons', () => {
+    renderModal()
+    expect(screen.getByRole('button', { name: /this week/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last week/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /custom/i })).toBeInTheDocument()
+  })
+
+  it('Export CSV button is initially disabled (no job selected)', () => {
+    renderModal()
+    expect(screen.getByRole('button', { name: /export csv/i })).toBeDisabled()
+  })
+
+  it('Print button is initially disabled (no job selected)', () => {
+    renderModal()
+    expect(screen.getByRole('button', { name: /print/i })).toBeDisabled()
+  })
+
+  it('calls onClose when the close button is clicked', () => {
+    const onClose = vi.fn()
+    renderModal({ onClose })
+    fireEvent.click(screen.getByRole('button', { name: /close/i }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls onClose when Escape is pressed', () => {
+    const onClose = vi.fn()
+    renderModal({ onClose })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('InvoiceModal — line items calculation', () => {
+  it('displays correct hours, rate, and amount after selecting a job', async () => {
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    // 1 hr × $100/hr = $100.00
+    await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
+    expect(screen.getAllByText('$100.00').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows "—" for amount when job has no rate set for that labor type', async () => {
+    const jobNoRates = [{ id: 1, name: 'No Rates Job', isActive: true, isDeleted: false, laborRates: {} }]
+    renderModal({ jobs: jobNoRates })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    // "1.00" appears twice (line-item hours + total hours); "—" for rate and amount
+    await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('enables Export CSV once line items are present', async () => {
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /export csv/i })).not.toBeDisabled()
+    )
+  })
+
+  it('shows "No completed entries" when entries list is empty', async () => {
+    useLiveQuery.mockImplementation(() => [])
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() =>
+      expect(screen.getByText(/no completed entries/i)).toBeInTheDocument()
+    )
+  })
+
+  it('shows "no rates set" hint when job has no labor rates', async () => {
+    const jobNoRates = [{ id: 1, name: 'Plain Job', isActive: true, isDeleted: false, laborRates: {} }]
+    useLiveQuery.mockImplementation(() => [])
+    renderModal({ jobs: jobNoRates })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() =>
+      expect(screen.getByText(/no hourly rates set/i)).toBeInTheDocument()
+    )
+  })
+})
+
+describe('InvoiceModal — period presets', () => {
+  it('selects "Last week" preset', () => {
+    renderModal()
+    fireEvent.click(screen.getByRole('button', { name: /last week/i }))
+    expect(screen.getByRole('button', { name: /last week/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('selects "This month" preset', () => {
+    renderModal()
+    fireEvent.click(screen.getByRole('button', { name: /this month/i }))
+    expect(screen.getByRole('button', { name: /this month/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('selects "Last month" preset', () => {
+    renderModal()
+    fireEvent.click(screen.getByRole('button', { name: /last month/i }))
+    expect(screen.getByRole('button', { name: /last month/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('shows custom date inputs when "Custom" preset is selected', () => {
+    renderModal()
+    fireEvent.click(screen.getByRole('button', { name: /^custom$/i }))
+    expect(screen.getAllByDisplayValue('').length).toBeGreaterThanOrEqual(1)
+    // Two date inputs appear
+    const dateInputs = document.querySelectorAll('input[type="date"]')
+    expect(dateInputs.length).toBe(2)
+  })
+
+  it('custom date inputs accept values', () => {
+    renderModal()
+    fireEvent.click(screen.getByRole('button', { name: /^custom$/i }))
+    const [startInput, endInput] = document.querySelectorAll('input[type="date"]')
+    fireEvent.change(startInput, { target: { value: '2025-06-01' } })
+    fireEvent.change(endInput,   { target: { value: '2025-06-30' } })
+    expect(startInput.value).toBe('2025-06-01')
+    expect(endInput.value).toBe('2025-06-30')
+  })
+})
+
+describe('InvoiceModal — export and print', () => {
+  beforeEach(() => {
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+    global.URL.revokeObjectURL = vi.fn()
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('calls URL.createObjectURL when Export CSV is clicked with line items', async () => {
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /export csv/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /export csv/i }))
+    expect(global.URL.createObjectURL).toHaveBeenCalled()
+  })
+
+  it('calls window.open when Print is clicked with line items', async () => {
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    expect(window.open).toHaveBeenCalled()
+  })
+})
+
+describe('InvoiceModal — backdrop and label', () => {
+  it('calls onClose when clicking the backdrop', () => {
+    const onClose = vi.fn()
+    const { container } = renderModal({ onClose })
+    fireEvent.click(container.firstChild)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows job name and client name in the invoice header once a job is selected', async () => {
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1))
+  })
+
+  it('initialises to "Custom" preset when currentTab is "daily"', () => {
+    renderModal({ currentTab: 'daily' })
+    expect(screen.getByRole('button', { name: /^custom$/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+})

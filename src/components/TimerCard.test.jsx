@@ -1,0 +1,101 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import TimerCard from './TimerCard'
+
+const mockEntriesUpdate = vi.fn().mockResolvedValue(1)
+
+vi.mock('../db', () => ({
+  db: {
+    entries: {
+      get update() { return mockEntriesUpdate },
+    },
+  },
+}))
+
+vi.mock('./EditEntryModal', () => ({
+  default: ({ onClose }) => (
+    <div data-testid="edit-modal">
+      <button onClick={onClose}>close-edit</button>
+    </div>
+  ),
+}))
+
+const ENTRY = {
+  id: 1,
+  jobId: 1,
+  laborTypeId: 1,
+  punchIn: new Date(Date.now() - 3600000),
+  punchOut: null,
+  notes: null,
+}
+const JOB = { id: 1, name: 'Acme Corp' }
+const LABOR_TYPE = { id: 1, name: 'Design', color: '#6366F1' }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('TimerCard — rendering', () => {
+  it('renders the job name', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('Acme Corp')).toBeInTheDocument()
+  })
+
+  it('renders the labor type name', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('Design')).toBeInTheDocument()
+  })
+
+  it('renders a Stop button', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByRole('button', { name: /stop timer for acme corp/i })).toBeInTheDocument()
+  })
+
+  it('renders elapsed time with role="timer"', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByRole('timer')).toBeInTheDocument()
+  })
+
+  it('shows "Unknown Job" when job prop is undefined', () => {
+    render(<TimerCard entry={ENTRY} job={undefined} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('Unknown Job')).toBeInTheDocument()
+  })
+
+  it('renders entry notes when present', () => {
+    const entryWithNotes = { ...ENTRY, notes: 'Quick fix session' }
+    render(<TimerCard entry={entryWithNotes} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('Quick fix session')).toBeInTheDocument()
+  })
+
+  it('does not render notes section when notes is null', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.queryByText('Quick fix session')).not.toBeInTheDocument()
+  })
+})
+
+describe('TimerCard — stop timer', () => {
+  it('calls db.entries.update with a punchOut Date when Stop is clicked', async () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    fireEvent.click(screen.getByRole('button', { name: /stop timer for acme corp/i }))
+    await waitFor(() =>
+      expect(mockEntriesUpdate).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ punchOut: expect.any(Date) })
+      )
+    )
+  })
+})
+
+describe('TimerCard — edit modal', () => {
+  it('opens EditEntryModal when the edit start time button is clicked', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit start time/i }))
+    expect(screen.getByTestId('edit-modal')).toBeInTheDocument()
+  })
+
+  it('closes EditEntryModal when the modal requests close', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit start time/i }))
+    fireEvent.click(screen.getByText('close-edit'))
+    expect(screen.queryByTestId('edit-modal')).not.toBeInTheDocument()
+  })
+})

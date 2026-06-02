@@ -162,3 +162,88 @@ describe('StartTimerModal — concurrent timer guard', () => {
     expect(mockEntriesFilter).not.toHaveBeenCalled()
   })
 })
+
+// --------------------------------------------------------------------------
+// Close behaviour
+// --------------------------------------------------------------------------
+
+describe('StartTimerModal — close behaviour', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useLiveQuery.mockReturnValue([])
+  })
+
+  it('close button (×) calls onClose', () => {
+    const onClose = vi.fn()
+    render(<StartTimerModal onClose={onClose} />)
+    fireEvent.click(screen.getByRole('button', { name: /close/i }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('pressing Escape calls onClose', () => {
+    const onClose = vi.fn()
+    render(<StartTimerModal onClose={onClose} />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+// --------------------------------------------------------------------------
+// Form field interactions
+// --------------------------------------------------------------------------
+
+describe('StartTimerModal — form field interactions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useAlternatingMock()
+  })
+
+  it('can type in the notes field', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const notesInput = screen.getByPlaceholderText('What are you working on?')
+    fireEvent.change(notesInput, { target: { value: 'Fixing the login bug' } })
+    expect(notesInput.value).toBe('Fixing the login bug')
+  })
+
+  it('can change the labor type select', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const ltSelect = screen.getAllByRole('combobox')[1]
+    fireEvent.change(ltSelect, { target: { value: '1' } })
+    expect(ltSelect.value).toBe('1')
+  })
+
+  it('pressing Enter in the notes field with no job selected shows the job validation error', async () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const notesInput = screen.getByPlaceholderText('What are you working on?')
+    fireEvent.keyDown(notesInput, { key: 'Enter' })
+    await waitFor(() =>
+      expect(screen.getByText('Please select a job')).toBeInTheDocument()
+    )
+  })
+})
+
+// --------------------------------------------------------------------------
+// Error handling (transaction rejection)
+// --------------------------------------------------------------------------
+
+describe('StartTimerModal — error handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSettings.allowConcurrentTimers = false
+    mockTransaction.mockRejectedValue(new Error('DB error'))
+    useAlternatingMock()
+  })
+
+  it('shows the error message in role="alert" when the transaction throws', async () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+
+    // Select a job — auto-fills laborTypeId via useEffect (job.laborTypeId = 1)
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('DB error')
+  })
+})

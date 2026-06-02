@@ -13,6 +13,18 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test-setup.js'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.{js,jsx}'],
+      exclude: ['src/main.jsx', 'src/**/*.test.{js,jsx}', 'src/test-setup.js'],
+      thresholds: {
+        lines: 88,
+        functions: 77,
+        branches: 71,
+        statements: 82,
+      },
+    },
   },
   plugins: [
     react(),
