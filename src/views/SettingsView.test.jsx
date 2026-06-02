@@ -10,6 +10,8 @@ const mockDbJobsClear         = vi.fn().mockResolvedValue(undefined)
 const mockDbLaborTypesClear   = vi.fn().mockResolvedValue(undefined)
 const mockDbSettingsClear     = vi.fn().mockResolvedValue(undefined)
 const mockDbSettingsBulkPut   = vi.fn().mockResolvedValue(undefined)
+const mockDbSettingsToArray   = vi.fn().mockResolvedValue([])
+const mockDbSettingsPut       = vi.fn().mockResolvedValue(undefined)
 const mockDbLaborTypesAdd     = vi.fn().mockResolvedValue(1)
 const mockDbJobsAdd           = vi.fn().mockResolvedValue(1)
 const mockDbEntriesAdd        = vi.fn().mockResolvedValue(1)
@@ -39,8 +41,10 @@ vi.mock('../db', () => ({
       get add()     { return mockDbLaborTypesAdd },
     },
     settings: {
+      get toArray() { return mockDbSettingsToArray },
       get clear()   { return mockDbSettingsClear },
       get bulkPut() { return mockDbSettingsBulkPut },
+      get put()     { return mockDbSettingsPut },
     },
     transaction: (_mode, _tables, fn) => fn(),
   },
@@ -56,6 +60,32 @@ vi.mock('../components/ChangelogModal', () => ({
   default: ({ onClose }) => (
     <div data-testid="changelog-modal"><button onClick={onClose}>close-changelog</button></div>
   ),
+}))
+
+const mockRunSync = vi.fn().mockResolvedValue(Date.now())
+const mockDisconnectSync = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('../sync/syncManager', () => ({
+  runSync: (...args) => mockRunSync(...args),
+  disconnectSync: (...args) => mockDisconnectSync(...args),
+}))
+
+vi.mock('../sync/config', () => ({
+  SYNC_CONFIG: {
+    github:   { clientId: 'gh-test-id', callbackBase: 'https://example.com' },
+    google:   { clientId: 'google-test-id' },
+    onedrive: { clientId: 'od-test-id' },
+  },
+}))
+
+vi.mock('../sync/providers/github', () => ({
+  buildGitHubOAuthUrl: () => 'https://github.com/oauth',
+}))
+vi.mock('../sync/providers/google', () => ({
+  buildGoogleOAuthUrl: () => 'https://accounts.google.com/oauth',
+}))
+vi.mock('../sync/providers/onedrive', () => ({
+  buildOneDriveOAuthUrl: () => 'https://login.microsoftonline.com/oauth',
 }))
 
 beforeEach(() => {
@@ -436,5 +466,106 @@ describe('SettingsView — Danger Zone: cancel at final stage', () => {
     // Final stage content is gone; top-level Factory Reset button is restored
     expect(screen.queryByText('There is no going back.')).not.toBeInTheDocument()
     expect(screen.getByText('Factory Reset')).toBeInTheDocument()
+  })
+})
+
+describe('SettingsView — Sync section', () => {
+  it('renders Sync section label', () => {
+    render(<SettingsView />)
+    expect(screen.getByText('Sync')).toBeInTheDocument()
+  })
+
+  it('shows disconnected state with provider buttons when client IDs are configured', () => {
+    render(<SettingsView />)
+    expect(screen.getByText('Sync across devices')).toBeInTheDocument()
+    expect(screen.getByText('GitHub Gist')).toBeInTheDocument()
+    expect(screen.getByText('Google Drive')).toBeInTheDocument()
+    expect(screen.getByText('OneDrive')).toBeInTheDocument()
+  })
+
+  it('shows connected state for GitHub when syncProvider is github', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'github' },
+      { key: 'lastSyncedAt', value: null },
+    ])
+    render(<SettingsView />)
+    await waitFor(() => expect(screen.getByText('GitHub Gist')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /Sync Now/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Disconnect/i })).toBeInTheDocument()
+  })
+
+  it('shows connected state for Google Drive', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'google' },
+      { key: 'lastSyncedAt', value: null },
+    ])
+    render(<SettingsView />)
+    await waitFor(() => expect(screen.getByText('Google Drive')).toBeInTheDocument())
+    expect(screen.getByText(/Never synced/)).toBeInTheDocument()
+  })
+
+  it('shows connected state for OneDrive', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'onedrive' },
+      { key: 'lastSyncedAt', value: Date.now() - 30000 },
+    ])
+    render(<SettingsView />)
+    await waitFor(() => expect(screen.getByText('OneDrive')).toBeInTheDocument())
+    expect(screen.getByText(/Just now/)).toBeInTheDocument()
+  })
+
+  it('shows "Token expired" and disables Sync Now when token is expired', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'google' },
+      { key: 'syncTokenExpiry', value: Date.now() - 1000 },
+    ])
+    render(<SettingsView />)
+    await waitFor(() => expect(screen.getByText(/Token expired/)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /Sync Now/i })).toBeDisabled()
+  })
+
+  it('shows sync error when present', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'github' },
+      { key: 'syncError', value: 'GitHub 401' },
+      { key: 'lastSyncedAt', value: null },
+    ])
+    render(<SettingsView />)
+    await waitFor(() => expect(screen.getByText('GitHub 401')).toBeInTheDocument())
+  })
+
+  it('calls runSync when Sync Now is clicked', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'github' },
+      { key: 'lastSyncedAt', value: null },
+    ])
+    render(<SettingsView />)
+    await waitFor(() => screen.getByRole('button', { name: /Sync Now/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Sync Now/i }))
+    await waitFor(() => expect(mockRunSync).toHaveBeenCalled())
+  })
+
+  it('calls disconnectSync when Disconnect is clicked and confirmed', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'github' },
+      { key: 'lastSyncedAt', value: null },
+    ])
+    global.confirm = vi.fn().mockReturnValue(true)
+    render(<SettingsView />)
+    await waitFor(() => screen.getByRole('button', { name: /Disconnect/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Disconnect/i }))
+    await waitFor(() => expect(mockDisconnectSync).toHaveBeenCalled())
+  })
+
+  it('does not call disconnectSync when Disconnect is cancelled', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'github' },
+      { key: 'lastSyncedAt', value: null },
+    ])
+    global.confirm = vi.fn().mockReturnValue(false)
+    render(<SettingsView />)
+    await waitFor(() => screen.getByRole('button', { name: /Disconnect/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Disconnect/i }))
+    expect(mockDisconnectSync).not.toHaveBeenCalled()
   })
 })

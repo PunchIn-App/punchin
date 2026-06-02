@@ -205,6 +205,10 @@ describe('EditEntryModal — save', () => {
     const combos = screen.getAllByRole('combobox')
     fireEvent.change(combos[0], { target: { value: '1' } })
     fireEvent.change(combos[1], { target: { value: '1' } })
+    // Set explicit times so the test is not flaky near midnight
+    const timeInputs = document.querySelectorAll('input[type="time"]')
+    fireEvent.change(timeInputs[0], { target: { value: '09:00' } })
+    fireEvent.change(timeInputs[1], { target: { value: '10:00' } })
     fireEvent.click(screen.getByRole('button', { name: /add time entry/i }))
     await waitFor(() => expect(mockEntriesAdd).toHaveBeenCalledWith(
       expect.objectContaining({ jobId: 1, laborTypeId: 1 })

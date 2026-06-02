@@ -156,10 +156,13 @@ async function captureDevice(browser, device, theme) {
   })
 
   const page = await ctx.newPage()
-
   // Load, seed (with correct theme), reload so the app picks it all up
   await page.goto(BASE_URL)
   await page.waitForLoadState('networkidle')
+  // Wait for the nav to appear — signals Dexie has finished opening/upgrading the DB.
+  // Use preview build (npm run preview) rather than dev server: the dev server's root=app/
+  // configuration causes Chromium to 404 on the ../src/main.jsx module script path.
+  await page.waitForSelector('nav[aria-label="Main navigation"]')
   await page.evaluate(seedData, theme)
   await page.reload()
   await page.waitForLoadState('networkidle')

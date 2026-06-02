@@ -6,7 +6,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-1f6feb?style=flat" alt="License" /></a>
   <a href="../../actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/PunchIn-App/punchin/ci.yml?branch=main&style=flat&label=CI&color=1f6feb" alt="CI" /></a>
-  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.9.0-1f6feb?style=flat" alt="Version 0.9.0" /></a>
+  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.10.0-1f6feb?style=flat" alt="Version 0.10.0" /></a>
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@ PunchIn is a mobile-first, offline-capable Progressive Web App (PWA) for freelan
 Most time tracking tools are bloated, require an account, or bill you monthly for basic features. PunchIn is the opposite:
 
 - **Instant** — open the app, tap Punch In, you're tracking
-- **Private** — all data stored locally in your browser (IndexedDB); nothing ever leaves your device
+- **Private** — all data stored locally in your browser (IndexedDB); nothing leaves your device unless you opt in to sync
 - **Installable** — works as a PWA; add it to your home screen and use it like a native app
 - **Offline-first** — works without an internet connection, always
 
@@ -140,6 +140,21 @@ Set **hourly rates** per labor type on each job (Jobs tab → edit a job → Hou
 </details>
 
 <details>
+<summary><strong>Cross-Device Sync</strong></summary>
+
+Sync your data across devices using your existing cloud storage — no PunchIn account required. Choose one of three free providers:
+
+- **GitHub Gist** (private) — ideal for developers; uses a private Gist in your account. Requires a GitHub OAuth App and a Cloudflare Worker secret to exchange the auth code server-side.
+- **Google Drive** — stores a single hidden file in the app-specific `appDataFolder`; never appears in your Drive file list.
+- **OneDrive** — stores a single file in your OneDrive App Folder.
+
+Sync is a **pull-then-push snapshot**: PunchIn pulls the remote snapshot, merges any new entries from other devices using the same smart deduplication as JSON import, then pushes the unified state back. Google and OneDrive tokens expire after ~1 hour; PunchIn detects expiry and prompts you to reconnect.
+
+Provider buttons only appear when the app is deployed with the corresponding `VITE_*` OAuth client ID. See `.env.example` for setup instructions.
+
+</details>
+
+<details>
 <summary><strong>Settings &amp; Data Portability</strong></summary>
 
 - **Concurrent timers** — toggle on or off; when off, starting a new timer automatically stops any running one
@@ -213,7 +228,10 @@ A `usePlatformContext()` hook detects standalone mode and the host OS at runtime
 ```
 punchin/
 ├── package.json            # Version source of truth
-├── wrangler.jsonc          # Cloudflare Workers deployment
+├── wrangler.jsonc          # Cloudflare Workers deployment (routes OAuth + serves static assets)
+├── .env.example            # VITE_* OAuth env var documentation
+├── worker/
+│   └── oauth.js            # Cloudflare Worker: GitHub OAuth code→token exchange
 ├── app/
 │   └── index.html          # App shell, fonts, theme-color meta
 ├── config/
@@ -224,9 +242,16 @@ punchin/
 │   └── CHANGELOG.md        # Version history
 └── src/
     ├── main.jsx            # React entry point
-    ├── App.jsx             # Root: tab state, theme application
+    ├── App.jsx             # Root: tab state, theme, OAuth callback handling
     ├── db.js               # Dexie schema, seed data, migrations
     ├── index.css           # CSS variables (dark/light), scrollbar utils
+    ├── sync/
+    │   ├── config.js           # OAuth client IDs from VITE_* build env
+    │   ├── syncManager.js      # pull→merge→push snapshot sync, disconnect
+    │   └── providers/
+    │       ├── github.js       # GitHub Gist API (OAuth + CRUD)
+    │       ├── google.js       # Google Drive appDataFolder API
+    │       └── onedrive.js     # Microsoft Graph App Folder API
     ├── components/
     │   ├── Layout.jsx          # Fixed header + bottom nav
     │   ├── ErrorBoundary.jsx   # Error boundary wrapping each view
@@ -242,7 +267,7 @@ punchin/
     │   ├── JobsView.jsx        # Jobs & Labor Types CRUD
     │   ├── TimesheetsView.jsx  # Daily/weekly logs + search
     │   ├── AnalyticsView.jsx   # Charts
-    │   └── SettingsView.jsx    # Preferences + data management
+    │   └── SettingsView.jsx    # Preferences, sync, data management
     ├── hooks/
     │   ├── useSettings.js          # Reactive settings hook
     │   ├── usePlatformContext.js   # Standalone + OS detection

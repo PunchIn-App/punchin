@@ -1,7 +1,9 @@
 {
   "name": "punchin",
   "compatibility_date": "2026-06-01",
+  "main": "./worker/oauth.js",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "binding": "ASSETS"
   }
 }

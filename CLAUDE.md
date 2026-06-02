@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.9.0
+**Version:** 0.10.0
 
 ---
 
@@ -15,7 +15,10 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 ```
 punchin/
 ├── README.md               # Product intro, screenshots, getting started
-├── wrangler.jsonc          # Cloudflare Workers deployment; deploy via `npm run deploy`
+├── wrangler.jsonc          # Cloudflare Workers deployment; deploy via `npm run deploy`; routes OAuth requests to worker/oauth.js and static assets via ASSETS binding
+├── .env.example            # Documents all VITE_* OAuth env vars with setup instructions for each provider
+├── worker/
+│   └── oauth.js            # Cloudflare Worker: handles GitHub OAuth code→token exchange; redirects to app with token in URL fragment; falls through to static assets for all other routes
 ├── app/
 │   └── index.html          # App shell (viewport, fonts, theme color); Vite root is app/
 ├── config/
@@ -35,7 +38,14 @@ punchin/
 │       └── desktop-light/  # 1920×1080 @1× · light theme — 7 views
 ├── src/
 │   ├── main.jsx            # React entry point; registers service worker and PWA install prompt listener
-│   ├── App.jsx             # Root: tab state, theme application
+│   ├── App.jsx             # Root: tab state, theme application, OAuth callback handling (reads window.location.hash on mount)
+│   ├── sync/
+│   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
+│   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), runSync (pull→merge→push), disconnectSync
+│   │   └── providers/
+│   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, createGist, updateGist, fetchGist (handles truncated files via raw_url)
+│   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope), pushToDrive, pullFromDrive
+│   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (implicit flow, AppFolder scope), pushToOneDrive, pullFromOneDrive
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
 │   ├── db.js               # Dexie schema, seed data, migrations
 │   ├── components/
@@ -53,7 +63,7 @@ punchin/
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
-│   │   └── SettingsView.jsx    # Settings: theme/accent, JSON/CSV backup, changelog, install prompt, check-for-updates, Danger Zone
+│   │   └── SettingsView.jsx    # Settings: theme/accent, JSON/CSV backup, changelog, install prompt, check-for-updates, Sync (GitHub Gist / Google Drive / OneDrive), Danger Zone
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web)
@@ -290,6 +300,12 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `weekStartsMonday` | boolean | `true` |
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
 | `accentColor` | hex string | `"#1f6feb"` |
+| `syncProvider` | `"github"` \| `"google"` \| `"onedrive"` \| `null` | `null` |
+| `syncToken` | string \| `null` | `null` |
+| `syncTokenExpiry` | number (ms epoch) \| `null` | `null` — GitHub tokens do not expire; Google/OneDrive implicit tokens expire after ~1 hour |
+| `syncFileId` | string \| `null` | `null` — GitHub Gist ID; unused for Google/OneDrive |
+| `lastSyncedAt` | number (ms epoch) \| `null` | `null` |
+| `syncError` | string \| `null` | `null` — set when the OAuth callback returns a `sync_error` fragment |
 
 ### Fresh Install / Zero State
 
@@ -433,22 +449,29 @@ Phone shots use the Pixel's **default** 1080×2404 resolution. At 486 PPI physic
 
 ### Regenerating
 
-1. Start the dev server: `npm run dev`
+> **Important:** Use the **preview build**, not the dev server. The dev server's `root: './app'` configuration causes Chromium (Playwright) to 404 on the `../src/main.jsx` module script path; the preview build serves a self-contained bundle that loads correctly.
+
+1. Build and start the preview server:
+
+```bash
+npm run build && npm run preview -- --port 5174
+```
+
 2. Run the script from the project root:
 
 ```bash
-node scripts/screenshots.mjs
+SCREENSHOT_URL=http://localhost:5174 node scripts/screenshots.mjs
 ```
 
 Playwright must be available — it ships with the cloud environment at `/opt/node22/lib/node_modules/playwright/index.mjs`. For local runs where it isn't globally installed:
 
 ```bash
 npm install --save-dev playwright && npx playwright install chromium
-node scripts/screenshots.mjs
+SCREENSHOT_URL=http://localhost:5174 node scripts/screenshots.mjs
 ```
 
 The script (`scripts/screenshots.mjs`):
-- Checks that the dev server is reachable before starting
+- Checks that the target server is reachable before starting
 - Iterates over 3 devices × 2 themes = 6 browser contexts
 - Seeds demo data directly into IndexedDB (including the `theme` setting), then reloads so the app picks it up
 - Injects 2 active timers (`punchOut: null`) so the Timer view is populated
@@ -478,7 +501,7 @@ The script (`scripts/screenshots.mjs`):
 
 ## What NOT to Do
 
-- Do not introduce a backend, authentication, or cloud sync without explicit scope agreement
+- Do not introduce a backend or server-side authentication without explicit scope agreement. Cloud sync via OAuth + provider-hosted storage (GitHub Gist, Google Drive, OneDrive) is in scope as of v0.10.0 — but adding a new sync provider requires a separate Cloudflare Worker secret and explicit agreement on the OAuth flow
 - Do not add a URL router — the tab-state approach is intentional for PWA standalone mode
 - Do not import new heavy libraries without checking bundle size impact (current bundle is intentionally small)
 - Do not store sensitive data in Dexie (it is plaintext in browser storage)

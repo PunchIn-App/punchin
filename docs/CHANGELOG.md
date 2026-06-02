@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.10.0] — 2026-06-02
+
+### Added
+- **Settings — Cloud Sync** — Sync your time-tracking data across devices using your choice of **GitHub Gist** (private), **Google Drive** (hidden app folder), or **OneDrive** (App Folder). Connect via OAuth, tap **Sync Now** to pull remote data and push a fresh snapshot. New entries from other devices are merged in using the same deduplication logic as the existing JSON import; no manual conflict resolution needed.
+- **Settings — Sync token expiry** — Google and OneDrive implicit-flow tokens expire after ~1 hour. When a token expires, the Sync section shows a "Token expired — reconnect" prompt and disables the Sync Now button until the user re-authenticates.
+- **Settings — Factory Reset** — Now clears all sync credentials (`syncProvider`, `syncToken`, `syncTokenExpiry`, `syncFileId`, `lastSyncedAt`, `syncError`) alongside all other data.
+- **Infrastructure — GitHub OAuth Worker** — A Cloudflare Worker (`worker/oauth.js`) handles the GitHub OAuth server-side code→token exchange (GitHub does not support PKCE for OAuth Apps). All other routes fall through to static assets. The GitHub client secret is stored as a Cloudflare Worker secret and never embedded in the client bundle.
+
+### Changed
+- **Infrastructure — Cloudflare Worker** — `wrangler.jsonc` now sets `"main": "./worker/oauth.js"` and adds an `ASSETS` binding so the single Worker handles both OAuth callbacks and static asset serving.
+
+---
+
 ## [0.9.0] — 2026-06-02
 
 ### Added

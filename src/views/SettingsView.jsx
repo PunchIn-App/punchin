@@ -2,12 +2,18 @@ import { useState, useEffect, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
 import ColorPicker from '../components/ColorPicker'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut } from 'lucide-react'
 import { getInstallPrompt, applyUpdate } from '../utils/pwa'
 import { format } from 'date-fns'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { usePlatformContext } from '../hooks/usePlatformContext'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { runSync, disconnectSync } from '../sync/syncManager'
+import { buildGitHubOAuthUrl } from '../sync/providers/github'
+import { buildGoogleOAuthUrl } from '../sync/providers/google'
+import { buildOneDriveOAuthUrl } from '../sync/providers/onedrive'
+import { SYNC_CONFIG } from '../sync/config'
 
 const ACCENT_PRESETS = [
   { name: 'Blue',   hex: '#1f6feb' },
@@ -110,6 +116,17 @@ export function buildBugReportUrl(appVersion, isStandalone, os) {
   return `https://github.com/PunchIn-App/punchin/issues/new?${params}`
 }
 
+const PROVIDER_LABEL = { github: 'GitHub Gist', google: 'Google Drive', onedrive: 'OneDrive' }
+
+function formatLastSync(ts) {
+  if (!ts) return 'Never synced'
+  const diff = Date.now() - ts
+  if (diff < 60000) return 'Just now'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+  return new Date(ts).toLocaleDateString()
+}
+
 export default function SettingsView() {
   const { settings, updateSetting } = useSettings()
   const { isStandalone, os } = usePlatformContext()
@@ -121,6 +138,12 @@ export default function SettingsView() {
   const [showChangelog, setShowChangelog] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(() => !!window.__pwaUpdateAvailable)
   const [installPrompt, setInstallPrompt] = useState(getInstallPrompt)
+  const [syncing, setSyncing] = useState(false)
+
+  const syncSettings = useLiveQuery(async () => {
+    const rows = await db.settings.toArray()
+    return rows.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
+  }, [])
 
   useEffect(() => {
     const onUpdateReady = () => setUpdateAvailable(true)
@@ -204,7 +227,7 @@ export default function SettingsView() {
         // 1. Import Labor Types
         const ltMap = {} // oldID -> newID
         const existingLts = await db.laborTypes.toArray()
-        
+
         for (const backupLt of data.laborTypes) {
           const matched = existingLts.find(lt => lt.name.toLowerCase() === backupLt.name.toLowerCase())
           if (matched) {
@@ -342,10 +365,34 @@ export default function SettingsView() {
         { key: 'weekStartsMonday',      value: true  },
         { key: 'theme',                 value: 'auto' },
         { key: 'accentColor',           value: '#F59E0B' },
+        { key: 'syncProvider',          value: null },
+        { key: 'syncToken',             value: null },
+        { key: 'syncTokenExpiry',       value: null },
+        { key: 'syncFileId',            value: null },
+        { key: 'lastSyncedAt',          value: null },
       ])
     })
     setResetStage(null)
   }
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await runSync()
+      await db.settings.put({ key: 'syncError', value: null })
+    } catch (err) {
+      await db.settings.put({ key: 'syncError', value: err.message })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleDisconnect = async () => {
+    if (!window.confirm('Disconnect sync? Your local data is kept.')) return
+    await disconnectSync()
+  }
+
+  const tokenExpired = syncSettings?.syncTokenExpiry && Date.now() > syncSettings.syncTokenExpiry
 
   return (
     <div className="h-full scrollable px-4 pt-4 pb-24 space-y-6 lg:max-w-2xl lg:mx-auto lg:w-full">
@@ -491,6 +538,104 @@ export default function SettingsView() {
             aria-label="Import backup JSON file"
             className="hidden"
           />
+        </div>
+      </section>
+
+      {/* Sync */}
+      <section>
+        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Sync</p>
+        <div className="rounded-xl border border-appBorder bg-appCard overflow-hidden">
+          {syncSettings?.syncProvider ? (
+            <>
+              <div className="flex items-center gap-3 px-4 py-4 border-b border-appBorderLight">
+                <Cloud className={`w-4 h-4 flex-shrink-0 ${tokenExpired ? 'text-red-400' : 'text-amber-400'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-appText font-medium">
+                    {PROVIDER_LABEL[syncSettings.syncProvider] ?? syncSettings.syncProvider}
+                  </p>
+                  <p className="text-xs text-appTextMuted mt-0.5">
+                    {tokenExpired
+                      ? 'Token expired — reconnect to continue syncing'
+                      : `Last synced: ${formatLastSync(syncSettings.lastSyncedAt)}`}
+                  </p>
+                  {syncSettings.syncError && !tokenExpired && (
+                    <p className="text-xs text-red-400 mt-0.5 truncate">{syncSettings.syncError}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex divide-x divide-appBorderLight">
+                <button
+                  onClick={handleSync}
+                  disabled={syncing || !!tokenExpired}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 hover:bg-appInput transition-colors text-sm text-appText disabled:opacity-40"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Syncing…' : 'Sync Now'}
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 hover:bg-appInput transition-colors text-sm text-appTextMuted hover:text-red-400"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Disconnect
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 px-4 py-4 border-b border-appBorderLight">
+                <CloudOff className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-appText font-medium">Sync across devices</p>
+                  <p className="text-xs text-appTextMuted mt-0.5">Store your data in your own cloud account</p>
+                </div>
+              </div>
+              <div className="px-4 py-4 space-y-2">
+                {SYNC_CONFIG.github.clientId && (
+                  <button
+                    onClick={() => { window.location.href = buildGitHubOAuthUrl(SYNC_CONFIG.github.clientId, SYNC_CONFIG.github.callbackBase) }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
+                  >
+                    <Github className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-appText font-medium">GitHub Gist</p>
+                      <p className="text-xs text-appTextMuted">Private gist in your GitHub account</p>
+                    </div>
+                  </button>
+                )}
+                {SYNC_CONFIG.google.clientId && (
+                  <button
+                    onClick={() => { window.location.href = buildGoogleOAuthUrl(SYNC_CONFIG.google.clientId) }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
+                  >
+                    <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-appText font-medium">Google Drive</p>
+                      <p className="text-xs text-appTextMuted">Stored in a hidden app folder</p>
+                    </div>
+                  </button>
+                )}
+                {SYNC_CONFIG.onedrive.clientId && (
+                  <button
+                    onClick={() => { window.location.href = buildOneDriveOAuthUrl(SYNC_CONFIG.onedrive.clientId) }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
+                  >
+                    <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-appText font-medium">OneDrive</p>
+                      <p className="text-xs text-appTextMuted">Stored in your OneDrive app folder</p>
+                    </div>
+                  </button>
+                )}
+                {!SYNC_CONFIG.github.clientId && !SYNC_CONFIG.google.clientId && !SYNC_CONFIG.onedrive.clientId && (
+                  <p className="text-xs text-appTextMuted px-1">
+                    Set <code className="font-mono">VITE_GITHUB_CLIENT_ID</code>, <code className="font-mono">VITE_GOOGLE_CLIENT_ID</code>, or <code className="font-mono">VITE_ONEDRIVE_CLIENT_ID</code> to enable sync.
+                    See <code className="font-mono">.env.example</code> for setup instructions.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </section>
 
