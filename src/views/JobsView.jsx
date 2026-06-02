@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { db } from '../db'
+import ColorPicker from '../components/ColorPicker'
 
 const PRESET_COLORS = [
   '#6366F1','#F59E0B','#22C55E','#3B82F6',
   '#EF4444','#EC4899','#8B5CF6','#14B8A6',
-  '#F97316','#06B6D4',
+  '#F97316',
 ]
+
+const PRESET_COLOR_OBJECTS = PRESET_COLORS.map(hex => ({ hex }))
 
 function JobForm({ job, laborTypes, onDone }) {
   const [name, setName]           = useState(job?.name || '')
@@ -133,18 +136,13 @@ function LaborTypeForm({ lt, onDone }) {
         onKeyDown={e => e.key === 'Enter' && save()}
         className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
                    placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors" />
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Select color">
-        {PRESET_COLORS.map(c => (
-          <button
-            key={c}
-            onClick={() => setColor(c)}
-            aria-label={`Color ${c}`}
-            aria-pressed={color === c}
-            className="w-9 h-9 rounded-full border-2 transition-all hover:scale-110"
-            style={{ backgroundColor: c, borderColor: color === c ? 'white' : 'transparent' }}
-          />
-        ))}
-      </div>
+      <ColorPicker
+        presets={PRESET_COLOR_OBJECTS}
+        value={color}
+        onChange={setColor}
+        size="lg"
+        label="Select color"
+      />
       <div className="flex gap-2 pt-1">
         <button onClick={save}
           className="flex-1 py-2 rounded-lg bg-appAccent hover:brightness-110 text-[#0F1117] font-bold text-sm transition-all">

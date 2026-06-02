@@ -1,17 +1,18 @@
 import { useState, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
+import ChangelogModal from '../components/ChangelogModal'
+import ColorPicker from '../components/ColorPicker'
 import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette } from 'lucide-react'
 import { format } from 'date-fns'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
 
 const ACCENT_PRESETS = [
-  { name: 'Amber',   hex: '#F59E0B' },
-  { name: 'Orange',  hex: '#F97316' },
-  { name: 'Lime',    hex: '#84CC16' },
-  { name: 'Teal',    hex: '#2DD4BF' },
-  { name: 'Sky',     hex: '#38BDF8' },
-  { name: 'Pink',    hex: '#F472B6' },
+  { name: 'Amber',  hex: '#F59E0B' },
+  { name: 'Orange', hex: '#F97316' },
+  { name: 'Lime',   hex: '#84CC16' },
+  { name: 'Teal',   hex: '#2DD4BF' },
+  { name: 'Sky',    hex: '#38BDF8' },
 ]
 
 function Toggle({ value, onChange, ariaLabel }) {
@@ -64,6 +65,7 @@ export default function SettingsView() {
   const [dangerOpen, setDangerOpen] = useState(false)
   const [updateStatus, setUpdateStatus] = useState(null) // null | 'checking' | 'latest'
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [showChangelog, setShowChangelog] = useState(false)
 
   const exportData = async () => {
     const [jobs, entries, laborTypes] = await Promise.all([
@@ -203,20 +205,48 @@ export default function SettingsView() {
 
   const checkForUpdates = async () => {
     setUpdateStatus('checking')
-    if ('serviceWorker' in navigator) {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration()
-        if (reg) {
-          await reg.update()
-          if (reg.waiting || reg.installing) {
-            window.location.reload()
-            return
-          }
-        }
-      } catch {}
+
+    if (!('serviceWorker' in navigator)) {
+      setUpdateStatus('latest')
+      setTimeout(() => setUpdateStatus(null), 2500)
+      return
     }
-    setUpdateStatus('latest')
-    setTimeout(() => setUpdateStatus(null), 2500)
+
+    try {
+      const reg = await navigator.serviceWorker.getRegistration()
+      if (!reg) {
+        setUpdateStatus('latest')
+        setTimeout(() => setUpdateStatus(null), 2500)
+        return
+      }
+
+      // Already a new version waiting → reload to apply it
+      if (reg.waiting) {
+        window.location.reload()
+        return
+      }
+
+      // With autoUpdate the new SW skips waiting and fires controllerchange on activate
+      let updateFound = false
+      reg.addEventListener('updatefound', () => { updateFound = true }, { once: true })
+      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true })
+
+      await reg.update()
+
+      // Brief buffer for updatefound / controllerchange to settle after update() resolves
+      await new Promise(r => setTimeout(r, 400))
+
+      if (updateFound) {
+        // New SW installing; controllerchange will reload — force reload as fallback
+        window.location.reload()
+      } else {
+        setUpdateStatus('latest')
+        setTimeout(() => setUpdateStatus(null), 2500)
+      }
+    } catch {
+      setUpdateStatus('latest')
+      setTimeout(() => setUpdateStatus(null), 2500)
+    }
   }
 
   const clearEntries = async () => {
@@ -319,21 +349,13 @@ export default function SettingsView() {
                 <p className="text-xs text-appTextMuted mt-0.5">Highlight color throughout the app</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0" role="group" aria-label="Choose accent color">
-              {ACCENT_PRESETS.map(({ name, hex }) => {
-                const active = (settings.accentColor || '#F59E0B') === hex
-                return (
-                  <button
-                    key={hex}
-                    onClick={() => updateSetting('accentColor', hex)}
-                    aria-label={`${name}${active ? ' (selected)' : ''}`}
-                    aria-pressed={active}
-                    className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${active ? 'border-white scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: hex }}
-                  />
-                )
-              })}
-            </div>
+            <ColorPicker
+              presets={ACCENT_PRESETS}
+              value={settings.accentColor || '#F59E0B'}
+              onChange={hex => updateSetting('accentColor', hex)}
+              size="md"
+              label="Choose accent color"
+            />
           </div>
         </div>
       </section>
@@ -480,11 +502,9 @@ export default function SettingsView() {
             </div>
             <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
           </a>
-          <a
-            href="https://github.com/PunchIn-App/punchin/blob/main/CHANGELOG.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-between px-4 py-4 gap-3 hover:bg-appInput transition-colors">
+          <button
+            onClick={() => setShowChangelog(true)}
+            className="w-full flex items-center justify-between px-4 py-4 gap-3 hover:bg-appInput transition-colors text-left">
             <div className="flex items-center gap-3 min-w-0">
               <ScrollText className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
               <div className="min-w-0">
@@ -492,8 +512,8 @@ export default function SettingsView() {
                 <p className="text-xs text-appTextMuted mt-0.5">See what's new in each release</p>
               </div>
             </div>
-            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
-          </a>
+            <ChevronDown className="w-4 h-4 text-appTextMuted flex-shrink-0 -rotate-90" aria-hidden="true" />
+          </button>
           <button
             onClick={checkForUpdates}
             disabled={updateStatus === 'checking'}
@@ -520,6 +540,8 @@ export default function SettingsView() {
           onCancel={() => setShowClearConfirm(false)}
         />
       )}
+
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </div>
   )
 }
