@@ -63,11 +63,10 @@ Most time tracking tools are bloated, require an account, or bill you monthly fo
 </p>
 <p align="center"><sub>Timer &nbsp;·&nbsp; Jobs &nbsp;·&nbsp; Labor Types &nbsp;·&nbsp; Daily Sheet &nbsp;·&nbsp; Weekly Sheet &nbsp;·&nbsp; Analytics &nbsp;·&nbsp; Settings</sub></p>
 
-<details>
-<summary><strong>Tablet &amp; Desktop screenshots</strong></summary>
+<summary><strong>Tablet &amp; Desktop </strong></summary>
 
 PunchIn adapts from pocket to desktop without a separate codebase. The bottom-nav shell and card layout reflow naturally across breakpoints. When installed as a PWA, it goes further: the app detects the host OS and applies platform-native behaviors automatically — iOS safe-area insets, Apple-style bottom sheets with swipe-to-dismiss and Taptic Engine feedback, and Material Design 3 sheets on Android with hardware back-button support.
-
+<details>
 #### Tablet
 
 <p align="center">
