@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.7.0
+**Version:** 0.8.0
 
 ---
 
@@ -154,7 +154,7 @@ Every version bump must update all of the following in the **same commit or PR**
 | File | What to change |
 |------|----------------|
 | `package.json` | `"version"` field — **source of truth** |
-| `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-F59E0B...` |
+| `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-1f6feb...` |
 | `CLAUDE.md` | `**Version:** {X.Y.Z}` in the Project Overview header |
 | `CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top |
 | `docs/screenshots/` | Regenerate if any visible UI changed (see Documentation Maintenance below) |
@@ -285,7 +285,7 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `allowConcurrentTimers` | boolean | `false` |
 | `weekStartsMonday` | boolean | `true` |
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
-| `accentColor` | hex string | `"#F59E0B"` |
+| `accentColor` | hex string | `"#1f6feb"` |
 
 ### Fresh Install / Zero State
 
@@ -321,7 +321,7 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 
 ### Color Conventions
 
-- **Accent:** `appAccent` / `text-appAccent` tokens — active nav, buttons, highlights (user-configurable; defaults to amber `#F59E0B`)
+- **Accent:** `appAccent` / `text-appAccent` tokens — active nav, buttons, highlights (user-configurable; defaults to `#1f6feb`)
 - **Stop/end actions:** red (`red-500`, `red-600`) — punch-out buttons and other irreversible-but-non-destructive actions; also used for destructive confirmations
 - **Labor type colors:** 9 preset hex values defined in `JobsView.jsx` (`#6366F1 #F59E0B #22C55E #3B82F6 #EF4444 #EC4899 #8B5CF6 #14B8A6 #F97316`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
 
@@ -340,7 +340,7 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 | `text-appText` | `--text-primary` | `#FFFFFF` | `#111827` |
 | `text-appTextMuted` | `--text-muted` | `#6B7280` | `#6B7280` |
 | `text-appTextDisabled` | `--text-disabled` | `#374151` | `#D1D5DB` |
-| `bg-appAccent` / `text-appAccent` | `--accent-rgb` | amber `#F59E0B` (user-configurable) | same |
+| `bg-appAccent` / `text-appAccent` | `--accent-rgb` | `#1f6feb` (user-configurable) | same |
 
 Two additional CSS variables exist in `index.css` but have **no Tailwind token** — use them via `var()` in CSS files or Recharts style props only, not via Tailwind utilities:
 

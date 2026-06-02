@@ -9,11 +9,11 @@ import { useSettings } from '../hooks/useSettings'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 
 const ACCENT_PRESETS = [
+  { name: 'Blue',   hex: '#1f6feb' },
   { name: 'Amber',  hex: '#F59E0B' },
   { name: 'Orange', hex: '#F97316' },
   { name: 'Lime',   hex: '#84CC16' },
   { name: 'Teal',   hex: '#2DD4BF' },
-  { name: 'Sky',    hex: '#38BDF8' },
 ]
 
 function Toggle({ value, onChange, ariaLabel }) {
@@ -403,7 +403,7 @@ export default function SettingsView() {
             </div>
             <ColorPicker
               presets={ACCENT_PRESETS}
-              value={settings.accentColor || '#F59E0B'}
+              value={settings.accentColor || '#1f6feb'}
               onChange={hex => updateSetting('accentColor', hex)}
               size="md"
               label="Choose accent color"
@@ -445,6 +445,7 @@ export default function SettingsView() {
             ref={fileInputRef}
             onChange={handleImport}
             accept=".json"
+            aria-label="Import backup JSON file"
             className="hidden"
           />
         </div>

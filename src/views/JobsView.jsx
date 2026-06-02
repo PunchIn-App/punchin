@@ -267,8 +267,8 @@ export default function JobsView() {
                     onClick={() => setShowArchivedJobs(v => !v)}
                     className="w-full flex items-center gap-2 py-2 px-1 text-xs text-appTextDisabled hover:text-appTextMuted transition-colors">
                     {showArchivedJobs
-                      ? <ChevronDown className="w-3.5 h-3.5" />
-                      : <ChevronRight className="w-3.5 h-3.5" />}
+                      ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                      : <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />}
                     Archived ({archived.length})
                   </button>
                   {showArchivedJobs && (
@@ -381,8 +381,8 @@ export default function JobsView() {
                     onClick={() => setShowArchivedLT(v => !v)}
                     className="w-full flex items-center gap-2 py-2 px-1 text-xs text-appTextDisabled hover:text-appTextMuted transition-colors">
                     {showArchivedLT
-                      ? <ChevronDown className="w-3.5 h-3.5" />
-                      : <ChevronRight className="w-3.5 h-3.5" />}
+                      ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                      : <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />}
                     Archived ({archived.length})
                   </button>
                   {showArchivedLT && (

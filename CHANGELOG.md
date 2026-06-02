@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.8.0] — 2026-06-02
+
+### Changed
+- **Settings — Accent color** — Default accent for new installs changed from amber (`#F59E0B`) to blue (`#1f6feb`). Preset swatches updated: Blue is now the first option, Amber moves to second, Sky (`#38BDF8`) removed.
+
+### Fixed
+- **Jobs — Archived folder toggle** — Chevron icons in the "Archived (N)" expand/collapse buttons are now hidden from screen readers, preventing duplicate announcements alongside the button label.
+- **Settings — Import data** — The hidden file input now carries an accessible label so screen readers can identify it correctly.
+
+---
+
 ## [0.7.0] — 2026-06-02
 
 ### Added
@@ -16,7 +27,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed (UI Polish)
 
-- **Analytics responsive layout** — "Hours by job" and "By labor type" charts now sit side by side on tablet and desktop (`lg:` breakpoint) instead of stacking in a single column with a large void below. On mobile they continue to stack vertically.
+- **Analytics responsive layout** — "Hours by job" and "By Labor Type" charts now sit side by side on tablet and desktop (`lg:` breakpoint) instead of stacking in a single column with a large void below. On mobile they continue to stack vertically.
 - **Consistent chart colors** — "Hours by job" bar color changed from hardcoded indigo (`#6366F1`) to the user's chosen accent color, matching the daily bar chart and making all three Analytics charts visually coherent.
 - **Stop button styling** — The Stop button on active timer cards is now red-tinted at rest (`bg-red-500/10`, `text-red-400`, red border) rather than plain gray, so its destructive intent is legible before hover without being visually alarming.
 - **Desktop max-width constraints** — Timer view (max 896 px), Jobs view (max 672 px), Settings view (max 672 px), and Analytics view (max 1280 px) are now centered at a comfortable reading width on large displays rather than stretching to fill 1920 px.
@@ -139,7 +150,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Active timer adjustments** — Start time of a running timer can be edited inline from the Timer view.
 - **12-hour timer warning** — Timers running longer than 12 hours display an animated warning badge.
 - **Timesheet search & filters** — Case-insensitive text search and per-job / per-labor-type filter dropdowns that dynamically adjust duration aggregates.
-- **Labor type archive / restore** — Labor types can be archived (replacing hard deletion). Archived types are hidden from all dropdowns but retained for historical accuracy; a restore button brings them back.
+- **Labor Types archive / restore** — Labor Types can be archived (replacing hard deletion). Archived types are hidden from all dropdowns but retained for historical accuracy; a restore button brings them back.
 - **Vitest test suite** — 87 tests covering time utilities, `EditEntryModal` date/time helpers, import deduplication logic, and the concurrent-timer guard in `StartTimerModal`.
 - **README** — Full product introduction with screenshots across phone, tablet, and desktop, feature descriptions, tech stack table, data model, and contributing guide.
 - **CLAUDE.md** — AI-assistant guide covering stack, repo structure, Dexie schema, data flow, theming conventions, and feature checklist.

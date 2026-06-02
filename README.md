@@ -4,23 +4,18 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-F59E0B?style=flat&labelColor=161923" alt="License" /></a>
-  <a href="../../actions/workflows/ci.yml"><img src="../../actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.7.0-F59E0B?style=flat&labelColor=161923" alt="Version 0.7.0" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-1f6feb?style=flat" alt="License" /></a>
+  <a href="../../actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/PunchIn-App/punchin/ci.yml?branch=main&style=flat&label=CI&color=1f6feb" alt="CI" /></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.8.0-1f6feb?style=flat" alt="Version 0.8.0" /></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/frontend-stack-374151?style=flat" alt="Frontend stack:" />
-  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-18-F59E0B?style=flat&labelColor=161923&logo=react&logoColor=white" alt="React 18" /></a>
-  <a href="https://dexie.org"><img src="https://img.shields.io/badge/Dexie-3-F59E0B?style=flat&labelColor=161923" alt="Dexie 3" /></a>
-  <a href="https://recharts.org"><img src="https://img.shields.io/badge/Recharts-2-F59E0B?style=flat&labelColor=161923" alt="Recharts 2" /></a>
-  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-6-F59E0B?style=flat&labelColor=161923&logo=vite&logoColor=white" alt="Vite 6" /></a>
-  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-3-F59E0B?style=flat&labelColor=161923&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 3" /></a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/backend-none-374151?style=flat" alt="No backend." />
-  <a href="https://workers.cloudflare.com"><img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-F59E0B?style=flat&labelColor=161923&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" /></a>
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-18-1f6feb?style=flat&logo=react&logoColor=white" alt="React 18" /></a>
+  <a href="https://dexie.org"><img src="https://img.shields.io/badge/Dexie-3-1f6feb?style=flat" alt="Dexie 3" /></a>
+  <a href="https://recharts.org"><img src="https://img.shields.io/badge/Recharts-2-1f6feb?style=flat" alt="Recharts 2" /></a>
+  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-6-1f6feb?style=flat&logo=vite&logoColor=white" alt="Vite 6" /></a>
+  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-3-1f6feb?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 3" /></a>
+  <a href="https://workers.cloudflare.com"><img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-1f6feb?style=flat&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" /></a>
 </p>
 
 <p align="center"><strong>Precision time tracking for freelancers</strong> — punch in, punch out, get paid accurately.</p>
@@ -39,6 +34,10 @@ Most time tracking tools are bloated, require an account, or bill you monthly fo
 - **Private** — all data stored locally in your browser (IndexedDB); nothing ever leaves your device
 - **Installable** — works as a PWA; add it to your home screen and use it like a native app
 - **Offline-first** — works without an internet connection, always
+
+## Get Started
+
+**[trackmytime.today](https://trackmytime.today)** — open it in any browser, add it to your home screen, and start tracking. No sign-up required.
 
 ---
 
@@ -103,17 +102,17 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
 
 <br>
 
-**Desktop · 1920×1080**
+### Desktop — 1920×1080
 
 <p align="center">
   <img src="docs/screenshots/desktop-dark/timer.png#gh-dark-mode-only"   width="720" alt="Timer on desktop" />
   <img src="docs/screenshots/desktop-light/timer.png#gh-light-mode-only" width="720" alt="Timer on desktop" /><br>
-  <sub>Timer view</sub>
+  <sub>Timer</sub>
 </p>
 <p align="center">
   <img src="docs/screenshots/desktop-dark/analytics.png#gh-dark-mode-only"   width="720" alt="Analytics on desktop" />
   <img src="docs/screenshots/desktop-light/analytics.png#gh-light-mode-only" width="720" alt="Analytics on desktop" /><br>
-  <sub>Analytics view</sub>
+  <sub>Analytics</sub>
 </p>
 <p align="center">
   <img src="docs/screenshots/desktop-dark/timesheets-weekly.png#gh-dark-mode-only"   width="720" alt="Weekly timesheets on desktop" />
@@ -126,7 +125,7 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
 ## Features
 
 ### Live Timer Dashboard
-Start one or more timers across different jobs simultaneously. Each running timer shows the job, labor type, start time, optional notes, and a live elapsed-time counter updated every second. Punch out with a single tap. When no timers are active, the most recently completed session is shown as a "Last Session" card so your previous work is always visible.
+Start one or more timers across different jobs simultaneously. Each running timer shows the job, labor type, start time, optional notes, and a live elapsed-time counter updated every second. Tap **Stop** to end a timer. When no timers are active, the most recently completed session is shown as a "Last Session" card so your previous work is always visible.
 
 ### Job & Labor Type Management
 Organize your work into **jobs** (client projects) and **labor types** (billable categories like Design, Development, Consulting). Both support color-coded badges for fast visual identification. Archiving a job or labor type hides it from active dropdowns and groups it under a collapsible **Archived** section at the bottom of the list — searchable and restorable any time. Historical entries are never broken; archived records are always preserved.
@@ -143,26 +142,61 @@ Charts powered by [Recharts](https://recharts.org) give you a visual overview of
 - **Hours by job** — horizontal bar chart sorted by volume
 - **Labor type donut** — proportion of time by category
 
-### Invoicing
+### Invoice Generator
 Set **hourly rates** per labor type on each job (Jobs tab → edit a job → Hourly rates). Then open the **Invoice** modal from the Timesheets toolbar: pick a job and period, and PunchIn builds a line-item invoice showing hours, rate, and amount for every entry. Export as a formatted **CSV** or use **Print / PDF** to send it directly to a client.
 
 ### Settings & Data Portability
-- Toggle concurrent timers on or off — when off, starting a new timer automatically punches out any running one
-- Choose whether your week starts on Monday or Sunday
-- Switch between **Auto / Light / Dark** theme (auto follows your OS preference)
-- **Accent color** — pick from 6 preset highlight colors (Amber, Orange, Lime, Teal, Sky, Pink); updates the entire app instantly
+- **Concurrent timers** — toggle on or off; when off, starting a new timer automatically stops any running one
+- **Week start** — choose whether your week starts on Monday or Sunday
+- **Theme** — switch between **Auto / Light / Dark** (auto follows your OS preference)
+- **Accent color** — pick from 5 preset highlight colors (Blue, Amber, Orange, Lime, Teal); updates the entire app instantly
 - **Export JSON** — full backup of all data (jobs, labor types, entries)
 - **Export CSV** — all completed entries as a spreadsheet ready for import into bookkeeping apps
-- **Import** a JSON backup (smart deduplication prevents duplicates)
+- **Import JSON** — restore from a backup file (smart deduplication prevents duplicates)
 - **Danger Zone** (collapsible) — **Clear entries** resets logged time while keeping jobs and labor types; **Factory Reset** wipes all data and restores the app to a clean slate (two confirmation steps required)
-- **Check for updates** checks for a pending service-worker update and reloads if one is found, or confirms you're already on the latest version
-- Tap the **PunchIn** logo in the header to return to the Timer view from anywhere
-- Tap the **PunchIn** row in About to open the GitHub repository
-- View the **Changelog** directly from the About section
+- **Check for updates** — applies any pending service-worker update and reloads; confirms you're on the latest version if none is found
+- **Header logo** — tap the PunchIn logo to return to the Timer view from any screen
+- **About → PunchIn** — opens the GitHub repository
+- **About → Changelog** — browse version history and release notes
 
 ---
 
-## Tech Stack
+## How It Works
+
+### Data Model
+
+All state lives in a local IndexedDB database named `PunchInDB`, managed by Dexie.
+
+| Table | Purpose |
+|---|---|
+| `entries` | Time entries — `punchOut: null` means the timer is still running |
+| `jobs` | Client projects; soft-archived via `isActive` / `isDeleted` |
+| `laborTypes` | Billable categories with hex color; soft-archived via `isArchived` |
+| `settings` | Key-value app preferences |
+
+Soft-deletion is used throughout: records are never hard-deleted so historical entries always retain valid references to their job and labor type.
+
+### State Management
+
+No Redux, no global Context. Dexie's `useLiveQuery` hook makes the database reactive — components re-render automatically when data changes. Local React state handles UI concerns (open modals, active tab, search input).
+
+### Theming
+
+Dark and light themes are implemented as CSS custom properties. The default `"auto"` setting tracks `prefers-color-scheme` via a `matchMedia` listener; users can override to force light or dark.
+
+The **accent color** (nav, buttons, active states) is stored as a hex setting and converted to an `--accent-rgb` CSS variable at runtime. A single `appAccent` Tailwind token wires the entire UI to the user's chosen color.
+
+### Adaptive Platform Shell
+
+A `usePlatformContext()` hook detects standalone mode and the host OS at runtime. When the app is installed:
+
+- **iOS** — `env(safe-area-inset-top/bottom)` pads the header and nav bar so nothing clips into the notch or home indicator. Modals render as Apple-style bottom sheets with a grabber pill, swipe-down-to-dismiss, and Taptic Engine haptic feedback via the WebKit `<input switch>` polyfill.
+- **Android** — Modals follow Material Design 3 (28 px top radius, 48 dp drag handle). The hardware back button closes open modals instead of exiting the app, implemented via `history.pushState` + `popstate`. Dismiss fires `navigator.vibrate(40)` for a crisp tick.
+- **Browser tab** — All of the above is bypassed; the original layout and modal behavior is unchanged.
+
+---
+
+## Tech Stack & Project Structure
 
 | Layer | Technology |
 |---|---|
@@ -176,71 +210,31 @@ Set **hourly rates** per labor type on each job (Jobs tab → edit a job → Hou
 | PWA | vite-plugin-pwa |
 | Hosting | Cloudflare Workers |
 
----
-
-## Get Started
-
-**[trackmytime.today](https://trackmytime.today)** — open it in any browser, add it to your home screen, and start tracking. No sign-up required.
-
----
-
-## How It Works
-
-### Data model
-
-All state lives in a local IndexedDB database named `PunchInDB`, managed by Dexie.
-
-| Table | Purpose |
-|---|---|
-| `entries` | Time records — `punchOut: null` means the timer is still running |
-| `jobs` | Client projects; soft-archived via `isActive` / `isDeleted` |
-| `laborTypes` | Billable categories with hex color; soft-archived via `isArchived` |
-| `settings` | Key-value app preferences |
-
-Soft-deletion is used throughout: records are never hard-deleted so historical entries always retain valid references to their job and labor type.
-
-### State management
-
-No Redux, no global Context. Dexie's `useLiveQuery` hook makes the database reactive — components re-render automatically when data changes. Local React state handles UI concerns (open modals, active tab, search input).
-
-### Theming
-
-Dark and light themes are implemented as CSS custom properties. The default `"auto"` setting tracks `prefers-color-scheme` via a `matchMedia` listener; users can override to force light or dark.
-
-The **accent color** (nav, buttons, active states) is stored as a hex setting and converted to an `--accent-rgb` CSS variable at runtime. A single `appAccent` Tailwind token wires the entire UI to the user's chosen color.
-
-### Adaptive platform shell
-
-A `usePlatformContext()` hook detects standalone mode and the host OS at runtime. When the app is installed:
-
-- **iOS** — `env(safe-area-inset-top/bottom)` pads the header and nav bar so nothing clips into the notch or home indicator. Modals render as Apple-style bottom sheets with a grabber pill, swipe-down-to-dismiss, and Taptic Engine haptic feedback via the WebKit `<input switch>` polyfill.
-- **Android** — Modals follow Material Design 3 (28 px top radius, 48 dp drag handle). The hardware back button closes open modals instead of exiting the app, implemented via `history.pushState` + `popstate`. Dismiss fires `navigator.vibrate(40)` for a crisp tick.
-- **Browser tab** — All of the above is bypassed; the original layout and modal behavior is unchanged.
-
----
-
-## Project Structure
-
 ```
 punchin/
+├── package.json            # Version source of truth
 ├── index.html              # App shell, fonts, theme-color meta
 ├── vite.config.js          # Vite + PWA plugin config
 ├── wrangler.jsonc          # Cloudflare Workers deployment
 ├── tailwind.config.js      # Custom font families + CSS-variable-backed color tokens
 └── src/
+    ├── main.jsx            # React entry point
     ├── App.jsx             # Root: tab state, theme application
     ├── db.js               # Dexie schema, seed data, migrations
     ├── index.css           # CSS variables (dark/light), scrollbar utils
     ├── components/
     │   ├── Layout.jsx          # Fixed header + bottom nav
+    │   ├── ErrorBoundary.jsx   # Error boundary wrapping each view
     │   ├── TimerCard.jsx       # Live timer card (1 s interval)
     │   ├── StartTimerModal.jsx # Punch-in form
     │   ├── EditEntryModal.jsx  # Edit active or completed entry
     │   ├── InvoiceModal.jsx    # Invoice generator with CSV/print export
-    │   └── ConfirmModal.jsx    # Accessible confirmation dialog
+    │   ├── ConfirmModal.jsx    # Accessible confirmation dialog
+    │   ├── ColorPicker.jsx     # Preset swatches + custom hex input
+    │   └── ChangelogModal.jsx  # Changelog viewer (built from CHANGELOG.md)
     ├── views/
     │   ├── TimerView.jsx       # Active timers list
-    │   ├── JobsView.jsx        # Jobs & labor types CRUD
+    │   ├── JobsView.jsx        # Jobs & Labor Types CRUD
     │   ├── TimesheetsView.jsx  # Daily/weekly logs + search
     │   ├── AnalyticsView.jsx   # Charts
     │   └── SettingsView.jsx    # Preferences + data management

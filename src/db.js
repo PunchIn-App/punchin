@@ -50,7 +50,7 @@ db.on('populate', async () => {
     { key: 'allowConcurrentTimers', value: false },
     { key: 'weekStartsMonday',      value: true  },
     { key: 'theme',                 value: 'auto' },
-    { key: 'accentColor',           value: '#F59E0B' },
+    { key: 'accentColor',           value: '#1f6feb' },
   ])
 })
 
