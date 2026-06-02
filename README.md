@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-F59E0B?style=flat&labelColor=161923" alt="License" /></a>
   <a href="../../actions/workflows/ci.yml"><img src="../../actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/version-0.6.6-F59E0B?style=flat&labelColor=161923" alt="Version 0.6.6" />
+  <img src="https://img.shields.io/badge/version-0.7.0-F59E0B?style=flat&labelColor=161923" alt="Version 0.7.0" />
 </p>
 
 <p align="center">

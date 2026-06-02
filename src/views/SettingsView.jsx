@@ -2,10 +2,11 @@ import { useState, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
 import ColorPicker from '../components/ColorPicker'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug } from 'lucide-react'
 import { format } from 'date-fns'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
+import { usePlatformContext } from '../hooks/usePlatformContext'
 
 const ACCENT_PRESETS = [
   { name: 'Amber',  hex: '#F59E0B' },
@@ -58,8 +59,59 @@ export function isEntryDuplicate(backupEntry, existingEntries, newJobId, newLtId
   )
 }
 
+export function buildBugReportUrl(appVersion, isStandalone, os) {
+  const ua = navigator.userAgent
+
+  let browser = 'Unknown'
+  if (/Edg\/(\d+)/.test(ua))                   browser = `Edge ${ua.match(/Edg\/(\d+)/)[1]}`
+  else if (/CriOS\/(\d+)/.test(ua))             browser = `Chrome ${ua.match(/CriOS\/(\d+)/)[1]} (iOS)`
+  else if (/FxiOS\/(\d+)/.test(ua))             browser = `Firefox ${ua.match(/FxiOS\/(\d+)/)[1]} (iOS)`
+  else if (/Chrome\/(\d+)/.test(ua))            browser = `Chrome ${ua.match(/Chrome\/(\d+)/)[1]}`
+  else if (/Version\/(\d+).*Safari/.test(ua))   browser = `Safari ${ua.match(/Version\/(\d+)/)[1]}`
+  else if (/Firefox\/(\d+)/.test(ua))           browser = `Firefox ${ua.match(/Firefox\/(\d+)/)[1]}`
+
+  let osStr = 'Unknown'
+  if (os === 'ios') {
+    const m = ua.match(/OS (\d+[_\d]*)/)
+    osStr = m ? `iOS ${m[1].replace(/_/g, '.')}` : 'iOS'
+  } else if (os === 'android') {
+    const m = ua.match(/Android (\d+\.?\d*)/)
+    osStr = m ? `Android ${m[1]}` : 'Android'
+  } else {
+    const mac = ua.match(/Mac OS X (\d+[_\d]*)/)
+    const win = ua.match(/Windows NT (\d+\.\d+)/)
+    if (mac) osStr = `macOS ${mac[1].replace(/_/g, '.')}`
+    else if (win) {
+      const ntMap = { '10.0': 'Windows 10 / 11', '6.3': 'Windows 8.1', '6.2': 'Windows 8', '6.1': 'Windows 7' }
+      osStr = ntMap[win[1]] ?? `Windows NT ${win[1]}`
+    } else osStr = 'Linux / other'
+  }
+
+  let device = 'Unknown'
+  if (os === 'ios') {
+    device = /iPad/.test(ua) ? 'iPad' : 'iPhone'
+  } else if (os === 'android') {
+    const m = ua.match(/\(Linux; Android [^;]+; ([^)]+)\)/)
+    device = m ? m[1].trim() : 'Android device'
+  } else {
+    device = `Desktop (${screen.width}×${screen.height})`
+  }
+
+  const params = new URLSearchParams({
+    template: 'bug_report.yml',
+    version: appVersion,
+    'install-type': isStandalone ? 'PWA (installed to home screen)' : 'Browser tab',
+    browser,
+    os: osStr,
+    device,
+  })
+
+  return `https://github.com/PunchIn-App/punchin/issues/new?${params}`
+}
+
 export default function SettingsView() {
   const { settings, updateSetting } = useSettings()
+  const { isStandalone, os } = usePlatformContext()
   const fileInputRef = useRef(null)
   const [resetStage, setResetStage] = useState(null) // null | 'warn' | 'final'
   const [dangerOpen, setDangerOpen] = useState(false)
@@ -513,6 +565,18 @@ export default function SettingsView() {
               </div>
             </div>
             <ChevronDown className="w-4 h-4 text-appTextMuted flex-shrink-0 -rotate-90" aria-hidden="true" />
+          </button>
+          <button
+            onClick={() => window.open(buildBugReportUrl(__APP_VERSION__, isStandalone, os), '_blank', 'noopener,noreferrer')}
+            className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
+            <div className="flex items-center gap-3 min-w-0">
+              <Bug className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-sm text-appText font-medium">Report a bug</p>
+                <p className="text-xs text-appTextMuted mt-0.5">Opens a pre-filled GitHub issue with your device info</p>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
           </button>
           <button
             onClick={checkForUpdates}

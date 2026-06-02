@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.0] — 2026-06-02
+
+### Added
+- Settings — "Report a bug" button in the About section opens a pre-filled GitHub issue with app version, install type (PWA or browser tab), browser, OS, and device auto-detected from the current session. Users only need to describe what happened and the steps to reproduce.
+
+---
+
 ## [0.6.6] — 2026-06-02
 
 ### Changed (UI Polish)
