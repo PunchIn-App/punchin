@@ -1,6 +1,17 @@
-# PunchIn
+<p align="center">
+  <img src="docs/logo.svg" alt="PunchIn" width="220" />
+</p>
 
-> **Precision time tracking for freelancers** — punch in, punch out, get paid accurately.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-F59E0B?style=flat&labelColor=161923" alt="License" /></a>
+  <a href="https://libraries.io/github/PunchIn-App/punchin"><img src="https://img.shields.io/librariesio/github/PunchIn-App/punchin?style=flat&labelColor=161923" alt="Dependencies" /></a>
+  <img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-F59E0B?style=flat&labelColor=161923&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" />
+  <img src="https://img.shields.io/github/package-json/v/PunchIn-App/punchin?style=flat&color=F59E0B&labelColor=161923&label=version" alt="Version" />
+</p>
+
+<p align="center"><strong>Precision time tracking for freelancers</strong> — punch in, punch out, get paid accurately.</p>
+
+---
 
 PunchIn is a mobile-first, offline-capable Progressive Web App (PWA) for freelancers and independent contractors who need fast, no-friction time tracking. No accounts. No cloud. No subscriptions. Your data lives entirely on your device.
 
@@ -209,34 +220,14 @@ punchin/
 
 ## Contributing
 
-### Running locally
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, workflow, and conventions.
 
-```bash
-git clone https://github.com/PunchIn-App/punchin.git
-cd punchin
-npm install
-npm run dev       # Vite dev server at http://localhost:5173
-npm run build     # production build → dist/
-npm run preview   # serve the production build locally
-```
-
-### Workflow
-
-1. Fork the repo and create a branch (`git checkout -b feature/your-idea`)
-2. Make your changes — see `CLAUDE.md` for architecture conventions and the "What NOT to do" list
-3. Test manually in a browser at mobile width (375 px) and at desktop width
-4. Open a pull request with a clear description of the change
-
-### Key conventions
-
-- **No router** — navigation is tab-based state in `App.jsx`; this is intentional for PWA standalone mode
-- **No backend** — keep all data local; do not introduce cloud sync or authentication
-- **Date math** — always use helpers from `src/utils/time.js`; never inline raw `Date` arithmetic
-- **Schema changes** — bump the Dexie version number and add an upgrade block in `db.js`
-- **Bundle size** — check impact before adding a new dependency; the bundle is intentionally small
+All contributors must agree to the [Contributor License Agreement](CLA.md) before their pull request can be merged.
 
 ---
 
 ## License
 
-MIT
+PunchIn Time Tracker is source-available under the [Business Source License 1.1](LICENSE). Free for personal, non-commercial use by individual freelancers. Commercial use requires a separate license — contact [licensing@trackmytime.today](mailto:licensing@trackmytime.today). The license converts to AGPL-3.0 on 2030-06-02.
+
+Contributions are accepted under the [Contributor License Agreement](CLA.md).
