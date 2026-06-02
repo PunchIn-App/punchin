@@ -1,5 +1,5 @@
 /**
- * Screenshot generator for docs/screenshots/{phone,tablet,desktop}/
+ * Screenshot generator for docs/screenshots/{phone,tablet,desktop}-{dark,light}/
  *
  * Usage (from project root, with dev server running):
  *   npm run dev &          # start Vite if not already running
@@ -9,13 +9,17 @@
  * /opt/node22/lib/node_modules/playwright/index.mjs, or install locally:
  *   npm install --save-dev playwright && npx playwright install chromium
  *
- * Captured views per device (21 total):
+ * Captured views per device × theme (42 total):
  *   timer · jobs · labor-types · timesheets-daily · timesheets-weekly · analytics · settings
  *
  * Device specs:
  *   phone   — Pixel 10 Pro XL default:  412 × 916  CSS px  @ 2.625×
  *   tablet  — iPad Air 11" M2 landscape: 1194 × 834 CSS px  @ 2×
  *   desktop — 1920 × 1080 CSS px @ 1×
+ *
+ * Output directories: docs/screenshots/{phone,tablet,desktop}-{dark,light}/
+ * README uses #gh-dark-mode-only / #gh-light-mode-only fragments so GitHub
+ * shows the correct theme variant automatically.
  */
 
 import { fileURLToPath } from 'url'
@@ -23,7 +27,6 @@ import { dirname, join } from 'path'
 import { mkdirSync, existsSync } from 'fs'
 
 // ── Playwright import ────────────────────────────────────────────────────────
-// Try the global cloud install first, fall back to local node_modules.
 let chromium
 const GLOBAL_PW = '/opt/node22/lib/node_modules/playwright/index.mjs'
 if (existsSync(GLOBAL_PW)) {
@@ -42,11 +45,12 @@ const DEVICES = [
   { name: 'desktop', width: 1920, height: 1080, dpr: 1,     isMobile: false },
 ]
 
+const THEMES = ['dark', 'light']
+
 // ── Demo data seed ───────────────────────────────────────────────────────────
-// Injected into the browser via page.evaluate() after first load.
-// Uses explicit `id` fields so job/labor-type references are deterministic.
-const SEED_FN = /* js */ `;(async () => {
-async function seed() {
+// Passed as a serialised function to page.evaluate(seedData, theme).
+// Must only reference browser globals — no outer Node.js scope.
+async function seedData(theme) {
   function txDone(tx) {
     return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error) })
   }
@@ -57,14 +61,14 @@ async function seed() {
     r.onerror  = () => rej(r.error)
   })
 
-  // Wipe existing content so re-runs are idempotent
+  // Wipe so re-runs are idempotent
   { const tx = db.transaction(['laborTypes','jobs','entries'], 'readwrite')
     tx.objectStore('laborTypes').clear()
     tx.objectStore('jobs').clear()
     tx.objectStore('entries').clear()
     await txDone(tx) }
 
-  // Labor types
+  // Labor types (explicit IDs for deterministic job references)
   { const tx = db.transaction(['laborTypes'], 'readwrite')
     const s = tx.objectStore('laborTypes')
     s.put({ id:1, name:'Development', color:'#22C55E', isArchived:false })
@@ -80,12 +84,12 @@ async function seed() {
     s.put({ id:3, name:'Internal',       clientName:null,          laborTypeId:3, isActive:true, laborRates:{}             })
     await txDone(tx) }
 
-  // Force dark theme
+  // Apply requested theme
   { const tx = db.transaction(['settings'], 'readwrite')
-    tx.objectStore('settings').put({ key:'theme', value:'dark' })
+    tx.objectStore('settings').put({ key:'theme', value: theme })
     await txDone(tx) }
 
-  // Time entries — spread across past 30 days for good analytics
+  // Completed entries spread across past 30 days for populated analytics
   function d(daysBack, h, m=0) {
     const t = new Date(); t.setDate(t.getDate()-daysBack); t.setHours(h,m,0,0); return t
   }
@@ -136,28 +140,26 @@ async function seed() {
 
   db.close()
 }
-await seed()
-})()`
 
-// ── Per-device capture ───────────────────────────────────────────────────────
-async function captureDevice(browser, device) {
+// ── Per-device-and-theme capture ─────────────────────────────────────────────
+async function captureDevice(browser, device, theme) {
   const { name, width, height, dpr, isMobile } = device
-  const outDir = join(ROOT, 'docs', 'screenshots', name)
+  const outDir = join(ROOT, 'docs', 'screenshots', `${name}-${theme}`)
   mkdirSync(outDir, { recursive: true })
 
   const ctx = await browser.newContext({
     viewport:          { width, height },
     deviceScaleFactor: dpr,
     isMobile,
-    colorScheme:       'dark',
+    colorScheme:       theme,
   })
 
   const page = await ctx.newPage()
 
-  // Load, seed, then reload so the app picks up all data
+  // Load, seed (with correct theme), reload so the app picks it all up
   await page.goto(BASE_URL)
   await page.waitForLoadState('networkidle')
-  await page.evaluate(SEED_FN)
+  await page.evaluate(seedData, theme)
   await page.reload()
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(600)
@@ -175,44 +177,37 @@ async function captureDevice(browser, device) {
     process.stdout.write(`  ${filename}\n`)
   }
 
-  // 1. Timer
   await goTab('Timer')
   await shot('timer.png')
 
-  // 2. Jobs
   await goTab('Jobs')
   await shot('jobs.png')
 
-  // 3. Labor Types (sub-tab within Jobs view)
   await page.getByRole('tab', { name: 'Labor Types' }).click()
   await page.waitForTimeout(300)
   await shot('labor-types.png')
 
-  // 4 & 5. Timesheets — daily then weekly
   await goTab('Timesheets')
   await shot('timesheets-daily.png')
   await page.getByRole('tab', { name: /weekly/i }).click()
   await page.waitForTimeout(300)
   await shot('timesheets-weekly.png')
 
-  // 6. Analytics — wait extra for Recharts to render
   await goTab('Analytics')
   await page.waitForTimeout(600)
   await shot('analytics.png')
 
-  // 7. Settings
   await goTab('Settings')
   await shot('settings.png')
 
   await ctx.close()
-  console.log(`✓ ${name} done (7 screenshots → docs/screenshots/${name}/)`)
+  console.log(`✓ ${name}-${theme} done → docs/screenshots/${name}-${theme}/`)
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log(`Connecting to ${BASE_URL} …`)
 
-  // Quick reachability check
   try {
     await fetch(BASE_URL)
   } catch {
@@ -224,12 +219,14 @@ async function main() {
   const browser = await chromium.launch()
 
   for (const device of DEVICES) {
-    console.log(`\n── ${device.name} (${device.width}×${device.height} @${device.dpr}×) ──`)
-    await captureDevice(browser, device)
+    for (const theme of THEMES) {
+      console.log(`\n── ${device.name}-${theme} (${device.width}×${device.height} @${device.dpr}×) ──`)
+      await captureDevice(browser, device, theme)
+    }
   }
 
   await browser.close()
-  console.log('\n✓ All 21 screenshots generated.')
+  console.log('\n✓ All 42 screenshots generated.')
 }
 
 main().catch(err => { console.error(err); process.exit(1) })

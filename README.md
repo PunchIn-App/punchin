@@ -46,13 +46,20 @@ Most time tracking tools are bloated, require an account, or bill you monthly fo
 ### Phone — Pixel 10 Pro XL (all views)
 
 <p align="center">
-  <img src="docs/screenshots/phone/timer.png"            width="110" alt="Timer — 2 active timers" />
-  <img src="docs/screenshots/phone/jobs.png"             width="110" alt="Jobs list" />
-  <img src="docs/screenshots/phone/labor-types.png"      width="110" alt="Labor Types" />
-  <img src="docs/screenshots/phone/timesheets-daily.png" width="110" alt="Timesheets — Daily" />
-  <img src="docs/screenshots/phone/timesheets-weekly.png"width="110" alt="Timesheets — Weekly" />
-  <img src="docs/screenshots/phone/analytics.png"        width="110" alt="Analytics" />
-  <img src="docs/screenshots/phone/settings.png"         width="110" alt="Settings" />
+  <img src="docs/screenshots/phone-dark/timer.png#gh-dark-mode-only"             width="110" alt="Timer — 2 active timers" />
+  <img src="docs/screenshots/phone-dark/jobs.png#gh-dark-mode-only"              width="110" alt="Jobs list" />
+  <img src="docs/screenshots/phone-dark/labor-types.png#gh-dark-mode-only"       width="110" alt="Labor Types" />
+  <img src="docs/screenshots/phone-dark/timesheets-daily.png#gh-dark-mode-only"  width="110" alt="Timesheets — Daily" />
+  <img src="docs/screenshots/phone-dark/timesheets-weekly.png#gh-dark-mode-only" width="110" alt="Timesheets — Weekly" />
+  <img src="docs/screenshots/phone-dark/analytics.png#gh-dark-mode-only"         width="110" alt="Analytics" />
+  <img src="docs/screenshots/phone-dark/settings.png#gh-dark-mode-only"          width="110" alt="Settings" />
+  <img src="docs/screenshots/phone-light/timer.png#gh-light-mode-only"             width="110" alt="Timer — 2 active timers" />
+  <img src="docs/screenshots/phone-light/jobs.png#gh-light-mode-only"              width="110" alt="Jobs list" />
+  <img src="docs/screenshots/phone-light/labor-types.png#gh-light-mode-only"       width="110" alt="Labor Types" />
+  <img src="docs/screenshots/phone-light/timesheets-daily.png#gh-light-mode-only"  width="110" alt="Timesheets — Daily" />
+  <img src="docs/screenshots/phone-light/timesheets-weekly.png#gh-light-mode-only" width="110" alt="Timesheets — Weekly" />
+  <img src="docs/screenshots/phone-light/analytics.png#gh-light-mode-only"         width="110" alt="Analytics" />
+  <img src="docs/screenshots/phone-light/settings.png#gh-light-mode-only"          width="110" alt="Settings" />
 </p>
 <p align="center"><sub>Timer &nbsp;·&nbsp; Jobs &nbsp;·&nbsp; Labor Types &nbsp;·&nbsp; Daily Sheet &nbsp;·&nbsp; Weekly Sheet &nbsp;·&nbsp; Analytics &nbsp;·&nbsp; Settings</sub></p>
 
@@ -71,12 +78,24 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
   </thead>
   <tbody>
     <tr>
-      <td align="center"><img src="docs/screenshots/phone/timer.png"     width="190" alt="Timer on phone" /></td>
-      <td align="center"><img src="docs/screenshots/tablet/timer.png"    width="370" alt="Timer on iPad" /></td>
+      <td align="center">
+        <img src="docs/screenshots/phone-dark/timer.png#gh-dark-mode-only"   width="190" alt="Timer on phone" />
+        <img src="docs/screenshots/phone-light/timer.png#gh-light-mode-only" width="190" alt="Timer on phone" />
+      </td>
+      <td align="center">
+        <img src="docs/screenshots/tablet-dark/timer.png#gh-dark-mode-only"   width="370" alt="Timer on iPad" />
+        <img src="docs/screenshots/tablet-light/timer.png#gh-light-mode-only" width="370" alt="Timer on iPad" />
+      </td>
     </tr>
     <tr>
-      <td align="center"><img src="docs/screenshots/phone/analytics.png" width="190" alt="Analytics on phone" /></td>
-      <td align="center"><img src="docs/screenshots/tablet/analytics.png"width="370" alt="Analytics on iPad" /></td>
+      <td align="center">
+        <img src="docs/screenshots/phone-dark/analytics.png#gh-dark-mode-only"   width="190" alt="Analytics on phone" />
+        <img src="docs/screenshots/phone-light/analytics.png#gh-light-mode-only" width="190" alt="Analytics on phone" />
+      </td>
+      <td align="center">
+        <img src="docs/screenshots/tablet-dark/analytics.png#gh-dark-mode-only"   width="370" alt="Analytics on iPad" />
+        <img src="docs/screenshots/tablet-light/analytics.png#gh-light-mode-only" width="370" alt="Analytics on iPad" />
+      </td>
     </tr>
   </tbody>
 </table>
@@ -86,15 +105,18 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
 **Desktop · 1920×1080**
 
 <p align="center">
-  <img src="docs/screenshots/desktop/timer.png"      width="720" alt="Timer on desktop" /><br>
+  <img src="docs/screenshots/desktop-dark/timer.png#gh-dark-mode-only"   width="720" alt="Timer on desktop" />
+  <img src="docs/screenshots/desktop-light/timer.png#gh-light-mode-only" width="720" alt="Timer on desktop" /><br>
   <sub>Timer view</sub>
 </p>
 <p align="center">
-  <img src="docs/screenshots/desktop/analytics.png"  width="720" alt="Analytics on desktop" /><br>
+  <img src="docs/screenshots/desktop-dark/analytics.png#gh-dark-mode-only"   width="720" alt="Analytics on desktop" />
+  <img src="docs/screenshots/desktop-light/analytics.png#gh-light-mode-only" width="720" alt="Analytics on desktop" /><br>
   <sub>Analytics view</sub>
 </p>
 <p align="center">
-  <img src="docs/screenshots/desktop/timesheets-weekly.png" width="720" alt="Weekly timesheets on desktop" /><br>
+  <img src="docs/screenshots/desktop-dark/timesheets-weekly.png#gh-dark-mode-only"   width="720" alt="Weekly timesheets on desktop" />
+  <img src="docs/screenshots/desktop-light/timesheets-weekly.png#gh-light-mode-only" width="720" alt="Weekly timesheets on desktop" /><br>
   <sub>Weekly timesheets</sub>
 </p>
 
