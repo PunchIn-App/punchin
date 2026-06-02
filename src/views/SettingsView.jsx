@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
 import ColorPicker from '../components/ColorPicker'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown } from 'lucide-react'
+import { getInstallPrompt, applyUpdate } from '../utils/pwa'
 import { format } from 'date-fns'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
@@ -118,6 +119,22 @@ export default function SettingsView() {
   const [updateStatus, setUpdateStatus] = useState(null) // null | 'checking' | 'latest'
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showChangelog, setShowChangelog] = useState(false)
+  const [updateAvailable, setUpdateAvailable] = useState(() => !!window.__pwaUpdateAvailable)
+  const [installPrompt, setInstallPrompt] = useState(getInstallPrompt)
+
+  useEffect(() => {
+    const onUpdateReady = () => setUpdateAvailable(true)
+    const onInstallReady = () => setInstallPrompt(getInstallPrompt())
+    const onInstalled = () => setInstallPrompt(null)
+    window.addEventListener('pwa:update-ready', onUpdateReady)
+    window.addEventListener('pwa:install-ready', onInstallReady)
+    window.addEventListener('pwa:installed', onInstalled)
+    return () => {
+      window.removeEventListener('pwa:update-ready', onUpdateReady)
+      window.removeEventListener('pwa:install-ready', onInstallReady)
+      window.removeEventListener('pwa:installed', onInstalled)
+    }
+  }, [])
 
   const exportData = async () => {
     const [jobs, entries, laborTypes] = await Promise.all([
@@ -256,11 +273,16 @@ export default function SettingsView() {
   }
 
   const checkForUpdates = async () => {
+    if (updateAvailable) {
+      applyUpdate()
+      return
+    }
+
     setUpdateStatus('checking')
 
     if (!('serviceWorker' in navigator)) {
       setUpdateStatus('latest')
-      setTimeout(() => setUpdateStatus(null), 2500)
+      setTimeout(() => setUpdateStatus(null), 3000)
       return
     }
 
@@ -268,36 +290,39 @@ export default function SettingsView() {
       const reg = await navigator.serviceWorker.getRegistration()
       if (!reg) {
         setUpdateStatus('latest')
-        setTimeout(() => setUpdateStatus(null), 2500)
+        setTimeout(() => setUpdateStatus(null), 3000)
         return
       }
 
-      // Already a new version waiting → reload to apply it
-      if (reg.waiting) {
-        window.location.reload()
-        return
-      }
-
-      // With autoUpdate the new SW skips waiting and fires controllerchange on activate
-      let updateFound = false
-      reg.addEventListener('updatefound', () => { updateFound = true }, { once: true })
-      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true })
-
+      // Prompt the browser to fetch the SW from the server right now.
+      // If a new version is found, onNeedRefresh in main.jsx fires and
+      // dispatches pwa:update-ready, which sets updateAvailable via the
+      // useEffect listener above.
       await reg.update()
 
-      // Brief buffer for updatefound / controllerchange to settle after update() resolves
-      await new Promise(r => setTimeout(r, 400))
+      // Wait long enough for the new SW to download and trigger onNeedRefresh.
+      await new Promise(r => setTimeout(r, 2500))
 
-      if (updateFound) {
-        // New SW installing; controllerchange will reload — force reload as fallback
-        window.location.reload()
-      } else {
+      if (!window.__pwaUpdateAvailable) {
         setUpdateStatus('latest')
-        setTimeout(() => setUpdateStatus(null), 2500)
+        setTimeout(() => setUpdateStatus(null), 3000)
       }
+      // If an update was found during the wait, updateAvailable is already
+      // true and the button will reflect it — no further action needed here.
     } catch {
       setUpdateStatus('latest')
-      setTimeout(() => setUpdateStatus(null), 2500)
+      setTimeout(() => setUpdateStatus(null), 3000)
+    }
+  }
+
+  const handleInstall = async () => {
+    const prompt = getInstallPrompt()
+    if (!prompt) return
+    await prompt.prompt()
+    const { outcome } = await prompt.userChoice
+    if (outcome === 'accepted') {
+      setInstallPrompt(null)
+      window.__pwaInstallPrompt = null
     }
   }
 
@@ -411,6 +436,24 @@ export default function SettingsView() {
           </div>
         </div>
       </section>
+
+      {/* Install — only shown when the browser has offered a native install prompt */}
+      {installPrompt && (
+        <section>
+          <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Install</p>
+          <div className="rounded-xl border border-appBorder bg-appCard">
+            <button
+              onClick={handleInstall}
+              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-xl">
+              <MonitorDown className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
+              <div>
+                <p className="text-sm text-appText font-medium">Add to Home Screen</p>
+                <p className="text-xs text-appTextMuted mt-0.5">Install as a standalone app for faster access</p>
+              </div>
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Data */}
       <section>
@@ -582,14 +625,21 @@ export default function SettingsView() {
           <button
             onClick={checkForUpdates}
             disabled={updateStatus === 'checking'}
-            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-b-xl disabled:opacity-60">
-            <RefreshCw className={`w-4 h-4 text-appTextMuted flex-shrink-0 ${updateStatus === 'checking' ? 'animate-spin' : ''}`} aria-hidden="true" />
+            className={`w-full flex items-center gap-3 px-4 py-4 transition-colors text-left rounded-b-xl disabled:opacity-60
+              ${updateAvailable ? 'hover:bg-appAccent/10' : 'hover:bg-appInput'}`}>
+            <RefreshCw
+              className={`w-4 h-4 flex-shrink-0 ${updateStatus === 'checking' ? 'animate-spin' : ''} ${updateAvailable ? 'text-appAccent' : 'text-appTextMuted'}`}
+              aria-hidden="true"
+            />
             <div>
-              <p className="text-sm text-appText font-medium">Check for updates</p>
+              <p className={`text-sm font-medium ${updateAvailable ? 'text-appAccent' : 'text-appText'}`}>
+                {updateAvailable ? 'Update available' : 'Check for updates'}
+              </p>
               <p className="text-xs text-appTextMuted mt-0.5">
-                {updateStatus === 'checking' && 'Checking…'}
-                {updateStatus === 'latest'   && 'Already up to date'}
-                {!updateStatus               && 'Reload to apply any pending app update'}
+                {updateAvailable                         && 'Tap to reload and apply the new version'}
+                {!updateAvailable && updateStatus === 'checking' && 'Checking…'}
+                {!updateAvailable && updateStatus === 'latest'   && 'Already up to date'}
+                {!updateAvailable && !updateStatus               && 'Tap to check for a new version'}
               </p>
             </div>
           </button>

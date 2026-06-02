@@ -6,6 +6,9 @@ import { readFileSync } from 'fs'
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'))
 
 export default defineConfig({
+  css: {
+    postcss: './config/postcss.config.js',
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
@@ -29,7 +32,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'PunchIn',
         short_name: 'PunchIn',

@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.8.0
+**Version:** 0.9.0
 
 ---
 
@@ -16,9 +16,11 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 punchin/
 ├── README.md               # Product intro, screenshots, getting started
 ├── index.html              # App shell (viewport, fonts, theme color)
-├── vite.config.js          # Vite + PWA plugin config
-├── wrangler.jsonc          # Cloudflare Workers deployment
-├── tailwind.config.js      # Custom fonts (Syne, DM Sans, JetBrains Mono) + CSS-variable-backed color tokens
+├── vite.config.js          # Vite + PWA plugin config; references config/ for PostCSS path
+├── wrangler.jsonc          # Cloudflare Workers deployment; deploy via `npm run deploy`
+├── config/
+│   ├── postcss.config.js   # PostCSS pipeline (Tailwind + autoprefixer); config path forwarded to tailwind.config.js
+│   └── tailwind.config.js  # Custom fonts (Syne, DM Sans, JetBrains Mono) + CSS-variable-backed color tokens
 ├── scripts/
 │   └── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
 ├── docs/
@@ -30,12 +32,12 @@ punchin/
 │       ├── desktop-dark/   # 1920×1080 @1× · dark theme — 7 views
 │       └── desktop-light/  # 1920×1080 @1× · light theme — 7 views
 ├── src/
-│   ├── main.jsx            # React entry point
+│   ├── main.jsx            # React entry point; registers service worker and PWA install prompt listener
 │   ├── App.jsx             # Root: tab state, theme application
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
 │   ├── db.js               # Dexie schema, seed data, migrations
 │   ├── components/
-│   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell
+│   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell; shows update badge on Settings icon
 │   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
 │   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
 │   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
@@ -49,13 +51,14 @@ punchin/
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
-│   │   └── SettingsView.jsx    # Settings: theme/accent, JSON/CSV backup, changelog, check-for-updates, Danger Zone
+│   │   └── SettingsView.jsx    # Settings: theme/accent, JSON/CSV backup, changelog, install prompt, check-for-updates, Danger Zone
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web)
 │   │   └── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
 │   └── utils/
-│       └── time.js             # Date/time helpers (format, range, sum)
+│       ├── time.js             # Date/time helpers (format, range, sum)
+│       └── pwa.js              # PWA state bridge: beforeinstallprompt capture, update notification, applyUpdate()
 ```
 
 ---
@@ -103,8 +106,7 @@ When adding new behaviour to any of the above, add a test file alongside it.
 ### Deploy
 
 ```bash
-npm run build
-npx wrangler deploy   # Deploys dist/ to Cloudflare Workers
+npm run deploy   # builds then deploys via wrangler --config config/wrangler.jsonc
 ```
 
 No `.env` files are needed — the app has no backend secrets. Cloudflare account credentials for deployment are managed via `wrangler login`.
@@ -403,9 +405,12 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 
 ## PWA & Deployment Notes
 
-- PWA is configured in `vite.config.js` with `vite-plugin-pwa` using **auto-update** strategy (new service worker activates immediately on next load)
+- PWA is configured in `vite.config.js` with `vite-plugin-pwa` using **prompt** strategy (`registerType: 'prompt'`) — the app controls when updates are applied; users are never interrupted by an auto-reload mid-session
+- Service worker registration and update callbacks are wired in `main.jsx` via `virtual:pwa-register`; state is exposed app-wide through `src/utils/pwa.js` using window events (no React context needed)
+- `beforeinstallprompt` is captured in `src/utils/pwa.js` and surfaced as an "Add to Home Screen" row in Settings when the browser offers it (Android/desktop Chrome; iOS does not fire this event)
 - Manifest defines: name `"PunchIn"`, display `"standalone"`, theme `#0F1117`, icons at 192×192 and 512×512
-- Build output goes to `dist/` — Cloudflare Workers serves it as static assets via `wrangler.jsonc`
+- Build output goes to `dist/` — Cloudflare Workers serves it as static assets via `wrangler.jsonc`; deploy with `npm run deploy`
+- `wrangler.jsonc` stays at the project root — Cloudflare's Git integration auto-detects it there and cannot be redirected without a Dashboard build-command override
 - The `compatibility_date` in `wrangler.jsonc` is pinned; update it intentionally, not automatically
 
 ---

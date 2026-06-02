@@ -1,6 +1,6 @@
 {
   "name": "punchin",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "license": "BUSL-1.1",
   "type": "module",
@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "deploy": "npm run build && wrangler deploy",
     "test": "vitest",
     "test:run": "vitest run",
     "coverage": "vitest run --coverage"

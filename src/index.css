@@ -72,3 +72,27 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Eliminate 300ms tap delay on interactive elements */
+button, a, [role="button"], [role="switch"], [role="tab"] {
+  touch-action: manipulation;
+}
+
+/* Hide number input spin buttons — they're too small to tap precisely on mobile */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Respect the user's OS motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

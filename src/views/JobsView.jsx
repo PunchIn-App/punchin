@@ -265,6 +265,7 @@ export default function JobsView() {
                 <>
                   <button
                     onClick={() => setShowArchivedJobs(v => !v)}
+                    aria-expanded={showArchivedJobs}
                     className="w-full flex items-center gap-2 py-2 px-1 text-xs text-appTextDisabled hover:text-appTextMuted transition-colors">
                     {showArchivedJobs
                       ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
@@ -379,6 +380,7 @@ export default function JobsView() {
                 <>
                   <button
                     onClick={() => setShowArchivedLT(v => !v)}
+                    aria-expanded={showArchivedLT}
                     className="w-full flex items-center gap-2 py-2 px-1 text-xs text-appTextDisabled hover:text-appTextMuted transition-colors">
                     {showArchivedLT
                       ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />

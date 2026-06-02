@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Clock, Briefcase, Calendar, BarChart2, Settings } from 'lucide-react'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 
@@ -22,6 +23,13 @@ function useAdaptiveStyles(isStandalone, os) {
 export default function Layout({ activeView, onNavigate, children }) {
   const { isStandalone, os } = usePlatformContext()
   const adaptive = useAdaptiveStyles(isStandalone, os)
+
+  const [hasUpdate, setHasUpdate] = useState(() => !!window.__pwaUpdateAvailable)
+  useEffect(() => {
+    const handler = () => setHasUpdate(true)
+    window.addEventListener('pwa:update-ready', handler)
+    return () => window.removeEventListener('pwa:update-ready', handler)
+  }, [])
 
   return (
     <div className="h-full flex flex-col bg-appBg">
@@ -61,11 +69,15 @@ export default function Layout({ activeView, onNavigate, children }) {
               key={id}
               onClick={() => onNavigate(id)}
               aria-current={active ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors
+              aria-label={id === 'settings' && hasUpdate ? 'Settings — update available' : undefined}
+              className={`relative flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:ring-inset
                 ${active ? 'text-appAccent' : 'text-appTextMuted hover:text-appText'}`}
             >
               <Icon className="w-5 h-5" strokeWidth={active ? 2 : 1.5} aria-hidden="true" />
+              {id === 'settings' && hasUpdate && (
+                <span aria-hidden="true" className="absolute top-1.5 right-[calc(50%-14px)] w-2 h-2 rounded-full bg-red-500" />
+              )}
               <span className={`text-[10px] ${active ? 'font-semibold' : 'font-normal'}`}>{label}</span>
             </button>
           )

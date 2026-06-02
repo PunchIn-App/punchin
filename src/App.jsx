@@ -48,6 +48,11 @@ export default function App() {
     document.documentElement.style.setProperty('--accent-rgb', hexToRgb(accentColor))
   }, [accentColor])
 
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', resolvedTheme === 'light' ? '#F3F4F6' : '#0F1117')
+  }, [resolvedTheme])
+
   const views = {
     timer:      <TimerView />,
     jobs:       <JobsView />,

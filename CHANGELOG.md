@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.0] — 2026-06-02
+
+### Added
+- **Settings — Install prompt** — "Add to Home Screen" row appears automatically when the browser offers a native install prompt (Android, desktop Chrome/Edge). Hides itself once the user installs the app. iOS does not surface this event; no row is shown there.
+- **Settings — Passive update indicator** — "Check for updates" button now changes label to "Update available — tap to reload" and highlights in accent color as soon as a new service worker finishes installing, without any manual action required.
+- **Layout — Update badge** — A red dot appears on the Settings nav icon when an update is waiting, so users notice it from any view.
+
+### Changed
+- **PWA — Update strategy** — Switched from `autoUpdate` to `prompt` mode. The app now controls when updates are applied; a new service worker parks in the waiting state rather than causing a surprise mid-session reload.
+- **PWA — Service worker wiring** — `main.jsx` now explicitly registers the service worker via `virtual:pwa-register` with `onNeedRefresh` and `onOfflineReady` callbacks. State (update availability, install prompt) is shared app-wide through a new `src/utils/pwa.js` module using window events.
+- **Settings — Check for updates** — Clicking the button when no update is known now calls `reg.update()` and waits up to 2.5 s for `onNeedRefresh` to fire before reporting "Already up to date" — replacing the old 400 ms race that could miss slow network fetches.
+- **Repo — Config directory** — `postcss.config.js` and `tailwind.config.js` moved to `config/`. `wrangler.jsonc` stays at root (Cloudflare's Git integration requires it there). Deploy is now `npm run deploy` (builds then calls `wrangler deploy`).
+- **Repo — GitHub directory** — `CONTRIBUTING.md` and `CLA.md` moved to `.github/` where GitHub resolves them natively as community health files.
+- **README — Screenshots** — Tablet and desktop screenshots collapsed under a `<details>` block; all 20 screenshot `alt` attributes rewritten to describe visible UI rather than just naming the tab.
+- **README — Features** — Each feature subsection collapsed under a `<details>/<summary>` block for scannability without full-page scroll.
+
+### Fixed
+- **Accessibility — Reduced motion** — CSS animations and transitions (`animate-pulse`, `animate-bounce`, `animate-spin`, theme transitions) now pause for users who have `prefers-reduced-motion` enabled in their OS.
+- **Accessibility — Archive buttons** — "Archived (N)" expand/collapse buttons in Jobs view now carry `aria-expanded` so screen readers announce open/closed state correctly.
+- **Mobile — Tap delay** — `touch-action: manipulation` applied globally to buttons, links, and interactive roles, eliminating the 300 ms double-tap-to-zoom delay.
+- **Mobile — Number inputs** — Spin buttons (`+`/`−` steppers) hidden on hourly-rate number inputs; they were too small to tap accurately on mobile.
+- **iOS — Status bar color** — `<meta name="theme-color">` now updates dynamically when the user switches themes; the status bar background no longer stays dark in light mode.
+
+---
+
 ## [0.8.0] — 2026-06-02
 
 ### Changed
