@@ -5,6 +5,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.6] — 2026-06-02
+
+### Changed (UI Polish)
+
+- **Analytics responsive layout** — "Hours by job" and "By labor type" charts now sit side by side on tablet and desktop (`lg:` breakpoint) instead of stacking in a single column with a large void below. On mobile they continue to stack vertically.
+- **Consistent chart colors** — "Hours by job" bar color changed from hardcoded indigo (`#6366F1`) to the user's chosen accent color, matching the daily bar chart and making all three Analytics charts visually coherent.
+- **Stop button styling** — The Stop button on active timer cards is now red-tinted at rest (`bg-red-500/10`, `text-red-400`, red border) rather than plain gray, so its destructive intent is legible before hover without being visually alarming.
+- **Desktop max-width constraints** — Timer view (max 896 px), Jobs view (max 672 px), Settings view (max 672 px), and Analytics view (max 1280 px) are now centered at a comfortable reading width on large displays rather than stretching to fill 1920 px.
+- **Donut chart stability** — The labor-type `<figure>` element is given explicit `w-[100px] h-[100px]` so it never collapses in a flex context, preventing the SVG from rendering as a degenerate line.
+
+---
+
+## [0.6.5] — 2026-06-02
+
+### Fixed (Accessibility & Usability)
+
+**Critical accessibility**
+- All three modals (`StartTimerModal`, `EditEntryModal`, `InvoiceModal`) now carry `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, a keyboard focus trap (Tab cycles inside the dialog), and an Escape key handler. Focus moves to the first interactive element when a modal opens.
+- All icon-only buttons now have explicit `aria-label` values — edit, archive, restore, delete, stop, close, period-nav chevrons, export/print/invoice toolbar buttons, and filter selects.
+- All `<label>` elements in modals and job/labor-type forms are linked to their controls via `htmlFor`/`id` pairs (using `useId()` for uniqueness within each form instance).
+- The live elapsed timer has `role="timer"` and `aria-live="off"` with a descriptive `aria-label`; inline form errors use `role="alert"`.
+- All three Recharts charts in the Analytics view are wrapped in `<figure role="img" aria-label="…">` with visually-hidden `<table>` fallbacks so screen readers can access the underlying data.
+
+**Serious accessibility**
+- The Toggle component now has `role="switch"` and `aria-checked` so screen readers announce on/off state. Both settings rows pass an `ariaLabel` prop.
+- Icon button touch targets increased to a minimum of `p-2 min-w-[40px] min-h-[40px]`.
+- Resting icon button color changed from `text-appTextDisabled` to `text-appTextMuted` on active controls, improving contrast to ~3.4:1 (passes WCAG 1.4.11 for UI components).
+- `window.confirm()` replaced with a new accessible `ConfirmModal` component in all three locations (Edit Entry delete, Timesheets delete, Settings → Clear entries). The modal has its own focus trap and defaults focus to Cancel for destructive-action safety.
+- Filter selects in Timesheets gained `aria-label`; the search field became `type="search"` with `aria-label`.
+
+**Moderate accessibility**
+- Tab bars (Jobs, Timesheets) now have `role="tablist"` + `role="tab"` + `aria-selected`.
+- Bottom navigation has `aria-current="page"` on the active item and `focus-visible:ring` for keyboard visibility.
+- Global `:focus-visible` rule added to `index.css` so all interactive elements show an accent-colored keyboard focus ring.
+- All text inputs/selects updated from `focus:border-*` (invisible in dark mode) to `focus:ring-2 focus:ring-appAccent/50`.
+- Decorative icons inside labeled buttons/links marked `aria-hidden="true"`.
+- Accent color swatches and labor-type color pickers gained `aria-label`, `aria-pressed`, and `role="group"` on their containers. Swatch sizes increased from `w-6`/`w-8` to `w-8`/`w-9`.
+- Danger Zone toggle has `aria-expanded`.
+- Printed HTML output (invoice, timesheet) now includes `lang="en"`.
+- `useHapticFeedback` now uses `useId()` to ensure the hidden iOS switch element never has a duplicate `id`.
+
+**Usability**
+- The stop button on TimerCard relabeled from "Out" to "Stop" to remove ambiguity with "log out".
+- `StartTimerModal` now tracks a `submitting` state — the Punch In button is disabled and shows "Starting…" during the async write to prevent accidental double-submit.
+
+---
+
 ## [0.6.0] — 2026-06-02
 
 ### Added

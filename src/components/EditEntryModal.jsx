@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useId } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
+import ConfirmModal from './ConfirmModal'
 
 // Helper helpers for date/time controls — exported for unit testing
 export function formatDateToYYYYMMDD(date) {
@@ -47,6 +48,45 @@ export default function EditEntryModal({ entry, onClose }) {
   const [endTime, setEndTime]       = useState(formatTimeToHHMM(new Date(Date.now() + 3600000)))
   const [notes, setNotes]           = useState('')
   const [error, setError]           = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const uid = useId()
+  const titleId    = `${uid}-title`
+  const jobId_     = `${uid}-job`
+  const ltId_      = `${uid}-lt`
+  const startDate_ = `${uid}-start-date`
+  const startTime_ = `${uid}-start-time`
+  const endDate_   = `${uid}-end-date`
+  const endTime_   = `${uid}-end-time`
+  const notesId_   = `${uid}-notes`
+  const errorId_   = `${uid}-error`
+
+  const dialogRef  = useRef(null)
+
+  // Focus trap and Escape handler
+  useEffect(() => {
+    const el = dialogRef.current
+    if (!el) return
+    const focusable = () => Array.from(el.querySelectorAll(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ))
+    const first = focusable()[0]
+    if (first) first.focus()
+
+    const handleKey = (e) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key !== 'Tab') return
+      const els = focusable()
+      if (!els.length) return
+      if (e.shiftKey && document.activeElement === els[0]) {
+        e.preventDefault(); els[els.length - 1].focus()
+      } else if (!e.shiftKey && document.activeElement === els[els.length - 1]) {
+        e.preventDefault(); els[0].focus()
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
 
   // Pre-fill on edit mode
   useEffect(() => {
@@ -114,139 +154,165 @@ export default function EditEntryModal({ entry, onClose }) {
 
   const handleDelete = async () => {
     if (!entry?.id) return
-    if (window.confirm('Are you sure you want to delete this time entry?')) {
-      try {
-        await db.entries.delete(entry.id)
-        onClose()
-      } catch (err) {
-        console.error(err)
-        setError('Failed to delete: ' + err.message)
-      }
+    try {
+      await db.entries.delete(entry.id)
+      onClose()
+    } catch (err) {
+      console.error(err)
+      setError('Failed to delete: ' + err.message)
     }
   }
 
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2.5 text-sm
-                    placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors`
+                    placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors`
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-      <div className="w-full max-w-md bg-appCard rounded-2xl border border-appBorder overflow-hidden flex flex-col shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-appBorder">
-          <h2 className="font-display font-semibold text-appText text-lg">
-            {isEditMode ? (isActiveTimer ? 'Edit Active Timer' : 'Edit Entry') : 'Add Manual Entry'}
-          </h2>
-          <div className="flex items-center gap-2">
-            {isEditMode && (
+    <>
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={error ? errorId_ : undefined}
+          className="w-full max-w-md bg-appCard rounded-2xl border border-appBorder overflow-hidden flex flex-col shadow-xl"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-appBorder">
+            <h2 id={titleId} className="font-display font-semibold text-appText text-lg">
+              {isEditMode ? (isActiveTimer ? 'Edit Active Timer' : 'Edit Entry') : 'Add Manual Entry'}
+            </h2>
+            <div className="flex items-center gap-2">
+              {isEditMode && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  aria-label="Delete entry"
+                  className="p-1.5 rounded-lg hover:bg-red-500/10 text-appTextMuted hover:text-red-400 transition-colors"
+                >
+                  <Trash2 className="w-5 h-5" aria-hidden="true" />
+                </button>
+              )}
               <button
-                onClick={handleDelete}
-                title="Delete Entry"
-                className="p-1.5 rounded-lg hover:bg-red-500/10 text-appTextMuted hover:text-red-400 transition-colors"
+                onClick={onClose}
+                aria-label="Close"
+                className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
               >
-                <Trash2 className="w-5 h-5" />
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
+            </div>
+          </div>
+
+          {/* Fields */}
+          <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[85vh]">
+            {/* Job Selection */}
+            <div className="space-y-1.5">
+              <label htmlFor={jobId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Job</label>
+              <select id={jobId_} value={jobId} onChange={e => setJobId(e.target.value)} className={inputCls}>
+                <option value="">Select a job...</option>
+                {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
+              </select>
+            </div>
+
+            {/* Labor Type Selection */}
+            <div className="space-y-1.5">
+              <label htmlFor={ltId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Labor Type</label>
+              <select id={ltId_} value={laborTypeId} onChange={e => setLaborTypeId(e.target.value)} className={inputCls}>
+                <option value="">Select labor type...</option>
+                {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
+              </select>
+            </div>
+
+            {/* Start Date */}
+            <div className="space-y-1.5">
+              <label htmlFor={startDate_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Date</label>
+              <input
+                id={startDate_}
+                type="date"
+                value={dateStr}
+                onChange={e => setDateStr(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+
+            {/* Start Time */}
+            <div className="space-y-1.5">
+              <label htmlFor={startTime_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Time</label>
+              <input
+                id={startTime_}
+                type="time"
+                value={startTime}
+                onChange={e => setStartTime(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+
+            {/* End Date */}
+            {!isActiveTimer && (
+              <div className="space-y-1.5">
+                <label htmlFor={endDate_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Date</label>
+                <input
+                  id={endDate_}
+                  type="date"
+                  value={endDateStr}
+                  onChange={e => setEndDateStr(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
             )}
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors">
-              <X className="w-5 h-5" />
+
+            {/* End Time */}
+            {!isActiveTimer && (
+              <div className="space-y-1.5">
+                <label htmlFor={endTime_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Time</label>
+                <input
+                  id={endTime_}
+                  type="time"
+                  value={endTime}
+                  onChange={e => setEndTime(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            )}
+
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <label htmlFor={notesId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Notes</label>
+              <input
+                id={notesId_}
+                type="text"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="What did you work on?"
+                className={inputCls}
+                onKeyDown={e => e.key === 'Enter' && handleSave()}
+              />
+            </div>
+
+            {error && <p id={errorId_} role="alert" className="text-red-400 text-sm mt-1">{error}</p>}
+          </div>
+
+          {/* CTA */}
+          <div className="px-5 pb-5 pt-2">
+            <button
+              onClick={handleSave}
+              className="w-full py-3.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90
+                         text-[#0F1117] font-display font-bold text-base transition-colors"
+            >
+              {isEditMode ? 'Save Changes' : 'Add Time Entry'}
             </button>
           </div>
         </div>
-
-        {/* Fields */}
-        <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[85vh]">
-          {/* Job Selection */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Job</label>
-            <select value={jobId} onChange={e => setJobId(e.target.value)} className={inputCls}>
-              <option value="">Select a job...</option>
-              {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
-            </select>
-          </div>
-
-          {/* Labor Type Selection */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Labor Type</label>
-            <select value={laborTypeId} onChange={e => setLaborTypeId(e.target.value)} className={inputCls}>
-              <option value="">Select labor type...</option>
-              {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
-            </select>
-          </div>
-
-          {/* Start Date */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Date</label>
-            <input
-              type="date"
-              value={dateStr}
-              onChange={e => setDateStr(e.target.value)}
-              className={inputCls}
-            />
-          </div>
-
-          {/* Start Time */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Time</label>
-            <input
-              type="time"
-              value={startTime}
-              onChange={e => setStartTime(e.target.value)}
-              className={inputCls}
-            />
-          </div>
-
-          {/* End Date */}
-          {!isActiveTimer && (
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Date</label>
-              <input
-                type="date"
-                value={endDateStr}
-                onChange={e => setEndDateStr(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          )}
-
-          {/* End Time */}
-          {!isActiveTimer && (
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Time</label>
-              <input
-                type="time"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          )}
-
-          {/* Notes */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Notes</label>
-            <input
-              type="text"
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="What did you work on?"
-              className={inputCls}
-              onKeyDown={e => e.key === 'Enter' && handleSave()}
-            />
-          </div>
-
-          {error && <p className="text-red-400 text-sm mt-1">{error}</p>}
-        </div>
-
-        {/* CTA */}
-        <div className="px-5 pb-5 pt-2">
-          <button
-            onClick={handleSave}
-            className="w-full py-3.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90
-                       text-[#0F1117] font-display font-bold text-base transition-colors"
-          >
-            {isEditMode ? 'Save Changes' : 'Add Time Entry'}
-          </button>
-        </div>
       </div>
-    </div>
+
+      {showDeleteConfirm && (
+        <ConfirmModal
+          title="Delete this time entry?"
+          message="This action cannot be undone."
+          confirmLabel="Delete"
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+    </>
   )
 }

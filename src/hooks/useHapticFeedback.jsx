@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useId } from 'react'
 
 // iOS Safari completely ignores navigator.vibrate(). The only way to trigger
 // the Taptic Engine from a web context is the WebKit-proprietary `switch` input
@@ -12,6 +12,7 @@ import { useRef, useEffect, useCallback } from 'react'
 export function useHapticFeedback(os) {
   const inputRef = useRef(null)
   const labelRef = useRef(null)
+  const uid = useId()
 
   useEffect(() => {
     if (os === 'ios' && inputRef.current) {
@@ -35,7 +36,7 @@ export function useHapticFeedback(os) {
       <input
         ref={inputRef}
         type="checkbox"
-        id="haptic-switch"
+        id={uid}
         className="sr-only"
         aria-hidden="true"
         tabIndex={-1}
@@ -43,7 +44,7 @@ export function useHapticFeedback(os) {
       />
       <label
         ref={labelRef}
-        htmlFor="haptic-switch"
+        htmlFor={uid}
         className="sr-only"
         aria-hidden="true"
       />

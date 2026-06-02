@@ -189,7 +189,8 @@ punchin/
     │   ├── TimerCard.jsx       # Live timer card (1 s interval)
     │   ├── StartTimerModal.jsx # Punch-in form
     │   ├── EditEntryModal.jsx  # Edit active or completed entry
-    │   └── InvoiceModal.jsx    # Invoice generator with CSV/print export
+    │   ├── InvoiceModal.jsx    # Invoice generator with CSV/print export
+    │   └── ConfirmModal.jsx    # Accessible confirmation dialog
     ├── views/
     │   ├── TimerView.jsx       # Active timers list
     │   ├── JobsView.jsx        # Jobs & labor types CRUD

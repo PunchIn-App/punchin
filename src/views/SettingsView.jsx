@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import ConfirmModal from '../components/ConfirmModal'
 import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette } from 'lucide-react'
 import { format } from 'date-fns'
 import { db } from '../db'
@@ -13,9 +14,12 @@ const ACCENT_PRESETS = [
   { name: 'Pink',    hex: '#F472B6' },
 ]
 
-function Toggle({ value, onChange }) {
+function Toggle({ value, onChange, ariaLabel }) {
   return (
     <button
+      role="switch"
+      aria-checked={value}
+      aria-label={ariaLabel}
       onClick={() => onChange(!value)}
       className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 border-2
         ${value ? 'bg-appAccent border-appAccent' : 'bg-appInput border-gray-500/60'}`}
@@ -59,6 +63,7 @@ export default function SettingsView() {
   const [resetStage, setResetStage] = useState(null) // null | 'warn' | 'final'
   const [dangerOpen, setDangerOpen] = useState(false)
   const [updateStatus, setUpdateStatus] = useState(null) // null | 'checking' | 'latest'
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   const exportData = async () => {
     const [jobs, entries, laborTypes] = await Promise.all([
@@ -215,9 +220,8 @@ export default function SettingsView() {
   }
 
   const clearEntries = async () => {
-    if (window.confirm('Permanently delete ALL time entries? Jobs and labor types are kept.')) {
-      await db.entries.clear()
-    }
+    await db.entries.clear()
+    setShowClearConfirm(false)
   }
 
   const factoryReset = async () => {
@@ -237,7 +241,7 @@ export default function SettingsView() {
   }
 
   return (
-    <div className="h-full scrollable px-4 pt-4 pb-24 space-y-6">
+    <div className="h-full scrollable px-4 pt-4 pb-24 space-y-6 lg:max-w-2xl lg:mx-auto lg:w-full">
 
       {/* Timer */}
       <section>
@@ -249,6 +253,7 @@ export default function SettingsView() {
             subtitle="Run multiple jobs at the same time"
             right={
               <Toggle
+                ariaLabel="Allow concurrent timers"
                 value={!!settings.allowConcurrentTimers}
                 onChange={v => updateSetting('allowConcurrentTimers', v)}
               />
@@ -267,6 +272,7 @@ export default function SettingsView() {
             subtitle="Off = week starts Sunday"
             right={
               <Toggle
+                ariaLabel="Week starts Monday"
                 value={settings.weekStartsMonday !== false}
                 onChange={v => updateSetting('weekStartsMonday', v)}
               />
@@ -313,15 +319,16 @@ export default function SettingsView() {
                 <p className="text-xs text-appTextMuted mt-0.5">Highlight color throughout the app</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0" role="group" aria-label="Choose accent color">
               {ACCENT_PRESETS.map(({ name, hex }) => {
                 const active = (settings.accentColor || '#F59E0B') === hex
                 return (
                   <button
                     key={hex}
                     onClick={() => updateSetting('accentColor', hex)}
-                    title={name}
-                    className={`w-6 h-6 rounded-full border-2 transition-all hover:scale-110 ${active ? 'border-white scale-110' : 'border-transparent'}`}
+                    aria-label={`${name}${active ? ' (selected)' : ''}`}
+                    aria-pressed={active}
+                    className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${active ? 'border-white scale-110' : 'border-transparent'}`}
                     style={{ backgroundColor: hex }}
                   />
                 )
@@ -373,16 +380,17 @@ export default function SettingsView() {
       <section>
         <button
           onClick={() => { setDangerOpen(o => !o); setResetStage(null) }}
+          aria-expanded={dangerOpen}
           className="flex items-center gap-2 mb-2 px-1 w-full group"
         >
           <p className="text-[10px] font-semibold text-red-400/70 uppercase tracking-widest">Danger Zone</p>
-          <ChevronDown className={`w-3 h-3 text-red-400/70 transition-transform ${dangerOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-3 h-3 text-red-400/70 transition-transform ${dangerOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
         </button>
 
         {dangerOpen && (
           <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
             {/* Clear entries */}
-            <button onClick={clearEntries}
+            <button onClick={() => setShowClearConfirm(true)}
               className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group border-b border-appBorderLight">
               <Trash2 className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
               <div>
@@ -464,13 +472,13 @@ export default function SettingsView() {
             rel="noopener noreferrer"
             className="flex items-center justify-between px-4 py-4 gap-3 hover:bg-appInput transition-colors rounded-t-xl">
             <div className="flex items-center gap-3 min-w-0">
-              <Info className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+              <Info className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-sm text-appText font-medium">PunchIn</p>
                 <p className="text-xs text-appTextMuted mt-0.5">{`v${__APP_VERSION__} · Data stored on this device`}</p>
               </div>
             </div>
-            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
           </a>
           <a
             href="https://github.com/PunchIn-App/punchin/blob/main/CHANGELOG.md"
@@ -478,19 +486,19 @@ export default function SettingsView() {
             rel="noopener noreferrer"
             className="flex items-center justify-between px-4 py-4 gap-3 hover:bg-appInput transition-colors">
             <div className="flex items-center gap-3 min-w-0">
-              <ScrollText className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+              <ScrollText className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-sm text-appText font-medium">Changelog</p>
                 <p className="text-xs text-appTextMuted mt-0.5">See what's new in each release</p>
               </div>
             </div>
-            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
           </a>
           <button
             onClick={checkForUpdates}
             disabled={updateStatus === 'checking'}
             className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-b-xl disabled:opacity-60">
-            <RefreshCw className={`w-4 h-4 text-appTextMuted flex-shrink-0 ${updateStatus === 'checking' ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-appTextMuted flex-shrink-0 ${updateStatus === 'checking' ? 'animate-spin' : ''}`} aria-hidden="true" />
             <div>
               <p className="text-sm text-appText font-medium">Check for updates</p>
               <p className="text-xs text-appTextMuted mt-0.5">
@@ -502,6 +510,16 @@ export default function SettingsView() {
           </button>
         </div>
       </section>
+
+      {showClearConfirm && (
+        <ConfirmModal
+          title="Clear all time entries?"
+          message="Jobs and labor types are kept. This cannot be undone."
+          confirmLabel="Clear entries"
+          onConfirm={clearEntries}
+          onCancel={() => setShowClearConfirm(false)}
+        />
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef, useId } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { X, Download, Printer } from 'lucide-react'
 import {
@@ -38,6 +38,11 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   const { isStandalone, os } = usePlatformContext()
   const { settings } = useSettings()
   const wsMon = settings?.weekStartsMonday !== false
+
+  const uid      = useId()
+  const titleId  = `${uid}-title`
+  const jobSelId = `${uid}-job`
+  const dialogRef = useRef(null)
 
   const initialPreset = currentTab === 'daily' ? 4 : 0
   const [preset, setPreset]       = useState(initialPreset)
@@ -130,7 +135,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
         <td class="right mono">${li.rate != null ? `$${li.rate.toFixed(2)}` : '—'}</td>
         <td class="right mono">${li.amount != null ? `$${li.amount.toFixed(2)}` : '—'}</td>
       </tr>`).join('')
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>Invoice — ${job.name}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -176,6 +181,31 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     setTimeout(() => { w.print() }, 250)
   }
 
+  // Focus trap and Escape handler
+  useEffect(() => {
+    const el = dialogRef.current
+    if (!el) return
+    const focusable = () => Array.from(el.querySelectorAll(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ))
+    const first = focusable()[0]
+    if (first) first.focus()
+
+    const handleKey = (e) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key !== 'Tab') return
+      const els = focusable()
+      if (!els.length) return
+      if (e.shiftKey && document.activeElement === els[0]) {
+        e.preventDefault(); els[els.length - 1].focus()
+      } else if (!e.shiftKey && document.activeElement === els[els.length - 1]) {
+        e.preventDefault(); els[0].focus()
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
   const isIos     = isStandalone && os === 'ios'
   const isAndroid = isStandalone && os === 'android'
 
@@ -194,23 +224,34 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
       className={`fixed inset-0 z-50 flex ${isMobileSheet ? 'items-center justify-center' : 'items-end sm:items-center'} ${scrimCls}`}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className={`relative w-full sm:max-w-lg bg-appCard ${sheetCls} shadow-xl overflow-hidden flex flex-col max-h-[90dvh]`}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className={`relative w-full sm:max-w-lg bg-appCard ${sheetCls} shadow-xl overflow-hidden flex flex-col max-h-[90dvh]`}
+      >
         {/* Handle (Android/iOS bottom sheet) */}
-        {isAndroid && <div className="w-12 h-1 bg-appBorder rounded-full mx-auto mt-3 flex-shrink-0" />}
+        {isAndroid && <div className="w-12 h-1 bg-appBorder rounded-full mx-auto mt-3 flex-shrink-0" aria-hidden="true" />}
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-appBorderLight flex-shrink-0">
-          <h2 className="font-display font-bold text-appText text-lg">Generate Invoice</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors">
-            <X className="w-5 h-5" />
+          <h2 id={titleId} className="font-display font-bold text-appText text-lg">Generate Invoice</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+          >
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {/* Job selector */}
           <div>
-            <label className="block text-xs text-appTextMuted mb-1.5">Job *</label>
+            <label htmlFor={jobSelId} className="block text-xs text-appTextMuted mb-1.5">Job *</label>
             <select
+              id={jobSelId}
               value={selectedJobId}
               onChange={e => setJobId(e.target.value)}
               className={`w-full ${inputCls}`}
@@ -224,12 +265,13 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 
           {/* Date range presets */}
           <div>
-            <label className="block text-xs text-appTextMuted mb-1.5">Period</label>
-            <div className="flex flex-wrap gap-1.5">
+            <p className="block text-xs text-appTextMuted mb-1.5" id={`${uid}-period-label`}>Period</p>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby={`${uid}-period-label`}>
               {RANGE_PRESETS.map((p, i) => (
                 <button
                   key={p.label}
                   onClick={() => setPreset(i)}
+                  aria-pressed={preset === i}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
                     ${preset === i ? 'bg-appAccent text-[#0F1117]' : 'bg-appInput border border-appBorder text-appTextMuted hover:text-appText'}`}
                 >
@@ -333,17 +375,19 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
           <button
             onClick={printInvoice}
             disabled={!lineItems.length}
+            aria-disabled={!lineItems.length}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-appInput border border-appBorder hover:bg-appBg text-appTextMuted text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="w-4 h-4" aria-hidden="true" />
             Print / PDF
           </button>
           <button
             onClick={exportCsv}
             disabled={!lineItems.length}
+            aria-disabled={!lineItems.length}
             className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90 text-[#0F1117] text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4" aria-hidden="true" />
             Export CSV
           </button>
         </div>

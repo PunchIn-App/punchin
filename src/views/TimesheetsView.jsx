@@ -11,6 +11,7 @@ import {
 } from '../utils/time'
 import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
+import ConfirmModal from '../components/ConfirmModal'
 
 function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { start, end } = getDayRange(date)
@@ -78,11 +79,11 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
                     {formatTime(entry.punchIn)} → {entry.punchOut ? formatTime(entry.punchOut) : 'running'}
                   </p>
                   <div className="flex items-center gap-1.5 mt-2">
-                    <button onClick={() => onEdit(entry)} className="p-1 rounded hover:bg-appInput text-appTextDarker hover:text-appAccent transition-colors" title="Edit Entry">
-                      <Pencil className="w-3.5 h-3.5" />
+                    <button onClick={() => onEdit(entry)} aria-label={`Edit entry for ${getJob(entry.jobId)?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
+                      <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
-                    <button onClick={() => onDelete(entry.id)} className="p-1 rounded hover:bg-appInput text-appTextDarker hover:text-red-400 transition-colors" title="Delete Entry">
-                      <Trash2 className="w-3.5 h-3.5" />
+                    <button onClick={() => onDelete(entry.id)} aria-label={`Delete entry for ${getJob(entry.jobId)?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -200,11 +201,11 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                         <span className="font-mono text-appTextDarker">{formatDurationHM(getEntryDuration(e))}</span>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => onEdit(e)} className="p-0.5 rounded hover:bg-appInput text-appTextDisabled hover:text-appAccent transition-colors" title="Edit Entry">
-                            <Pencil className="w-3 h-3" />
+                          <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${getJob(e.jobId)?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
+                            <Pencil className="w-3 h-3" aria-hidden="true" />
                           </button>
-                          <button onClick={() => onDelete(e.id)} className="p-0.5 rounded hover:bg-appInput text-appTextDisabled hover:text-red-400 transition-colors" title="Delete Entry">
-                            <Trash2 className="w-3 h-3" />
+                          <button onClick={() => onDelete(e.id)} aria-label={`Delete entry for ${getJob(e.jobId)?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
+                            <Trash2 className="w-3 h-3" aria-hidden="true" />
                           </button>
                         </div>
                       </div>
@@ -227,9 +228,10 @@ export default function TimesheetsView() {
   const wsMon                  = settings?.weekStartsMonday !== false
 
   // Modals state
-  const [editingEntry, setEditingEntry] = useState(null)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showInvoice, setShowInvoice]   = useState(false)
+  const [editingEntry, setEditingEntry]   = useState(null)
+  const [showAddModal, setShowAddModal]   = useState(false)
+  const [showInvoice, setShowInvoice]     = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
   // Search & Filter State
   const [searchQuery, setSearchQuery]             = useState('')
@@ -259,10 +261,15 @@ export default function TimesheetsView() {
     return now >= start && now <= end
   }
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this time entry?')) {
-      await db.entries.delete(id)
+  const handleDelete = (id) => {
+    setConfirmDeleteId(id)
+  }
+
+  const confirmDelete = async () => {
+    if (confirmDeleteId) {
+      await db.entries.delete(confirmDeleteId)
     }
+    setConfirmDeleteId(null)
   }
 
   const exportCsv = async () => {
@@ -336,7 +343,7 @@ export default function TimesheetsView() {
         </tr>`
       }).join('')
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>Timesheet — ${titleStr}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -381,9 +388,11 @@ export default function TimesheetsView() {
   return (
     <div className="h-full flex flex-col">
       {/* Tabs */}
-      <div className="flex-shrink-0 flex border-b border-appBorderLight">
+      <div role="tablist" className="flex-shrink-0 flex border-b border-appBorderLight">
         {['daily','weekly'].map(t => (
           <button key={t} onClick={() => setTab(t)}
+            role="tab"
+            aria-selected={tab === t}
             className={`flex-1 py-3 text-sm font-medium capitalize transition-colors
               ${tab === t ? 'text-appAccent border-b-2 border-appAccent' : 'text-appTextMuted'}`}>
             {t}
@@ -393,16 +402,25 @@ export default function TimesheetsView() {
 
       {/* Period nav */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-appBorderLight">
-        <button onClick={() => go(-1)} className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors">
-          <ChevronLeft className="w-5 h-5" />
+        <button
+          onClick={() => go(-1)}
+          aria-label={tab === 'daily' ? 'Previous day' : 'Previous week'}
+          className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" aria-hidden="true" />
         </button>
         <button onClick={() => setDate(new Date())}
+          aria-label={`${isCurrent() ? 'Current period: ' : 'Jump to today, currently viewing: '}${title()}`}
           className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors
             ${isCurrent() ? 'text-appAccent' : 'text-appText hover:bg-appInput'}`}>
           {title()}
         </button>
-        <button onClick={() => go(1)} className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors">
-          <ChevronRight className="w-5 h-5" />
+        <button
+          onClick={() => go(1)}
+          aria-label={tab === 'daily' ? 'Next day' : 'Next week'}
+          className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+        >
+          <ChevronRight className="w-5 h-5" aria-hidden="true" />
         </button>
       </div>
 
@@ -410,13 +428,14 @@ export default function TimesheetsView() {
       <div className="flex-shrink-0 px-4 py-2.5 border-b border-appBorderLight bg-appNav flex gap-2 flex-wrap items-center">
         {/* Search */}
         <div className="relative flex-1 min-w-[150px]">
-          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-appTextDarker" />
+          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-appTextMuted pointer-events-none" aria-hidden="true" />
           <input
-            type="text"
+            type="search"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search logs..."
-            className="w-full bg-appCard border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-appAccent/50 transition-colors placeholder-appTextDisabled"
+            aria-label="Search time entries"
+            className="w-full bg-appCard border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors placeholder-appTextDisabled"
           />
         </div>
 
@@ -424,7 +443,8 @@ export default function TimesheetsView() {
         <select
           value={filterJobId}
           onChange={e => setFilterJobId(e.target.value)}
-          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-appAccent/50"
+          aria-label="Filter by job"
+          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50"
         >
           <option value="">All Jobs</option>
           {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
@@ -434,7 +454,8 @@ export default function TimesheetsView() {
         <select
           value={filterLaborTypeId}
           onChange={e => setFilterLaborTypeId(e.target.value)}
-          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-appAccent/50"
+          aria-label="Filter by labor type"
+          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50"
         >
           <option value="">All Types</option>
           {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
@@ -444,33 +465,33 @@ export default function TimesheetsView() {
         <div className="flex items-center gap-1 ml-auto">
           <button
             onClick={exportCsv}
+            aria-label="Export current view as CSV"
             className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-appCard border border-appBorder hover:bg-appInput text-appTextMuted text-xs font-medium transition-colors"
-            title="Export CSV"
           >
-            <FileDown className="w-3.5 h-3.5" />
+            <FileDown className="w-3.5 h-3.5" aria-hidden="true" />
             CSV
           </button>
           <button
             onClick={printTimesheet}
+            aria-label="Print timesheet or save as PDF"
             className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-appCard border border-appBorder hover:bg-appInput text-appTextMuted text-xs font-medium transition-colors"
-            title="Print / Save as PDF"
           >
-            <Printer className="w-3.5 h-3.5" />
+            <Printer className="w-3.5 h-3.5" aria-hidden="true" />
             Print
           </button>
           <button
             onClick={() => setShowInvoice(true)}
+            aria-label="Generate invoice"
             className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-appCard border border-appBorder hover:bg-appInput text-appTextMuted text-xs font-medium transition-colors"
-            title="Generate Invoice"
           >
-            <Receipt className="w-3.5 h-3.5" />
+            <Receipt className="w-3.5 h-3.5" aria-hidden="true" />
             Invoice
           </button>
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-1 px-3 py-2 rounded-lg bg-appAccent hover:brightness-110 active:brightness-90 text-[#0F1117] text-xs font-bold transition-all"
           >
-            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
             Log Manual
           </button>
         </div>
@@ -519,6 +540,17 @@ export default function TimesheetsView() {
           currentDate={currentDate}
           currentTab={tab}
           onClose={() => setShowInvoice(false)}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Delete this time entry?"
+          message="This action cannot be undone."
+          confirmLabel="Delete"
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </div>

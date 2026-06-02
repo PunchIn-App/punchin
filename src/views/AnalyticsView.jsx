@@ -24,7 +24,15 @@ export default function AnalyticsView() {
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
 
   if (!entries || !jobs || !laborTypes) {
-    return <div className="flex items-center justify-center h-full text-appTextDisabled text-sm">Loading...</div>
+    return (
+      <div
+        className="flex items-center justify-center h-full text-appTextMuted text-sm"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        Loading…
+      </div>
+    )
   }
 
   const total = sumDurations(entries)
@@ -55,11 +63,12 @@ export default function AnalyticsView() {
   })).filter(d => d.value > 0)
 
   return (
-    <div className="h-full scrollable px-4 pt-4 pb-24 space-y-4">
+    <div className="h-full scrollable px-4 pt-4 pb-24 space-y-4 lg:max-w-5xl lg:mx-auto">
       {/* Period toggle */}
-      <div className="flex gap-2">
+      <div className="flex gap-2" role="group" aria-label="Select analysis period">
         {['7d', '30d'].map(p => (
           <button key={p} onClick={() => setPeriod(p)}
+            aria-pressed={period === p}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
               ${period === p ? 'bg-appAccent text-[#0F1117]' : 'bg-appCard border border-appBorder text-appTextMuted'}`}>
             Last {p === '7d' ? '7 days' : '30 days'}
@@ -83,58 +92,92 @@ export default function AnalyticsView() {
 
       {/* Daily chart */}
       <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-        <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4">Hours per day</p>
-        <ResponsiveContainer width="100%" height={130}>
-          <BarChart data={dailyData} barCategoryGap="30%">
-            <XAxis dataKey="date" tick={{ fill: 'var(--text-darker)', fontSize: 10 }} axisLine={false} tickLine={false} />
-            <YAxis hide />
-            <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
-              formatter={(v) => [`${v}h`, 'Hours']} />
-            <Bar dataKey="hours" fill="rgb(var(--accent-rgb))" radius={[3,3,0,0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Hours by job */}
-      {jobData.length > 0 && (
-        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-          <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4">Hours by job</p>
-          <ResponsiveContainer width="100%" height={Math.max(80, jobData.length * 44)}>
-            <BarChart data={jobData} layout="vertical" barCategoryGap="30%">
-              <XAxis type="number" hide />
-              <YAxis type="category" dataKey="name"
-                tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={110} />
+        <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4" id="daily-chart-label">Hours per day</p>
+        <figure aria-labelledby="daily-chart-label" role="img"
+          aria-label={`Bar chart: daily hours for the last ${days} days. Total: ${formatDurationHM(total)}.`}>
+          <ResponsiveContainer width="100%" height={130}>
+            <BarChart data={dailyData} barCategoryGap="30%">
+              <XAxis dataKey="date" tick={{ fill: 'var(--text-darker)', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis hide />
               <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
                 formatter={(v) => [`${v}h`, 'Hours']} />
-              <Bar dataKey="hours" fill="#6366F1" radius={[0,3,3,0]} />
+              <Bar dataKey="hours" fill="rgb(var(--accent-rgb))" radius={[3,3,0,0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Labor type donut */}
-      {ltData.length > 1 && (
-        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-          <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4">By labor type</p>
-          <div className="flex items-center gap-5">
-            <PieChart width={100} height={100}>
-              <Pie data={ltData} cx={45} cy={45} innerRadius={28} outerRadius={44}
-                paddingAngle={2} dataKey="value" stroke="none">
-                {ltData.map((d, i) => <Cell key={i} fill={d.color} />)}
-              </Pie>
-            </PieChart>
-            <div className="flex-1 space-y-2.5">
-              {ltData.map(lt => (
-                <div key={lt.name} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
-                    <span className="text-xs text-appTextMuted truncate">{lt.name}</span>
-                  </div>
-                  <span className="font-mono text-xs text-appText flex-shrink-0">{formatDurationHM(lt.value)}</span>
-                </div>
+          <table className="sr-only">
+            <caption>Daily hours for the last {days} days</caption>
+            <thead><tr><th scope="col">Day</th><th scope="col">Hours</th></tr></thead>
+            <tbody>
+              {dailyData.map(d => (
+                <tr key={d.date}><td>{d.date}</td><td>{d.hours}h</td></tr>
               ))}
+            </tbody>
+          </table>
+        </figure>
+      </div>
+
+      {/* Hours by job + Labor type — side by side on desktop */}
+      {(jobData.length > 0 || ltData.length > 1) && (
+        <div className="flex flex-col lg:flex-row gap-4">
+          {jobData.length > 0 && (
+            <div className="flex-1 min-w-0 rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+              <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4" id="job-chart-label">Hours by job</p>
+              <figure aria-labelledby="job-chart-label" role="img"
+                aria-label={`Bar chart: hours by job. Top job: ${jobData[0]?.name} with ${jobData[0]?.hours}h.`}>
+                <ResponsiveContainer width="100%" height={Math.max(80, jobData.length * 44)}>
+                  <BarChart data={jobData} layout="vertical" barCategoryGap="30%">
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name"
+                      tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={110} />
+                    <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
+                      formatter={(v) => [`${v}h`, 'Hours']} />
+                    <Bar dataKey="hours" fill="rgb(var(--accent-rgb))" radius={[0,3,3,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <table className="sr-only">
+                  <caption>Hours by job</caption>
+                  <thead><tr><th scope="col">Job</th><th scope="col">Hours</th></tr></thead>
+                  <tbody>
+                    {jobData.map(d => (
+                      <tr key={d.name}><td>{d.name}</td><td>{d.hours}h</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </figure>
             </div>
-          </div>
+          )}
+
+          {ltData.length > 1 && (
+            <div className="lg:w-72 flex-shrink-0 rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+              <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4" id="lt-chart-label">By labor type</p>
+              <div className="flex items-center gap-5">
+                <figure
+                  className="flex-shrink-0 w-[100px] h-[100px]"
+                  aria-labelledby="lt-chart-label"
+                  role="img"
+                  aria-label={`Donut chart: hours by labor type. ${ltData.map(d => `${d.name}: ${formatDurationHM(d.value)}`).join(', ')}.`}
+                >
+                  <PieChart width={100} height={100}>
+                    <Pie data={ltData} cx={45} cy={45} innerRadius={28} outerRadius={44}
+                      paddingAngle={2} dataKey="value" stroke="none">
+                      {ltData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Pie>
+                  </PieChart>
+                </figure>
+                <div className="flex-1 space-y-2.5" aria-hidden="true">
+                  {ltData.map(lt => (
+                    <div key={lt.name} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+                        <span className="text-xs text-appTextMuted truncate">{lt.name}</span>
+                      </div>
+                      <span className="font-mono text-xs text-appText flex-shrink-0">{formatDurationHM(lt.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

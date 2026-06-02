@@ -27,7 +27,7 @@ export default function TimerView() {
 
   return (
     <div className="h-full flex flex-col scrollable">
-      <div className="flex-1 px-4 pt-4 pb-24">
+      <div className="flex-1 px-4 pt-4 pb-24 lg:max-w-3xl lg:mx-auto lg:w-full">
 
         {/* Header row */}
         <div className="flex items-center justify-between mb-5">

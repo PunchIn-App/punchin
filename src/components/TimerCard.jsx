@@ -46,6 +46,7 @@ export default function TimerCard({ entry, job, laborType }) {
                 <span
                   className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium"
                   style={{ backgroundColor: `${color}25`, color }}
+                  aria-label={laborType.name}
                 >
                   {laborType.name}
                 </span>
@@ -54,10 +55,10 @@ export default function TimerCard({ entry, job, laborType }) {
                 <span>since {formatTime(entry.punchIn)}</span>
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="p-1 rounded hover:bg-appInput text-appTextDarker hover:text-appTextMuted transition-colors"
-                  title="Adjust start time / notes"
+                  aria-label="Edit start time and notes"
+                  className="p-1 rounded hover:bg-appInput text-appTextMuted hover:text-appText transition-colors"
                 >
-                  <Pencil className="w-3 h-3" />
+                  <Pencil className="w-3 h-3" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -68,18 +69,25 @@ export default function TimerCard({ entry, job, laborType }) {
 
           <button
             onClick={punchOut}
+            aria-label={`Stop timer for ${job?.name || 'this job'}`}
             className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                       bg-appInput border border-appBorder
-                       hover:bg-red-500/15 hover:border-red-500/30 hover:text-red-400
-                       text-appTextMuted transition-all text-sm font-medium"
+                       bg-red-500/10 border border-red-500/25 text-red-400
+                       hover:bg-red-500/20 hover:border-red-500/40
+                       transition-all text-sm font-medium"
           >
-            <Square className="w-3.5 h-3.5 fill-current" />
-            Out
+            <Square className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
+            Stop
           </button>
         </div>
 
         {/* Live clock */}
-        <div className="mt-3 font-mono text-4xl font-medium tracking-wider" style={{ color }}>
+        <div
+          role="timer"
+          aria-live="off"
+          aria-label={`Elapsed time: ${formatElapsed(elapsed)}`}
+          className="mt-3 font-mono text-4xl font-medium tracking-wider"
+          style={{ color }}
+        >
           {formatElapsed(elapsed)}
         </div>
       </div>

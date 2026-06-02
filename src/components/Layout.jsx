@@ -32,12 +32,13 @@ export default function Layout({ activeView, onNavigate, children }) {
       >
         <button
           onClick={() => onNavigate('timer')}
+          aria-label="PunchIn — go to Timer"
           className="flex items-center gap-2 rounded-lg transition-opacity active:opacity-70"
         >
-          <div className="w-7 h-7 rounded-lg bg-appAccent flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-appAccent flex items-center justify-center" aria-hidden="true">
             <Clock className="w-4 h-4 text-[#0F1117]" strokeWidth={2.5} />
           </div>
-          <span className="font-display font-bold text-appText tracking-tight text-xl">PunchIn</span>
+          <span className="font-display font-bold text-appText tracking-tight text-xl" aria-hidden="true">PunchIn</span>
         </button>
         <span className="font-mono text-[10px] text-appTextMuted select-none">v{__APP_VERSION__}</span>
       </header>
@@ -50,6 +51,7 @@ export default function Layout({ activeView, onNavigate, children }) {
       {/* Bottom nav */}
       <nav
         style={adaptive.nav}
+        aria-label="Main navigation"
         className="flex-shrink-0 flex border-t border-appBorderLight bg-appNav"
       >
         {NAV.map(({ id, label, Icon }) => {
@@ -58,11 +60,12 @@ export default function Layout({ activeView, onNavigate, children }) {
             <button
               key={id}
               onClick={() => onNavigate(id)}
-              className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${
-                active ? 'text-appAccent' : 'text-appTextMuted hover:text-appText'
-              }`}
+              aria-current={active ? 'page' : undefined}
+              className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:ring-inset
+                ${active ? 'text-appAccent' : 'text-appTextMuted hover:text-appText'}`}
             >
-              <Icon className="w-5 h-5" strokeWidth={active ? 2 : 1.5} />
+              <Icon className="w-5 h-5" strokeWidth={active ? 2 : 1.5} aria-hidden="true" />
               <span className={`text-[10px] ${active ? 'font-semibold' : 'font-normal'}`}>{label}</span>
             </button>
           )

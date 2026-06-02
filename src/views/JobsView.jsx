@@ -133,11 +133,16 @@ function LaborTypeForm({ lt, onDone }) {
         onKeyDown={e => e.key === 'Enter' && save()}
         className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
                    placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors" />
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Select color">
         {PRESET_COLORS.map(c => (
-          <button key={c} onClick={() => setColor(c)}
-            className="w-8 h-8 rounded-full border-2 transition-all hover:scale-110"
-            style={{ backgroundColor: c, borderColor: color === c ? 'white' : 'transparent' }} />
+          <button
+            key={c}
+            onClick={() => setColor(c)}
+            aria-label={`Color ${c}`}
+            aria-pressed={color === c}
+            className="w-9 h-9 rounded-full border-2 transition-all hover:scale-110"
+            style={{ backgroundColor: c, borderColor: color === c ? 'white' : 'transparent' }}
+          />
         ))}
       </div>
       <div className="flex gap-2 pt-1">
@@ -182,9 +187,11 @@ export default function JobsView() {
   return (
     <div className="h-full flex flex-col">
       {/* Tabs */}
-      <div className="flex-shrink-0 flex border-b border-appBorderLight">
+      <div role="tablist" className="flex-shrink-0 flex border-b border-appBorderLight">
         {['jobs','labor'].map(t => (
           <button key={t} onClick={() => setTab(t)}
+            role="tab"
+            aria-selected={tab === t}
             className={`flex-1 py-3 text-sm font-medium capitalize transition-colors
               ${tab === t ? 'text-appAccent border-b-2 border-appAccent' : 'text-appTextMuted'}`}>
             {t === 'labor' ? 'Labor Types' : 'Jobs'}
@@ -192,7 +199,7 @@ export default function JobsView() {
         ))}
       </div>
 
-      <div className="flex-1 scrollable px-4 pt-4 pb-24 space-y-3">
+      <div className="flex-1 scrollable px-4 pt-4 pb-24 space-y-3 lg:max-w-2xl lg:mx-auto lg:w-full">
         {/* ── JOBS tab ── */}
         {tab === 'jobs' && (
           <>
@@ -238,14 +245,14 @@ export default function JobsView() {
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button onClick={() => setEditingJob(job)}
-                        className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                        title="Edit Job">
-                        <Pencil className="w-4 h-4" />
+                        aria-label={`Edit ${job.name}`}
+                        className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                        <Pencil className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <button onClick={() => toggleArchive(job)}
-                        className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                        title="Archive Job">
-                        <Archive className="w-4 h-4" />
+                        aria-label={`Archive ${job.name}`}
+                        className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                        <Archive className="w-4 h-4" aria-hidden="true" />
                       </button>
                     </div>
                   </div>
@@ -303,9 +310,9 @@ export default function JobsView() {
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <button onClick={() => toggleArchive(job)}
-                              className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                              title="Restore Job">
-                              <ArchiveRestore className="w-4 h-4" />
+                              aria-label={`Restore ${job.name}`}
+                              className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                              <ArchiveRestore className="w-4 h-4" aria-hidden="true" />
                             </button>
                           </div>
                         </div>
@@ -353,14 +360,14 @@ export default function JobsView() {
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setEditingLT(lt)}
-                      className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                      title="Edit Labor Type">
-                      <Pencil className="w-4 h-4" />
+                      aria-label={`Edit ${lt.name}`}
+                      className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                      <Pencil className="w-4 h-4" aria-hidden="true" />
                     </button>
                     <button onClick={() => toggleArchiveLaborType(lt)}
-                      className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                      title="Archive Labor Type">
-                      <Archive className="w-4 h-4" />
+                      aria-label={`Archive ${lt.name}`}
+                      className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                      <Archive className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -407,9 +414,9 @@ export default function JobsView() {
                         </div>
                         <div className="flex items-center gap-1">
                           <button onClick={() => toggleArchiveLaborType(lt)}
-                            className="p-1.5 rounded-lg hover:bg-appInput text-appTextDisabled hover:text-appTextMuted transition-colors"
-                            title="Restore Labor Type">
-                            <ArchiveRestore className="w-4 h-4" />
+                            aria-label={`Restore ${lt.name}`}
+                            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                            <ArchiveRestore className="w-4 h-4" aria-hidden="true" />
                           </button>
                         </div>
                       </div>

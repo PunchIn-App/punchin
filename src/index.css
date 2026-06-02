@@ -41,6 +41,11 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent-rgb) / 0.75);
+    outline-offset: 2px;
+  }
+
   html, body, #root {
     height: 100%;
     overflow: hidden;
