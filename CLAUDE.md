@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.4.0
+**Version:** 0.5.0
 
 ---
 
@@ -30,13 +30,13 @@ punchin/
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
 │   ├── db.js               # Dexie schema, seed data, migrations
 │   ├── components/
-│   │   ├── Layout.jsx          # Fixed header + bottom nav shell
+│   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell
 │   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
 │   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
-│   │   ├── StartTimerModal.jsx # Punch-in form modal
+│   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
 │   │   └── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
 │   ├── views/
-│   │   ├── TimerView.jsx       # Active timers list
+│   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
@@ -104,7 +104,7 @@ Both `jobs` and `laborTypes` use soft-deletion — records are never hard-delete
 
 Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archived/deleted records. `EditEntryModal` still includes a record's own archived labor type so existing entries can be saved without data loss.
 
-#### Archive UX (v0.3.0+)
+#### Archive UX (v0.3.0+, unchanged in v0.5.0)
 - Active jobs show in the main list with **Edit** and **Archive** buttons only — there is no Delete button in the UI.
 - Archived items appear under a collapsible **"Archived (N)"** row at the bottom of each tab. The folder is collapsed by default and has a live search input when expanded.
 - Archived items show only a **Restore** button.
@@ -263,7 +263,7 @@ The script:
 ## Adding Features — Checklist
 
 1. **New data type?** Add table/indexes in `db.js`, bump version, add seed data if needed
-2. **New setting?** Add key to `db.js` initializer, document it in the settings table above, and add it to the `factoryReset` function in `SettingsView.jsx` so it resets correctly
+2. **New setting?** Add key to `db.js` initializer, document it in the settings table above, and add it to the `factoryReset` function in `SettingsView.jsx` so it resets correctly. Destructive data actions belong in the collapsible **Danger Zone** section, not in the main Data section.
 3. **New view?** Add to `App.jsx` tab switch and `Layout.jsx` nav bar (keep it to 5 nav items max for mobile)
 4. **Editing time?** Always go through `utils/time.js` helpers; never use raw `Date` arithmetic inline
 5. **Charts?** Follow `AnalyticsView.jsx` — use Recharts, reference CSS variables for colors (`var(--text-secondary)` etc.)

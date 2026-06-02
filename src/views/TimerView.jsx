@@ -4,6 +4,7 @@ import { Plus, Clock } from 'lucide-react'
 import { db } from '../db'
 import TimerCard from '../components/TimerCard'
 import StartTimerModal from '../components/StartTimerModal'
+import { formatDurationHM, formatTime } from '../utils/time'
 
 export default function TimerView() {
   const [showModal, setShowModal] = useState(false)
@@ -11,6 +12,15 @@ export default function TimerView() {
   const active     = useLiveQuery(() => db.entries.filter(e => !e.punchOut).toArray(), [])
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
+  const lastEntry  = useLiveQuery(async () => {
+    const results = await db.entries
+      .orderBy('punchOut')
+      .filter(e => !!e.punchOut)
+      .reverse()
+      .limit(1)
+      .toArray()
+    return results[0] ?? null
+  }, [])
 
   const getJob = id => jobs?.find(j => j.id === id)
   const getLT  = id => laborTypes?.find(lt => lt.id === id)
@@ -62,6 +72,39 @@ export default function TimerView() {
             />
           ))}
         </div>
+
+        {/* Last completed session */}
+        {lastEntry && active?.length === 0 && (() => {
+          const job = getJob(lastEntry.jobId)
+          const lt  = getLT(lastEntry.laborTypeId)
+          const color = lt?.color || '#6366F1'
+          const duration = new Date(lastEntry.punchOut) - new Date(lastEntry.punchIn)
+          return (
+            <div className="mt-8">
+              <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2">Last Session</p>
+              <div className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden opacity-70">
+                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
+                <div className="pl-5 pr-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || 'Unknown Job'}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {lt && (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium"
+                          style={{ backgroundColor: `${color}25`, color }}>
+                          {lt.name}
+                        </span>
+                      )}
+                      <span className="text-xs text-appTextMuted font-mono">
+                        {formatTime(lastEntry.punchIn)} – {formatTime(lastEntry.punchOut)}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="font-mono text-appTextMuted text-sm flex-shrink-0">{formatDurationHM(duration)}</span>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {showModal && <StartTimerModal onClose={() => setShowModal(false)} />}

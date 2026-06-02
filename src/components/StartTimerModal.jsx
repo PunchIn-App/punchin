@@ -139,8 +139,11 @@ export default function StartTimerModal({ onClose }) {
     try {
       await db.transaction('rw', db.entries, async () => {
         if (!settings.allowConcurrentTimers) {
-          const running = await db.entries.filter(e => !e.punchOut).count()
-          if (running > 0) throw new Error('Concurrent timers are off. Punch out first, or enable them in Settings.')
+          const now = new Date()
+          const running = await db.entries.filter(e => !e.punchOut).toArray()
+          for (const e of running) {
+            await db.entries.update(e.id, { punchOut: now })
+          }
         }
         await db.entries.add({
           jobId:       Number(jobId),

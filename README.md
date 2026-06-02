@@ -79,7 +79,7 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
 ## Features
 
 ### Live Timer Dashboard
-Start one or more timers across different jobs simultaneously. Each running timer shows the job, labor type, start time, optional notes, and a live elapsed-time counter updated every second. Punch out with a single tap.
+Start one or more timers across different jobs simultaneously. Each running timer shows the job, labor type, start time, optional notes, and a live elapsed-time counter updated every second. Punch out with a single tap. When no timers are active, the most recently completed session is shown as a "Last Session" card so your previous work is always visible.
 
 ### Job & Labor Type Management
 Organize your work into **jobs** (client projects) and **labor types** (billable categories like Design, Development, Consulting). Both support color-coded badges for fast visual identification. Archiving a job or labor type hides it from active dropdowns and groups it under a collapsible **Archived** section at the bottom of the list — searchable and restorable any time. Historical entries are never broken; archived records are always preserved.
@@ -95,16 +95,16 @@ Charts powered by [Recharts](https://recharts.org) give you a visual overview of
 - **Labor type donut** — proportion of time by category
 
 ### Settings & Data Portability
-- Toggle concurrent timers on or off
+- Toggle concurrent timers on or off — when off, starting a new timer automatically punches out any running one
 - Choose whether your week starts on Monday or Sunday
 - Switch between **Auto / Light / Dark** theme (auto follows your OS preference)
 - **Export** a full JSON backup of all your data
 - **Import** a backup (smart deduplication prevents duplicates)
-- **Clear entries** to reset logged time while keeping your jobs and labor types
-- **Check for updates** to force the PWA to apply any pending service-worker update
+- **Danger Zone** (collapsible) — **Clear entries** resets logged time while keeping jobs and labor types; **Factory Reset** wipes all data and restores the app to a clean slate (two confirmation steps required)
+- **Check for updates** checks for a pending service-worker update and reloads if one is found, or confirms you're already on the latest version
+- Tap the **PunchIn** logo in the header to return to the Timer view from anywhere
 - Tap the **PunchIn** row in About to open the GitHub repository
 - View the **Changelog** directly from the About section
-- **Factory Reset** wipes all data and restores the app to a clean slate (two confirmation steps required)
 
 ---
 

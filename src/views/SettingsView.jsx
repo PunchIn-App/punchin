@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown } from 'lucide-react'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
 
@@ -7,10 +7,10 @@ function Toggle({ value, onChange }) {
   return (
     <button
       onClick={() => onChange(!value)}
-      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 border
-        ${value ? 'bg-amber-500 border-amber-500' : 'bg-appInput border-appBorder'}`}
+      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 border-2
+        ${value ? 'bg-amber-500 border-amber-500' : 'bg-appInput border-gray-500/60'}`}
     >
-      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform
+      <span className={`absolute top-[1px] left-[1px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform
         ${value ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   )
@@ -47,6 +47,8 @@ export default function SettingsView() {
   const { settings, updateSetting } = useSettings()
   const fileInputRef = useRef(null)
   const [resetStage, setResetStage] = useState(null) // null | 'warn' | 'final'
+  const [dangerOpen, setDangerOpen] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState(null) // null | 'checking' | 'latest'
 
   const exportData = async () => {
     const [jobs, entries, laborTypes] = await Promise.all([
@@ -153,11 +155,21 @@ export default function SettingsView() {
   }
 
   const checkForUpdates = async () => {
+    setUpdateStatus('checking')
     if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration()
-      if (reg) await reg.update()
+      try {
+        const reg = await navigator.serviceWorker.getRegistration()
+        if (reg) {
+          await reg.update()
+          if (reg.waiting || reg.installing) {
+            window.location.reload()
+            return
+          }
+        }
+      } catch {}
     }
-    window.location.reload()
+    setUpdateStatus('latest')
+    setTimeout(() => setUpdateStatus(null), 2500)
   }
 
   const clearEntries = async () => {
@@ -279,81 +291,92 @@ export default function SettingsView() {
             accept=".json"
             className="hidden"
           />
-          <button onClick={clearEntries}
-            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group">
-            <Trash2 className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
-            <div>
-              <p className="text-sm text-appText font-medium group-hover:text-red-400">Clear time entries</p>
-              <p className="text-xs text-appTextMuted mt-0.5">Permanent — jobs and types are kept</p>
-            </div>
-          </button>
         </div>
       </section>
 
       {/* Danger Zone */}
       <section>
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Danger Zone</p>
-        <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
-          {resetStage === null && (
-            <button
-              onClick={() => setResetStage('warn')}
-              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group">
-              <AlertTriangle className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
+        <button
+          onClick={() => { setDangerOpen(o => !o); setResetStage(null) }}
+          className="flex items-center gap-2 mb-2 px-1 w-full group"
+        >
+          <p className="text-[10px] font-semibold text-red-400/70 uppercase tracking-widest">Danger Zone</p>
+          <ChevronDown className={`w-3 h-3 text-red-400/70 transition-transform ${dangerOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {dangerOpen && (
+          <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
+            {/* Clear entries */}
+            <button onClick={clearEntries}
+              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group border-b border-appBorderLight">
+              <Trash2 className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
               <div>
-                <p className="text-sm text-appText font-medium group-hover:text-red-400">Factory Reset</p>
-                <p className="text-xs text-appTextMuted mt-0.5">Erase all data and restore app to default state</p>
+                <p className="text-sm text-appText font-medium group-hover:text-red-400">Clear time entries</p>
+                <p className="text-xs text-appTextMuted mt-0.5">Permanent — jobs and types are kept</p>
               </div>
             </button>
-          )}
 
-          {resetStage === 'warn' && (
-            <div className="px-4 py-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            {resetStage === null && (
+              <button
+                onClick={() => setResetStage('warn')}
+                className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group">
+                <AlertTriangle className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
                 <div>
-                  <p className="text-sm text-appText font-medium">Reset to factory defaults?</p>
-                  <p className="text-xs text-appTextMuted mt-1">This will permanently delete all time entries, jobs, and labor types. Settings will be reset. This action cannot be undone.</p>
+                  <p className="text-sm text-appText font-medium group-hover:text-red-400">Factory Reset</p>
+                  <p className="text-xs text-appTextMuted mt-0.5">Erase all data and restore app to default state</p>
+                </div>
+              </button>
+            )}
+
+            {resetStage === 'warn' && (
+              <div className="px-4 py-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-appText font-medium">Reset to factory defaults?</p>
+                    <p className="text-xs text-appTextMuted mt-1">This will permanently delete all time entries, jobs, and labor types. Settings will be reset. This action cannot be undone.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setResetStage('final')}
+                    className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors">
+                    Continue
+                  </button>
+                  <button
+                    onClick={() => setResetStage(null)}
+                    className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
+                    Cancel
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setResetStage('final')}
-                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors">
-                  Continue
-                </button>
-                <button
-                  onClick={() => setResetStage(null)}
-                  className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
+            )}
 
-          {resetStage === 'final' && (
-            <div className="px-4 py-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-red-400">There is no going back.</p>
-                  <p className="text-xs text-appTextMuted mt-1">Every entry, job, and labor type will be permanently erased. Are you absolutely sure?</p>
+            {resetStage === 'final' && (
+              <div className="px-4 py-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-400">There is no going back.</p>
+                    <p className="text-xs text-appTextMuted mt-1">Every entry, job, and labor type will be permanently erased. Are you absolutely sure?</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={factoryReset}
+                    className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
+                    Yes, wipe everything
+                  </button>
+                  <button
+                    onClick={() => setResetStage(null)}
+                    className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
+                    Cancel
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={factoryReset}
-                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
-                  Yes, wipe everything
-                </button>
-                <button
-                  onClick={() => setResetStage(null)}
-                  className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* About */}
@@ -372,7 +395,7 @@ export default function SettingsView() {
                 <p className="text-xs text-appTextMuted mt-0.5">{`v${__APP_VERSION__} · Data stored on this device`}</p>
               </div>
             </div>
-            <ExternalLink className="w-4 h-4 text-appTextDisabled flex-shrink-0" />
+            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" />
           </a>
           <a
             href="https://github.com/PunchIn-App/punchin/blob/main/CHANGELOG.md"
@@ -386,15 +409,20 @@ export default function SettingsView() {
                 <p className="text-xs text-appTextMuted mt-0.5">See what's new in each release</p>
               </div>
             </div>
-            <ExternalLink className="w-4 h-4 text-appTextDisabled flex-shrink-0" />
+            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" />
           </a>
           <button
             onClick={checkForUpdates}
-            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-b-xl">
-            <RefreshCw className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+            disabled={updateStatus === 'checking'}
+            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-b-xl disabled:opacity-60">
+            <RefreshCw className={`w-4 h-4 text-appTextMuted flex-shrink-0 ${updateStatus === 'checking' ? 'animate-spin' : ''}`} />
             <div>
               <p className="text-sm text-appText font-medium">Check for updates</p>
-              <p className="text-xs text-appTextMuted mt-0.5">Reload to apply any pending app update</p>
+              <p className="text-xs text-appTextMuted mt-0.5">
+                {updateStatus === 'checking' && 'Checking…'}
+                {updateStatus === 'latest'   && 'Already up to date'}
+                {!updateStatus               && 'Reload to apply any pending app update'}
+              </p>
             </div>
           </button>
         </div>

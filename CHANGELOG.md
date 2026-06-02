@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.5.0] — 2026-06-02
+
+### Added
+- **Last session card** — When no timers are running the Timer view now shows a muted "Last Session" card displaying the most recently completed entry (job, labor type, time range, and duration), so your previous work is always visible at a glance.
+
+### Changed
+- **Logo navigates home** — Tapping the PunchIn logo in the header navigates back to the Timer view from any tab.
+- **Danger Zone is now collapsible** — The destructive data actions (Clear time entries and Factory Reset) are hidden behind a collapsible "Danger Zone" section header in Settings. The panel is collapsed by default so these actions can no longer be triggered accidentally. Both buttons still require confirmation steps once expanded.
+- **Starting a new timer with concurrent timers off** — Previously punching in while a timer was already running (with concurrent timers disabled) showed an error and blocked the action. The app now automatically punches out any running timers and immediately starts the new one.
+- **Check for updates** — The button in Settings > About now shows a spinner while checking and reports "Already up to date" if no new service worker is waiting, instead of always reloading.
+
+### Fixed
+- **Light mode text contrast** — The version string in the header and inactive bottom-nav icons were using `text-appTextDisabled` (`#D1D5DB` in light mode), which was nearly invisible against the white nav background. Both now use `text-appTextMuted` (`#6B7280`).
+- **Toggle button border visibility** — The off-state toggle border was `border-appBorder` (`#2A2F45`) on `bg-appInput` (`#1E2232`) — too low contrast to see in dark mode. Border is now `border-2 border-gray-500/60`, clearly visible in both themes.
+- **External link icon contrast** — The `ExternalLink` icons in the About section were using `text-appTextDisabled`, which is invisible in light mode. Now use `text-appTextMuted`.
+
+---
+
 ## [0.4.0] — 2026-06-02
 
 ### Added
