@@ -34,7 +34,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{js,jsx}'],
-      exclude: ['src/main.jsx', 'src/**/*.test.{js,jsx}', 'src/test-setup.js', 'src/sync/**'],
+      exclude: ['src/main.jsx', 'src/**/*.test.{js,jsx}', 'src/test-setup.js'],
       thresholds: {
         lines: 88,
         functions: 77,

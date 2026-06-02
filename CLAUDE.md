@@ -101,19 +101,36 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | File | What's tested |
 |------|---------------|
 | `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `getEntryDuration`, `formatTime`, `formatDate`, `getDayRange`, `getWeekRange`, `getWeekDays`, `isEntryInRange`, `sumDurations` |
-| `src/components/StartTimerModal.test.jsx` | Render, form validation, concurrent-timer guard |
+| `src/utils/pwa.test.js` | `getInstallPrompt`, `notifyUpdateAvailable`, `setPwaUpdateFn`, `applyUpdate`, `initPwaInstallPrompt` |
+| `src/db.test.js` | Schema validation, default settings seed, basic CRUD for jobs/labor types/entries |
+| `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
+| `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), standalone mode detection |
+| `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
+| `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap |
+| `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
+| `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management |
+| `src/components/EditEntryModal.test.jsx` | Add/edit/active-timer modes, validation, save/delete flows, keyboard |
 | `src/components/EditEntryModal.helpers.test.js` | `formatDateToYYYYMMDD`, `formatTimeToHHMM`, `combineDateAndTime` |
+| `src/components/ErrorBoundary.test.jsx` | Children render, fallback UI on throw, "Try again" reset |
+| `src/components/InvoiceModal.test.jsx` | Line-item calc, period presets, CSV export, print, empty state |
+| `src/components/Layout.test.jsx` | Logo button, nav items, `aria-current`, tab callbacks |
+| `src/components/StartTimerModal.test.jsx` | Render, form validation, concurrent-timer guard |
+| `src/components/TimerCard.test.jsx` | Job/labor-type display, stop timer, open/close EditEntryModal |
+| `src/views/AnalyticsView.test.jsx` | Loading state, period toggle, summary cards, empty state, charts |
+| `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
+| `src/views/SettingsView.test.jsx` | All settings sections, toggles, theme, export/import, sync UI, danger zone |
+| `src/views/SettingsView.bugReport.test.js` | `buildBugReportUrl` browser/OS/device/install-type detection |
 | `src/views/SettingsView.dedup.test.js` | `isEntryDuplicate` (backup import dedup logic) |
+| `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
+| `src/views/TimesheetsView.test.jsx` | Daily/weekly tabs, period nav, search/filter, CSV/print, edit/delete |
+| `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks |
+| `src/sync/config.test.js` | `SYNC_CONFIG` shape and env-var fallbacks |
+| `src/sync/providers/github.test.js` | `buildGitHubOAuthUrl`, `createGist`, `updateGist`, `fetchGist` (incl. truncated-content `raw_url` path) |
+| `src/sync/providers/google.test.js` | `buildGoogleOAuthUrl`, `pushToDrive` (create + update path), `pullFromDrive` |
+| `src/sync/providers/onedrive.test.js` | `buildOneDriveOAuthUrl`, `pushToOneDrive`, `pullFromOneDrive` (404 → null) |
+| `src/sync/syncManager.test.js` | `exportSnapshot`, `disconnectSync`, `runSync` (auth guards, per-provider dispatch, merge, full dedup) |
 
-#### Known gaps (no tests yet)
-
-- `src/db.js` — schema migrations, seed logic
-- `src/hooks/useSettings.js`, `usePlatformContext.js`, `useHapticFeedback.jsx`
-- `src/views/TimesheetsView.jsx`, `JobsView.jsx`, `AnalyticsView.jsx`, `TimerView.jsx`
-- `src/components/InvoiceModal.jsx`, `ChangelogModal.jsx`, `ColorPicker.jsx`
-- `src/components/EditEntryModal.jsx` (full component, not just helpers)
-
-When adding new behaviour to any of the above, add a test file alongside it.
+When adding new behaviour to any source file, add a test alongside it.
 
 ### Deploy
 
