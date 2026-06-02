@@ -9,6 +9,10 @@ db.version(1).stores({
   entries:     '++id, jobId, laborTypeId, punchIn',
 })
 
+db.version(2).stores({
+  entries:     '++id, jobId, laborTypeId, punchIn, punchOut',
+})
+
 // Seed default settings on first run — no jobs or labor types pre-loaded
 db.on('populate', async () => {
   await db.settings.bulkPut([
