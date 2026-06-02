@@ -4,7 +4,11 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-F59E0B?style=flat&labelColor=161923" alt="License" /></a>
-  <img src="https://img.shields.io/badge/dependencies-none-F59E0B?style=flat&labelColor=161923" alt="No server-side dependencies" />
+  <img src="https://img.shields.io/badge/React-18-F59E0B?style=flat&labelColor=161923&logo=react&logoColor=white" alt="React 18" />
+  <img src="https://img.shields.io/badge/Dexie-3-F59E0B?style=flat&labelColor=161923" alt="Dexie 3" />
+  <img src="https://img.shields.io/badge/Recharts-2-F59E0B?style=flat&labelColor=161923" alt="Recharts 2" />
+  <img src="https://img.shields.io/badge/Vite-6-F59E0B?style=flat&labelColor=161923&logo=vite&logoColor=white" alt="Vite 6" />
+  <img src="https://img.shields.io/badge/Tailwind-3-F59E0B?style=flat&labelColor=161923&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 3" />
   <img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-F59E0B?style=flat&labelColor=161923&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" />
   <img src="https://img.shields.io/badge/version-0.6.6-F59E0B?style=flat&labelColor=161923" alt="Version 0.6.6" />
 </p>
