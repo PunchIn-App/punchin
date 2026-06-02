@@ -1,6 +1,6 @@
 <p align="center">
-  <img src="docs/logo.svg#gh-dark-mode-only"       alt="PunchIn" width="220" />
-  <img src="docs/logo-light.svg#gh-light-mode-only" alt="PunchIn" width="220" />
+  <img src="docs/social-preview.svg#gh-dark-mode-only"       alt="PunchIn — Precision time tracking for freelancers" width="720" />
+  <img src="docs/social-preview-light.svg#gh-light-mode-only" alt="PunchIn — Precision time tracking for freelancers" width="720" />
 </p>
 
 <p align="center">
