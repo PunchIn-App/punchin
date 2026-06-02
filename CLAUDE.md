@@ -101,6 +101,29 @@ npx wrangler deploy   # Deploys dist/ to Cloudflare Workers
 
 No `.env` files are needed — the app has no backend secrets. Cloudflare account credentials for deployment are managed via `wrangler login`.
 
+### Versioning
+
+PunchIn follows **semantic versioning** (`MAJOR.MINOR.PATCH`).
+
+- **Pre-1.0** (current): `0.MINOR.PATCH` — `MINOR` increments for new user-visible features or significant UX changes; `PATCH` for bug fixes, accessibility improvements, and internal refactors with no visible feature change.
+- **Post-1.0**: standard semver — `MAJOR` for breaking data-model changes or major UX overhauls; `MINOR` for new features; `PATCH` for fixes.
+- The canonical version source is `package.json` → `"version"`. `vite.config.js` reads it automatically via `__APP_VERSION__` — no manual sync needed for the in-app display.
+- The BUSL-1.1 **Change Date** of `2030-06-02` is fixed and independent of version — it does not move when the version number changes.
+
+### Release checklist
+
+Every version bump must update all of the following in the same commit or PR:
+
+| File | What to change |
+|------|----------------|
+| `package.json` | `"version"` field — **source of truth** |
+| `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-F59E0B...` |
+| `CLAUDE.md` | `**Version:** {X.Y.Z}` in the Project Overview header |
+| `CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top, following Keep a Changelog format |
+| `docs/screenshots/` | Regenerate with the Playwright script if any visible UI changed (see Screenshots section below) |
+
+The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump — update it only when intentionally upgrading the Cloudflare Workers runtime.
+
 ---
 
 ## Database (Dexie / IndexedDB)

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/frontend-stack-374151?style=flat" alt="" />
+  <img src="https://img.shields.io/badge/frontend-stack-374151?style=flat" alt="Frontend stack:" />
   <img src="https://img.shields.io/badge/React-18-F59E0B?style=flat&labelColor=161923&logo=react&logoColor=white" alt="React 18" />
   <img src="https://img.shields.io/badge/Dexie-3-F59E0B?style=flat&labelColor=161923" alt="Dexie 3" />
   <img src="https://img.shields.io/badge/Recharts-2-F59E0B?style=flat&labelColor=161923" alt="Recharts 2" />
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/backend-none-374151?style=flat" alt="" />
+  <img src="https://img.shields.io/badge/backend-none-374151?style=flat" alt="No backend." />
   <img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-F59E0B?style=flat&labelColor=161923&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" />
 </p>
 
@@ -43,7 +43,7 @@ Most time tracking tools are bloated, require an account, or bill you monthly fo
 
 ## Screenshots
 
-### All views &nbsp;·&nbsp; Pixel 10 Pro XL (default 1080×2404 @486 PPI · 412×916 CSS px @2.625×)
+### Phone — Pixel 10 Pro XL (all views)
 
 <p align="center">
   <img src="docs/screenshots/phone/timer.png"            width="110" alt="Timer — 2 active timers" />
@@ -65,8 +65,8 @@ PunchIn adapts from pocket to desktop without a separate codebase. The bottom-na
 <table align="center">
   <thead>
     <tr>
-      <th align="center">Phone<br><sub>Pixel 10 Pro XL · default 1080×2404 @486 PPI · 412×916 CSS px @2.625×</sub></th>
-      <th align="center">Tablet<br><sub>iPad Air 11" M2 · landscape 2388×1668 @2×</sub></th>
+      <th scope="col" align="center">Phone<br><sub>Pixel 10 Pro XL · 412×916 CSS px</sub></th>
+      <th scope="col" align="center">Tablet<br><sub>iPad Air 11" M2 · landscape</sub></th>
     </tr>
   </thead>
   <tbody>
@@ -241,6 +241,6 @@ All contributors must agree to the [Contributor License Agreement](CLA.md) befor
 
 ## License
 
-PunchIn Time Tracker is source-available under the [Business Source License 1.1](LICENSE). Free for personal, non-commercial use by individual freelancers. Commercial use requires a separate license — contact [licensing@trackmytime.today](mailto:licensing@trackmytime.today). The license converts to AGPL-3.0 on 2030-06-02.
+PunchIn Time Tracker is source-available under the [Business Source License 1.1](LICENSE). Free for personal, non-commercial use by individual freelancers. Commercial use requires a separate license — [contact the licensor](mailto:licensing@trackmytime.today). The license converts to AGPL-3.0 on 2030-06-02.
 
 Contributions are accepted under the [Contributor License Agreement](CLA.md).
