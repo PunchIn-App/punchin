@@ -148,7 +148,7 @@ When adding new behaviour to any source file, add a test alongside it.
 ### Deploy
 
 ```bash
-npm run deploy   # builds then deploys via wrangler --config config/wrangler.jsonc
+npm run deploy   # builds then deploys via `wrangler deploy` using the root wrangler.jsonc
 ```
 
 No `.env` files are needed — the app has no backend secrets. Cloudflare account credentials for deployment are managed via `wrangler login`.
