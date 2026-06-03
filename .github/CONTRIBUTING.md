@@ -10,6 +10,15 @@ PR description or as a comment:
 
 > I have read and agree to the PunchIn Time Tracker Contributor License Agreement.
 
+## Reporting Security Vulnerabilities
+
+Please **do not** open a public GitHub issue for security vulnerabilities.
+
+Instead, use GitHub's private advisory system:
+**[Report a vulnerability →](https://github.com/PunchIn-App/punchin/security/advisories/new)**
+
+See [SECURITY.md](../SECURITY.md) for the full policy, supported versions, and response timeline.
+
 ---
 
 ## Getting Started
@@ -129,6 +138,7 @@ A version bump commit must update **all** of the following in the same PR:
 | `README.md` | Version badge URL |
 | `CLAUDE.md` | `**Version:**` in the Project Overview header |
 | `docs/CHANGELOG.md` | New section at the top (see format below) |
+| `SECURITY.md` | Update the **Supported Versions** table — set the new `X.Y.x` row to **Yes**, mark all prior minor versions as **No** |
 | `docs/screenshots/` | Regenerate if any visible UI changed (see below) |
 
 Commit message convention: `chore: bump to vX.Y.Z`
