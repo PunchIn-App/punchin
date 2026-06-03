@@ -2,6 +2,11 @@
   "name": "punchin",
   "compatibility_date": "2026-06-01",
   "main": "./worker/oauth.js",
+  // Preserve dashboard-set runtime vars/secrets (e.g. GITHUB_CLIENT_ID,
+  // GITHUB_CLIENT_SECRET, APP_URL for sync) across deploys. Without this,
+  // each deploy deletes plaintext vars not declared here. Secrets always
+  // persist regardless; this protects the non-secret sync vars too.
+  "keep_vars": true,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"

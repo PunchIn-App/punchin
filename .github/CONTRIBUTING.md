@@ -65,6 +65,8 @@ GitHub is the only provider with a server-side token exchange, so it needs entri
 
 > Setting everything in **runtime only** → the button never appears (build didn't get the `VITE_*` vars). Setting everything in **build only** → the OAuth callback fails when GitHub redirects back (the worker can't exchange the code without its runtime secret). You need both.
 
+> **Why dashboard runtime vars sometimes vanish after a deploy:** by default a deploy deletes any plaintext runtime var not declared in `wrangler.jsonc`, then re-applies what the config lists (secrets are never deleted — which is why `GITHUB_CLIENT_SECRET` survives but `GITHUB_CLIENT_ID` / `APP_URL` disappear). This repo sets [`keep_vars: true`](../wrangler.jsonc) so dashboard-set runtime vars persist across deploys. If you fork and remove that flag, declare the non-secret runtime vars under `vars` in `wrangler.jsonc` instead.
+
 ### Google Drive (implicit flow — build only, no worker, no secret)
 
 Browser-side implicit OAuth, so there's no runtime value and no client secret. Register a Web application OAuth client at <https://console.cloud.google.com> (enable the Google Drive API, scope `drive.appdata`, authorized redirect URI `https://<your-app>.workers.dev/`), then set:
