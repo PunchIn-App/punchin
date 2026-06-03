@@ -14,7 +14,7 @@
     "coverage": "vitest run --coverage --config config/vite.config.js"
   },
   "dependencies": {
-    "date-fns": "^3.6.0",
+    "date-fns": "^4.4.0",
     "dexie": "^3.2.7",
     "dexie-react-hooks": "^1.1.7",
     "lucide-react": "^0.383.0",
