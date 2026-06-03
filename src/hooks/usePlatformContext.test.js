@@ -58,6 +58,40 @@ describe('usePlatformContext — OS detection', () => {
   })
 })
 
+describe('usePlatformContext — iOS Safari detection', () => {
+  const IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) '
+
+  it('isIOSSafari=true for iOS Safari (no third-party browser token)', () => {
+    setUA(IOS + 'Version/17.0 Mobile/15E148 Safari/604.1')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIOSSafari).toBe(true)
+  })
+
+  it('isIOSSafari=false for Chrome on iOS (CriOS)', () => {
+    setUA(IOS + 'CriOS/120.0 Mobile/15E148 Safari/604.1')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIOSSafari).toBe(false)
+  })
+
+  it('isIOSSafari=false for Firefox on iOS (FxiOS)', () => {
+    setUA(IOS + 'FxiOS/121.0 Mobile/15E148 Safari/604.1')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIOSSafari).toBe(false)
+  })
+
+  it('isIOSSafari=false for Edge on iOS (EdgiOS)', () => {
+    setUA(IOS + 'EdgiOS/120.0 Mobile/15E148 Safari/604.1')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIOSSafari).toBe(false)
+  })
+
+  it('isIOSSafari=false on non-iOS platforms', () => {
+    setUA('Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120.0')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIOSSafari).toBe(false)
+  })
+})
+
 describe('usePlatformContext — standalone detection', () => {
   beforeEach(() => {
     setUA('Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36')

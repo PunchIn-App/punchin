@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useId } from 'react'
-import { X, MonitorDown, Share, Plus } from 'lucide-react'
+import { X, MonitorDown, Share, Plus, Compass } from 'lucide-react'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 
@@ -69,13 +69,19 @@ function useSheetStyles(isStandalone, os) {
   }
 }
 
-// First-run install nudge. Two variants:
-//   - canInstall (Chrome/Edge): primary button replays the captured native
-//     prompt via onInstall (a user gesture, which the API requires).
-//   - otherwise (iOS Safari / any browser with no captured prompt): show the
-//     manual Share → Add to Home Screen instructions; there's no API to invoke.
-export default function InstallPromptModal({ canInstall, onInstall, onClose }) {
+// First-run install nudge. Three modes (chosen by the caller):
+//   - 'native'    (Chrome/Edge): primary button replays the captured native
+//                 prompt via onInstall (a user gesture, which the API requires).
+//   - 'ios-safari': manual Share → Add to Home Screen steps (works in Safari).
+//   - 'ios-other':  Chrome/Firefox/etc. on iOS can't install a real PWA — tell
+//                 the user to open the page in Safari instead.
+export default function InstallPromptModal({ mode = 'native', onInstall, onClose }) {
   const { isStandalone, os } = usePlatformContext()
+  // Native install lands in different places per platform — avoid "home screen"
+  // wording on desktop, where it installs as an app window.
+  const nativeDesc = os === 'android'
+    ? 'Add PunchIn to your home screen for faster access and a full-screen, app-like experience. Your data stays on this device.'
+    : 'Install PunchIn for faster access and a dedicated, app-like window. Your data stays on this device.'
   const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(isStandalone ? os : 'web')
 
   const uid = useId()
@@ -148,12 +154,10 @@ export default function InstallPromptModal({ canInstall, onInstall, onClose }) {
           </button>
         </div>
 
-        {canInstall ? (
+        {mode === 'native' && (
           <>
             <div className="px-5 py-4">
-              <p id={descId} className="text-sm text-appTextMuted leading-relaxed">
-                Add PunchIn to your home screen for faster access and a full-screen, app-like experience. Your data stays on this device.
-              </p>
+              <p id={descId} className="text-sm text-appTextMuted leading-relaxed">{nativeDesc}</p>
             </div>
             <div className="px-5 pb-5 space-y-2">
               <button
@@ -171,11 +175,13 @@ export default function InstallPromptModal({ canInstall, onInstall, onClose }) {
               </button>
             </div>
           </>
-        ) : (
+        )}
+
+        {mode === 'ios-safari' && (
           <>
             <div className="px-5 py-4 space-y-3">
               <p id={descId} className="text-sm text-appTextMuted leading-relaxed">
-                Install PunchIn for faster access and a full-screen experience. From your browser:
+                Install PunchIn for faster access and a full-screen experience. From Safari:
               </p>
               <ol className="space-y-2.5 text-sm text-appText">
                 <li className="flex items-center gap-3">
@@ -185,6 +191,35 @@ export default function InstallPromptModal({ canInstall, onInstall, onClose }) {
                 <li className="flex items-center gap-3">
                   <Plus className="w-5 h-5 text-appAccent flex-shrink-0" aria-hidden="true" />
                   <span>Choose <span className="font-semibold">Add to Home Screen</span></span>
+                </li>
+              </ol>
+            </div>
+            <div className="px-5 pb-5">
+              <button
+                onClick={onClose}
+                className="w-full py-3.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90
+                           text-[#0F1117] font-display font-bold text-base transition-colors"
+              >
+                Got it
+              </button>
+            </div>
+          </>
+        )}
+
+        {mode === 'ios-other' && (
+          <>
+            <div className="px-5 py-4 space-y-3">
+              <p id={descId} className="text-sm text-appTextMuted leading-relaxed">
+                To install PunchIn on iPhone or iPad, open this page in <span className="font-semibold text-appText">Safari</span> — it's the only iOS browser that can add web apps to the home screen.
+              </p>
+              <ol className="space-y-2.5 text-sm text-appText">
+                <li className="flex items-center gap-3">
+                  <Compass className="w-5 h-5 text-appAccent flex-shrink-0" aria-hidden="true" />
+                  <span>Open <span className="font-semibold">trackmytime.today</span> in Safari</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <Share className="w-5 h-5 text-appAccent flex-shrink-0" aria-hidden="true" />
+                  <span>Tap <span className="font-semibold">Share</span> → <span className="font-semibold">Add to Home Screen</span></span>
                 </li>
               </ol>
             </div>

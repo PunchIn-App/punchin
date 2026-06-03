@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.11.2] — 2026-06-02
+
+### Fixed
+- **Install — correct guidance in non-Safari iOS browsers.** Chrome, Firefox, and Edge on iPhone/iPad can't add web apps to the home screen — only Safari can — but the install prompt previously showed them the Safari-only "Add to Home Screen" steps, which lead nowhere there. Those browsers now get the right instruction: open the page in Safari first.
+
+### Changed
+- **Install — platform-aware prompts.** On desktop the install prompt no longer says "Add to Home Screen" (it installs as an app window), and the first-run install nudge now appears only on phones/tablets; on desktop the install option remains available in Settings.
+
+---
+
 ## [0.11.1] — 2026-06-02
 
 ### Changed

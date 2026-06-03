@@ -14,7 +14,7 @@ import { usePlatformContext } from './usePlatformContext'
 //     "Add to Home Screen". We can show instructions but cannot trigger it.
 //   - When already running standalone, nothing should be offered.
 export function useInstallPrompt() {
-  const { isStandalone, os } = usePlatformContext()
+  const { isStandalone, os, isIOSSafari } = usePlatformContext()
   const [prompt, setPrompt] = useState(getInstallPrompt)
   const [installed, setInstalled] = useState(false)
 
@@ -48,8 +48,11 @@ export function useInstallPrompt() {
     canInstall: !!prompt && !isStandalone,
     // True when running as an installed app (or appinstalled fired this session).
     isInstalled: isStandalone || installed,
-    // iOS Safari path: no API, instructions only.
+    // Any iOS browser (no beforeinstallprompt exists on iOS at all).
     isIOS: os === 'ios',
+    // iOS Safari specifically — the only iOS browser where Add to Home Screen
+    // produces a real standalone PWA. Other iOS browsers can't install one.
+    isIOSSafari: isIOSSafari && !isStandalone,
     os,
     isStandalone,
     promptInstall,

@@ -160,12 +160,18 @@ describe('App — first-run install nudge', () => {
     }
   }
 
+  // The auto-nudge is mobile-only, so present an Android UA for these tests.
+  const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36'
+  let realUA
   beforeEach(() => {
     vi.stubGlobal('localStorage', fakeStorage())
+    realUA = Object.getOwnPropertyDescriptor(navigator, 'userAgent')
+    Object.defineProperty(navigator, 'userAgent', { value: ANDROID_UA, configurable: true })
     delete window.__pwaInstallPrompt
   })
   afterEach(() => {
     vi.unstubAllGlobals()
+    if (realUA) Object.defineProperty(navigator, 'userAgent', realUA)
     delete window.__pwaInstallPrompt
   })
 
@@ -187,6 +193,28 @@ describe('App — first-run install nudge', () => {
   it('does not show the nudge again after it has been dismissed', () => {
     localStorage.setItem('pi.opens', '5')
     localStorage.setItem('pi.installNudgeDismissed', '1')
+    window.__pwaInstallPrompt = { prompt: vi.fn() }
+    render(<App />)
+    expect(nudge()).not.toBeInTheDocument()
+  })
+
+  it('shows the nudge on Chrome-for-iOS (no native prompt, ios-other mode)', () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0 Mobile/15E148 Safari/604.1',
+      configurable: true,
+    })
+    localStorage.setItem('pi.opens', '3')
+    render(<App />)
+    expect(nudge()).toBeInTheDocument()
+    expect(screen.getByText(/only ios browser that can add web apps/i)).toBeInTheDocument()
+  })
+
+  it('does not auto-show the nudge on desktop even when installable', () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+      configurable: true,
+    })
+    localStorage.setItem('pi.opens', '5')
     window.__pwaInstallPrompt = { prompt: vi.fn() }
     render(<App />)
     expect(nudge()).not.toBeInTheDocument()

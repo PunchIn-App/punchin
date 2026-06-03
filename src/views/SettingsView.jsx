@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
 import ColorPicker from '../components/ColorPicker'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut, Check, Share, Plus } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut, Check, Share, Plus, Compass } from 'lucide-react'
 import { applyUpdate } from '../utils/pwa'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { format } from 'date-fns'
@@ -140,7 +140,7 @@ export default function SettingsView() {
   const [updateAvailable, setUpdateAvailable] = useState(() => !!window.__pwaUpdateAvailable)
   const [iosHelpOpen, setIosHelpOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
-  const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt()
+  const { canInstall, isInstalled, isIOS, isIOSSafari, os: installOs, promptInstall } = useInstallPrompt()
 
   const syncSettings = useLiveQuery(async () => {
     const rows = await db.settings.toArray()
@@ -488,11 +488,11 @@ export default function SettingsView() {
                 className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-xl">
                 <MonitorDown className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
                 <div>
-                  <p className="text-sm text-appText font-medium">Add to Home Screen</p>
+                  <p className="text-sm text-appText font-medium">{installOs === 'android' ? 'Add to Home Screen' : 'Install app'}</p>
                   <p className="text-xs text-appTextMuted mt-0.5">Install as a standalone app for faster access</p>
                 </div>
               </button>
-            ) : (
+            ) : isIOSSafari ? (
               <>
                 <button
                   onClick={() => setIosHelpOpen(o => !o)}
@@ -515,6 +515,33 @@ export default function SettingsView() {
                     <p className="flex items-center gap-3">
                       <Plus className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
                       <span>Choose <span className="font-semibold">Add to Home Screen</span></span>
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIosHelpOpen(o => !o)}
+                  aria-expanded={iosHelpOpen}
+                  className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left">
+                  <MonitorDown className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-appText font-medium">Add to Home Screen</p>
+                    <p className="text-xs text-appTextMuted mt-0.5">Open in Safari to install</p>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-appTextMuted flex-shrink-0 transition-transform ${iosHelpOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+                {iosHelpOpen && (
+                  <div className="px-4 pb-4 -mt-1 space-y-2.5 text-sm text-appText">
+                    <p className="text-xs text-appTextMuted">Only Safari can install web apps on iOS.</p>
+                    <p className="flex items-center gap-3">
+                      <Compass className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
+                      <span>Open <span className="font-semibold">trackmytime.today</span> in Safari</span>
+                    </p>
+                    <p className="flex items-center gap-3">
+                      <Share className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
+                      <span>Tap <span className="font-semibold">Share</span> → <span className="font-semibold">Add to Home Screen</span></span>
                     </p>
                   </div>
                 )}

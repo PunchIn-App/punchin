@@ -5,8 +5,8 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('InstallPromptModal — native (canInstall) variant', () => {
-  const props = () => ({ canInstall: true, onInstall: vi.fn(), onClose: vi.fn() })
+describe('InstallPromptModal — native mode', () => {
+  const props = () => ({ mode: 'native', onInstall: vi.fn(), onClose: vi.fn() })
 
   it('renders the install CTA and a dismiss option', () => {
     render(<InstallPromptModal {...props()} />)
@@ -47,15 +47,14 @@ describe('InstallPromptModal — native (canInstall) variant', () => {
   })
 })
 
-describe('InstallPromptModal — instructions (no native prompt) variant', () => {
-  const props = () => ({ canInstall: false, onInstall: vi.fn(), onClose: vi.fn() })
+describe('InstallPromptModal — ios-safari mode', () => {
+  const props = () => ({ mode: 'ios-safari', onInstall: vi.fn(), onClose: vi.fn() })
 
   it('renders the Share → Add to Home Screen steps and a "Got it" button', () => {
     render(<InstallPromptModal {...props()} />)
-    expect(screen.getByText(/share/i)).toBeInTheDocument()
+    expect(screen.getByText(/from safari/i)).toBeInTheDocument()
     expect(screen.getByText(/add to home screen/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /got it/i })).toBeInTheDocument()
-    // No native install button in this variant.
     expect(screen.queryByRole('button', { name: /^install$/i })).not.toBeInTheDocument()
   })
 
@@ -64,5 +63,17 @@ describe('InstallPromptModal — instructions (no native prompt) variant', () =>
     render(<InstallPromptModal {...p} />)
     fireEvent.click(screen.getByRole('button', { name: /got it/i }))
     expect(p.onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('InstallPromptModal — ios-other mode (Chrome/Firefox on iOS)', () => {
+  const props = () => ({ mode: 'ios-other', onInstall: vi.fn(), onClose: vi.fn() })
+
+  it('tells the user to open in Safari rather than giving Safari-only steps as if they work', () => {
+    render(<InstallPromptModal {...props()} />)
+    expect(screen.getByText(/open this page in/i)).toBeInTheDocument()
+    expect(screen.getByText(/only ios browser that can add web apps/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /got it/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^install$/i })).not.toBeInTheDocument()
   })
 })

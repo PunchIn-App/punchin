@@ -112,8 +112,14 @@ export default function App() {
   }, [])
 
   // --- First-run install nudge -------------------------------------------
-  const { canInstall, isIOS, isInstalled, promptInstall } = useInstallPrompt()
+  const { canInstall, isIOS, isIOSSafari, isInstalled, os, promptInstall } = useInstallPrompt()
   const [showInstall, setShowInstall] = useState(false)
+
+  // What kind of install guidance applies, or null if none is possible here.
+  const installMode = canInstall ? 'native'
+    : isIOSSafari ? 'ios-safari'
+    : isIOS ? 'ios-other'
+    : null
 
   // Count app opens once per mount.
   useEffect(() => {
@@ -123,18 +129,22 @@ export default function App() {
     } catch { /* storage unavailable (private mode); skip the nudge gracefully */ }
   }, [])
 
-  // Decide whether to surface the nudge. Re-runs when canInstall flips true
-  // (beforeinstallprompt can fire shortly after load).
+  // Decide whether to surface the nudge. Re-runs when installMode resolves
+  // (beforeinstallprompt can fire shortly after load). The auto-nudge is
+  // mobile-only — on desktop the Settings install entry is enough, popping a
+  // sheet there is pushier than it's worth.
   useEffect(() => {
     if (isInstalled) return
+    if (os !== 'ios' && os !== 'android') return
+    if (!installMode) return
     let opens = 0
     try {
       if (localStorage.getItem(INSTALL_DISMISSED_KEY)) return
       opens = Number(localStorage.getItem(OPEN_COUNT_KEY) || '0')
     } catch { return }
     if (opens < NUDGE_MIN_OPENS) return
-    if (canInstall || isIOS) setShowInstall(true)
-  }, [canInstall, isIOS, isInstalled])
+    setShowInstall(true)
+  }, [installMode, isInstalled, os])
 
   const dismissInstall = () => {
     try { localStorage.setItem(INSTALL_DISMISSED_KEY, '1') } catch { /* ignore */ }
@@ -159,9 +169,9 @@ export default function App() {
       <ErrorBoundary key={activeView}>
         {views[activeView]}
       </ErrorBoundary>
-      {showInstall && (
+      {showInstall && installMode && (
         <InstallPromptModal
-          canInstall={canInstall}
+          mode={installMode}
           onInstall={handleInstall}
           onClose={dismissInstall}
         />

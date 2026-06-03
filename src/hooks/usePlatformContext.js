@@ -20,9 +20,22 @@ function detectStandalone() {
   )
 }
 
+// On iOS, Add-to-Home-Screen that produces a real standalone PWA is Safari-only.
+// Third-party iOS browsers (Chrome/CriOS, Firefox/FxiOS, Edge/EdgiOS) are WebKit
+// under the hood but cannot install a true PWA — so we must distinguish them.
+function detectIOSSafari(os) {
+  if (os !== 'ios') return false
+  return !/CriOS|FxiOS|EdgiOS|OPiOS|GSA/i.test(navigator.userAgent || '')
+}
+
 export function usePlatformContext() {
-  return useMemo(() => ({
-    isStandalone: detectStandalone(),
-    os: detectOS(),
-  }), [])
+  return useMemo(() => {
+    const os = detectOS()
+    return {
+      isStandalone: detectStandalone(),
+      os,
+      // True only in iOS Safari, where Add to Home Screen actually works.
+      isIOSSafari: detectIOSSafari(os),
+    }
+  }, [])
 }
