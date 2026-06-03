@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react'
 import Layout from './components/Layout'
 import ErrorBoundary  from './components/ErrorBoundary'
+import InstallPromptModal from './components/InstallPromptModal'
 import TimerView      from './views/TimerView'
 import JobsView       from './views/JobsView'
 import TimesheetsView from './views/TimesheetsView'
 import AnalyticsView  from './views/AnalyticsView'
 import SettingsView   from './views/SettingsView'
 import { useSettings } from './hooks/useSettings'
+import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { db } from './db'
+
+// localStorage keys for the first-run install nudge. Kept out of the Dexie
+// data model so a factory reset doesn't wipe (or re-trigger) them.
+const INSTALL_DISMISSED_KEY = 'pi.installNudgeDismissed'
+const OPEN_COUNT_KEY        = 'pi.opens'
+// Show the nudge once the user has opened the app at least this many times —
+// after they've seen some value, which converts far better than a cold first paint.
+const NUDGE_MIN_OPENS = 2
 
 function hexToRgb(hex) {
   const r = parseInt(hex.slice(1, 3), 16)
@@ -99,6 +109,41 @@ export default function App() {
     }
   }, [])
 
+  // --- First-run install nudge -------------------------------------------
+  const { canInstall, isIOS, isInstalled, promptInstall } = useInstallPrompt()
+  const [showInstall, setShowInstall] = useState(false)
+
+  // Count app opens once per mount.
+  useEffect(() => {
+    try {
+      const opens = Number(localStorage.getItem(OPEN_COUNT_KEY) || '0') + 1
+      localStorage.setItem(OPEN_COUNT_KEY, String(opens))
+    } catch { /* storage unavailable (private mode); skip the nudge gracefully */ }
+  }, [])
+
+  // Decide whether to surface the nudge. Re-runs when canInstall flips true
+  // (beforeinstallprompt can fire shortly after load).
+  useEffect(() => {
+    if (isInstalled) return
+    let opens = 0
+    try {
+      if (localStorage.getItem(INSTALL_DISMISSED_KEY)) return
+      opens = Number(localStorage.getItem(OPEN_COUNT_KEY) || '0')
+    } catch { return }
+    if (opens < NUDGE_MIN_OPENS) return
+    if (canInstall || isIOS) setShowInstall(true)
+  }, [canInstall, isIOS, isInstalled])
+
+  const dismissInstall = () => {
+    try { localStorage.setItem(INSTALL_DISMISSED_KEY, '1') } catch { /* ignore */ }
+    setShowInstall(false)
+  }
+
+  const handleInstall = async () => {
+    await promptInstall()
+    dismissInstall()
+  }
+
   const views = {
     timer:      <TimerView />,
     jobs:       <JobsView />,
@@ -112,6 +157,13 @@ export default function App() {
       <ErrorBoundary key={activeView}>
         {views[activeView]}
       </ErrorBoundary>
+      {showInstall && (
+        <InstallPromptModal
+          canInstall={canInstall}
+          onInstall={handleInstall}
+          onClose={dismissInstall}
+        />
+      )}
     </Layout>
   )
 }

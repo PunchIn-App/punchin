@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.11.0] — 2026-06-02
+
+### Added
+- **Install — first-run install nudge** — After you've opened PunchIn a couple of times, a dismissible bottom sheet now offers to add it to your home screen. On Chrome/Edge it triggers the real one-tap install; on iOS Safari it shows the Share → Add to Home Screen steps (no install API exists there). Dismiss once and it won't ask again.
+- **Settings — always-available install entry** — The Settings "Install" section is now shown on every supported platform: a one-tap install button on Chrome/Edge, expandable Share-sheet instructions on iOS, and an "Installed" confirmation once the app is added to the home screen.
+
+### Fixed
+- **Install — PWA install option missing on Android/desktop Chrome** — The web app manifest referenced `icon-192.png` and `icon-512.png`, but those files were never present, so the icon URLs returned 404. Chrome treats valid icons as an installability requirement, so it silently withheld both the install prompt and the "Install app" menu item — leaving no way to install the app. The icon set now ships (standard 192/512, a maskable 512 for Android adaptive icons, and an iOS `apple-touch-icon`), restoring the install option. ([#55](https://github.com/PunchIn-App/punchin/issues/55))
+
+---
+
 ## [0.10.0] — 2026-06-02
 
 ### Added

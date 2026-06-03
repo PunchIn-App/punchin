@@ -146,3 +146,49 @@ describe('App — OAuth callback handling', () => {
     expect(mockDbSettingsPut).not.toHaveBeenCalled()
   })
 })
+
+describe('App — first-run install nudge', () => {
+  // jsdom in this setup does not provide localStorage; the app guards every
+  // access in try/catch. Provide a Map-backed fake so the nudge logic runs.
+  function fakeStorage() {
+    const m = new Map()
+    return {
+      getItem: k => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => m.set(k, String(v)),
+      removeItem: k => m.delete(k),
+      clear: () => m.clear(),
+    }
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', fakeStorage())
+    delete window.__pwaInstallPrompt
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    delete window.__pwaInstallPrompt
+  })
+
+  const nudge = () => screen.queryByRole('heading', { name: /install punchin/i })
+
+  it('does not show the nudge on the very first open', () => {
+    window.__pwaInstallPrompt = { prompt: vi.fn() }
+    render(<App />)
+    expect(nudge()).not.toBeInTheDocument()
+  })
+
+  it('shows the install nudge once the user has opened the app enough times', () => {
+    localStorage.setItem('pi.opens', '1') // this mount becomes the 2nd open
+    window.__pwaInstallPrompt = { prompt: vi.fn(), userChoice: Promise.resolve({ outcome: 'dismissed' }) }
+    render(<App />)
+    expect(nudge()).toBeInTheDocument()
+  })
+
+  it('does not show the nudge again after it has been dismissed', () => {
+    localStorage.setItem('pi.opens', '5')
+    localStorage.setItem('pi.installNudgeDismissed', '1')
+    window.__pwaInstallPrompt = { prompt: vi.fn() }
+    render(<App />)
+    expect(nudge()).not.toBeInTheDocument()
+  })
+})

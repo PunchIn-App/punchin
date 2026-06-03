@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.10.0
+**Version:** 0.11.0
 
 ---
 
@@ -20,13 +20,19 @@ punchin/
 ├── worker/
 │   └── oauth.js            # Cloudflare Worker: handles GitHub OAuth code→token exchange; redirects to app with token in URL fragment; falls through to static assets for all other routes
 ├── app/
-│   └── index.html          # App shell (viewport, fonts, theme color); Vite root is app/
+│   ├── index.html          # App shell (viewport, fonts, theme color, apple-touch-icon link); Vite root is app/
+│   └── public/             # Static assets copied verbatim to dist/ root; holds the PWA/home-screen icons
+│       ├── icon-192.png        # Manifest icon (192×192, purpose any)
+│       ├── icon-512.png        # Manifest icon (512×512, purpose any)
+│       ├── icon-512-maskable.png # Manifest icon (512×512, purpose maskable) for Android adaptive icons
+│       └── apple-touch-icon.png  # iOS home-screen icon (180×180), linked from index.html
 ├── config/
 │   ├── vite.config.js      # Vite + Vitest + PWA config; root=app/, outDir=../dist, test.root=..
 │   ├── postcss.config.js   # PostCSS pipeline (Tailwind + autoprefixer)
 │   └── tailwind.config.js  # Custom fonts (Syne, DM Sans, JetBrains Mono) + CSS-variable-backed color tokens
 ├── scripts/
-│   └── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
+│   ├── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
+│   └── icons.mjs           # Generates app/public icon set (Clock mark on accent square) via sharp; run to regenerate brand icons
 ├── docs/
 │   ├── CHANGELOG.md        # Version history; imported at build time by ChangelogModal via ?raw import
 │   └── screenshots/
@@ -38,7 +44,7 @@ punchin/
 │       └── desktop-light/  # 1920×1080 @1× · light theme — 7 views
 ├── src/
 │   ├── main.jsx            # React entry point; registers service worker and PWA install prompt listener
-│   ├── App.jsx             # Root: tab state, theme application, OAuth callback handling (reads window.location.hash on mount)
+│   ├── App.jsx             # Root: tab state, theme application, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated)
 │   ├── sync/
 │   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
 │   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), runSync (pull→merge→push), disconnectSync
@@ -57,7 +63,8 @@ punchin/
 │   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
 │   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
 │   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
-│   │   └── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets
+│   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets
+│   │   └── InstallPromptModal.jsx # First-run install bottom sheet; native one-tap install (Chrome/Edge) or Share→Add-to-Home-Screen instructions (iOS)
 │   ├── views/
 │   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
@@ -67,6 +74,7 @@ punchin/
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web)
+│   │   ├── useInstallPrompt.js     # PWA install state: canInstall/isInstalled/isIOS + promptInstall(); shared by SettingsView and the install nudge
 │   │   └── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
 │   └── utils/
 │       ├── time.js             # Date/time helpers (format, range, sum)
@@ -106,7 +114,9 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), standalone mode detection |
 | `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
+| `src/hooks/useInstallPrompt.test.js` | `canInstall`/`isInstalled` state from `pwa:install-ready`/`pwa:installed`; `promptInstall` accept/dismiss outcomes |
 | `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap |
+| `src/components/InstallPromptModal.test.jsx` | Native vs instructions variant, dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
 | `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
 | `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management |
 | `src/components/EditEntryModal.test.jsx` | Add/edit/active-timer modes, validation, save/delete flows, keyboard |
@@ -123,7 +133,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/views/SettingsView.dedup.test.js` | `isEntryDuplicate` (backup import dedup logic) |
 | `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
 | `src/views/TimesheetsView.test.jsx` | Daily/weekly tabs, period nav, search/filter, CSV/print, edit/delete |
-| `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks |
+| `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks, first-run install nudge gating |
 | `src/sync/config.test.js` | `SYNC_CONFIG` shape and env-var fallbacks |
 | `src/sync/providers/github.test.js` | `buildGitHubOAuthUrl`, `createGist`, `updateGist`, `fetchGist` (incl. truncated-content `raw_url` path) |
 | `src/sync/providers/google.test.js` | `buildGoogleOAuthUrl`, `pushToDrive` (create + update path), `pullFromDrive` |

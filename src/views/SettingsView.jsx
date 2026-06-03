@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
 import ColorPicker from '../components/ColorPicker'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut } from 'lucide-react'
-import { getInstallPrompt, applyUpdate } from '../utils/pwa'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut, Check, Share, Plus } from 'lucide-react'
+import { applyUpdate } from '../utils/pwa'
+import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { format } from 'date-fns'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
@@ -137,8 +138,9 @@ export default function SettingsView() {
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showChangelog, setShowChangelog] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(() => !!window.__pwaUpdateAvailable)
-  const [installPrompt, setInstallPrompt] = useState(getInstallPrompt)
+  const [iosHelpOpen, setIosHelpOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt()
 
   const syncSettings = useLiveQuery(async () => {
     const rows = await db.settings.toArray()
@@ -147,16 +149,8 @@ export default function SettingsView() {
 
   useEffect(() => {
     const onUpdateReady = () => setUpdateAvailable(true)
-    const onInstallReady = () => setInstallPrompt(getInstallPrompt())
-    const onInstalled = () => setInstallPrompt(null)
     window.addEventListener('pwa:update-ready', onUpdateReady)
-    window.addEventListener('pwa:install-ready', onInstallReady)
-    window.addEventListener('pwa:installed', onInstalled)
-    return () => {
-      window.removeEventListener('pwa:update-ready', onUpdateReady)
-      window.removeEventListener('pwa:install-ready', onInstallReady)
-      window.removeEventListener('pwa:installed', onInstalled)
-    }
+    return () => window.removeEventListener('pwa:update-ready', onUpdateReady)
   }, [])
 
   const exportData = async () => {
@@ -339,14 +333,7 @@ export default function SettingsView() {
   }
 
   const handleInstall = async () => {
-    const prompt = getInstallPrompt()
-    if (!prompt) return
-    await prompt.prompt()
-    const { outcome } = await prompt.userChoice
-    if (outcome === 'accepted') {
-      setInstallPrompt(null)
-      window.__pwaInstallPrompt = null
-    }
+    await promptInstall()
   }
 
   const clearEntries = async () => {
@@ -484,20 +471,55 @@ export default function SettingsView() {
         </div>
       </section>
 
-      {/* Install — only shown when the browser has offered a native install prompt */}
-      {installPrompt && (
+      {/* Install — behaviour adapts to the platform's install capabilities */}
+      {(isInstalled || canInstall || isIOS) && (
         <section>
           <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Install</p>
-          <div className="rounded-xl border border-appBorder bg-appCard">
-            <button
-              onClick={handleInstall}
-              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-xl">
-              <MonitorDown className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
-              <div>
-                <p className="text-sm text-appText font-medium">Add to Home Screen</p>
-                <p className="text-xs text-appTextMuted mt-0.5">Install as a standalone app for faster access</p>
-              </div>
-            </button>
+          <div className="rounded-xl border border-appBorder bg-appCard overflow-hidden">
+            {isInstalled ? (
+              <SettingsRow
+                icon={Check}
+                title="Installed"
+                subtitle="PunchIn is installed on this device"
+              />
+            ) : canInstall ? (
+              <button
+                onClick={handleInstall}
+                className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left rounded-xl">
+                <MonitorDown className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
+                <div>
+                  <p className="text-sm text-appText font-medium">Add to Home Screen</p>
+                  <p className="text-xs text-appTextMuted mt-0.5">Install as a standalone app for faster access</p>
+                </div>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIosHelpOpen(o => !o)}
+                  aria-expanded={iosHelpOpen}
+                  className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left">
+                  <MonitorDown className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-appText font-medium">Add to Home Screen</p>
+                    <p className="text-xs text-appTextMuted mt-0.5">Install as a standalone app for faster access</p>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-appTextMuted flex-shrink-0 transition-transform ${iosHelpOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+                {iosHelpOpen && (
+                  <div className="px-4 pb-4 -mt-1 space-y-2.5 text-sm text-appText">
+                    <p className="text-xs text-appTextMuted">From Safari, install in two steps:</p>
+                    <p className="flex items-center gap-3">
+                      <Share className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
+                      <span>Tap the <span className="font-semibold">Share</span> button</span>
+                    </p>
+                    <p className="flex items-center gap-3">
+                      <Plus className="w-4 h-4 text-appAccent flex-shrink-0" aria-hidden="true" />
+                      <span>Choose <span className="font-semibold">Add to Home Screen</span></span>
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </section>
       )}
