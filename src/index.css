@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../config/tailwind.config.js";
 
 :root {
   color-scheme: dark;
@@ -44,6 +43,13 @@
   :focus-visible {
     outline: 2px solid rgb(var(--accent-rgb) / 0.75);
     outline-offset: 2px;
+  }
+
+  /* Tailwind v4 resets interactive elements to cursor: default; restore the
+     pointer cursor on enabled buttons/role=button to preserve v3 behavior. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 
   html, body, #root {
