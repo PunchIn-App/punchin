@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.11.4] — 2026-06-02
+
+### Changed
+- **Settings — clearer message when sync isn't available.** On builds where cloud sync hasn't been configured, the Sync section now shows a plain-language note ("Sync isn't set up on this version") that points you to the data export, instead of developer setup instructions referencing environment variables.
+
+---
+
 ## [0.11.3] — 2026-06-02
 
 ### Fixed

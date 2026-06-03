@@ -680,10 +680,14 @@ export default function SettingsView() {
                   </button>
                 )}
                 {!SYNC_CONFIG.github.clientId && !SYNC_CONFIG.google.clientId && !SYNC_CONFIG.onedrive.clientId && (
-                  <p className="text-xs text-appTextMuted px-1">
-                    Set <code className="font-mono">VITE_GITHUB_CLIENT_ID</code>, <code className="font-mono">VITE_GOOGLE_CLIENT_ID</code>, or <code className="font-mono">VITE_ONEDRIVE_CLIENT_ID</code> to enable sync.
-                    See <code className="font-mono">.env.example</code> for setup instructions.
-                  </p>
+                  <div className="px-1 space-y-1">
+                    <p className="text-sm text-appText font-medium">Sync isn’t set up on this version</p>
+                    <p className="text-xs text-appTextMuted">
+                      Cloud sync hasn’t been configured for this deployment. Your data stays safe on this
+                      device — use <span className="text-appText">Export data</span> above to back it up or move
+                      it to another device.
+                    </p>
+                  </div>
                 )}
               </div>
             </>
