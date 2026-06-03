@@ -34,6 +34,35 @@ CI enforces this on every push and PR to `main`.
 
 ---
 
+## Configuring Sync (self-hosting)
+
+Cloud sync (GitHub Gist / Google Drive / OneDrive) is **optional** and **off by default**. Without configuration, the app runs fully offline and the Settings → Sync section shows a "not set up" note — this is expected, not a bug ([#59](https://github.com/PunchIn-App/punchin/issues/59)).
+
+The provider buttons only appear when the matching `VITE_<provider>_CLIENT_ID` is present. Because Vite **inlines `import.meta.env.VITE_*` at build time**, these must be set wherever the production build runs (e.g. your Cloudflare Workers build environment), not just in local `.env.local`.
+
+All `VITE_*` values are **public client IDs** — never put secrets in them. See [`.env.example`](../.env.example) for the full list and per-provider OAuth app setup notes.
+
+### GitHub Gist (recommended — token never expires; worker already built)
+
+GitHub is the only provider with a server-side token exchange, handled by [`worker/oauth.js`](../worker/oauth.js). It needs **both** build variables and runtime secrets:
+
+1. Register a GitHub OAuth App at <https://github.com/settings/developers> with callback URL `https://<your-app>.workers.dev/oauth/github/callback`, then generate a client secret.
+2. In your Cloudflare Worker → Settings → Variables and Secrets, set:
+   - **Build variables** (inlined into the bundle): `VITE_GITHUB_CLIENT_ID`, `VITE_APP_URL`
+   - **Runtime secrets** (read by the worker): `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `APP_URL`
+3. Redeploy so Vite re-inlines the build variable.
+
+### Google Drive / OneDrive (implicit flow — no worker, no secret)
+
+These use browser-side implicit OAuth, so they need **only** their build variable plus a registered OAuth app:
+
+- **Google Drive** — `VITE_GOOGLE_CLIENT_ID` (Web app, Drive API + `drive.appdata` scope, redirect URI `https://<your-app>.workers.dev/`)
+- **OneDrive** — `VITE_ONEDRIVE_CLIENT_ID` (SPA redirect `https://<your-app>.workers.dev/`, permissions `Files.ReadWrite.AppFolder` + `User.Read`)
+
+> The most common setup mistake is setting only the build variable **or** only the runtime secret for GitHub — both are required.
+
+---
+
 ## Workflow
 
 1. Fork the repo and create a branch from `main`
@@ -159,7 +188,7 @@ Rules:
 The full conventions are in [`CLAUDE.md`](CLAUDE.md). Key rules:
 
 - **No router** — navigation is tab-based state in `App.jsx`; this is intentional for PWA standalone mode
-- **No backend** — keep all data local; do not introduce cloud sync or authentication
+- **No custom backend** — keep all data local. Optional cloud sync exists via OAuth + provider-hosted storage (GitHub Gist / Google Drive / OneDrive); adding a **new** sync provider requires explicit agreement on the OAuth flow and its own Cloudflare Worker secret (see [`CLAUDE.md`](../CLAUDE.md) → "What NOT to Do" and the Configuring Sync section above)
 - **Date math** — always use helpers from `src/utils/time.js`; never inline raw `Date` arithmetic
 - **Theming** — use `appAccent` / `text-appAccent` for accent-colored elements; never hardcode `amber-*` classes
 - **Modals** — follow the platform-native bottom-sheet pattern from `StartTimerModal.jsx`
