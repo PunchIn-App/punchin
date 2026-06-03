@@ -215,6 +215,7 @@ Every version bump must update all of the following in the **same commit or PR**
 | `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-1f6feb...` |
 | `CLAUDE.md` | `**Version:** {X.Y.Z}` in the Project Overview header |
 | `docs/CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top |
+| `SECURITY.md`        | Update the **Supported Versions** table — bump the supported version to `{X.Y.Z}.x` and mark all prior minor versions as `No` |
 | `docs/screenshots/` | Regenerate if any visible UI changed (see Documentation Maintenance below) |
 
 The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump — update it only when intentionally upgrading the Cloudflare Workers runtime.
@@ -274,6 +275,18 @@ Every PR that changes code must update relevant documentation in the **same comm
 | New exported helper from any source file | Update the relevant section | — | — | — |
 | Any visible UI change | — | — | — | ✓ regenerate |
 | Version bump | Update `**Version:**` in header | Update version badge | Add new section | ✓ if UI changed |
+
+### Security Policy Maintenance
+
+Keep `SECURITY.md` accurate whenever code changes affect what versions are supported or how vulnerabilities should be reported.
+
+| Trigger | What to update in `SECURITY.md` |
+|---------|----------------------------------|
+| Version bump (any MINOR or PATCH) | Update the **Supported Versions** table: set the new `X.Y.x` row to **Yes**, mark all prior minor versions as **No** |
+| Vulnerability reporting process changes (e.g. new contact channel, new response SLA) | Update the **Reporting a Vulnerability** section accordingly |
+| Repository rename or move | Update the **Report a vulnerability** link URL |
+
+> **Rule:** If you change `package.json` `"version"` you must update `SECURITY.md` in the same commit.
 
 ### What counts as a "visible UI change" for screenshots
 
