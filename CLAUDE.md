@@ -375,6 +375,36 @@ When adding new tables or indexes, increment the version number in `db.js` and a
 
 ---
 
+## GitHub Gist Sync Architecture
+
+The GitHub Gist sync uses a **multi-file per-device structure** (as of v0.15.1):
+
+- `- PunchIn Sync` — static JSON marker file; sorts first alphabetically; identifies the gist as PunchIn's
+- `punchin-data-{deviceId}.json` — one file per device; each device **only ever writes its own file**
+
+This eliminates last-write-wins race conditions: two devices syncing simultaneously can never overwrite each other because they write to different files. The pull side reads all matching files and merges them via the existing dedup logic.
+
+### Device ID
+
+Generated once by `src/utils/deviceId.js` as 8 random hex chars and stored in `localStorage` under `pi.deviceId`. Intentionally persists across factory resets so reconnecting after a reset reuses the same filename rather than creating a stale orphan.
+
+### Pull / push flow
+
+| Step | Function |
+|------|----------|
+| Find gist on first connect | `findExistingPunchInGist(token)` — matches marker, legacy `punchin-data.json`, or any `punchin-data-*.json` |
+| Pull all device data | `fetchAllDeviceData(token, gistId)` — fetches every matching file, returns array of snapshots |
+| Merge each snapshot | `mergeSnapshot(snapshot)` loop in `syncManager.js` |
+| Push own data | `pushDeviceData(token, gistId, deviceId, snapshot)` — writes marker + own device file |
+| Create new gist | `createGist(token, deviceId, snapshot)` — includes marker + own device file from the start |
+| Disconnect cleanup | `deleteDeviceFile(token, gistId, deviceId)` — nulls the device file (GitHub Gist PATCH API deletes files set to `null`) |
+
+### Backward compatibility
+
+Legacy single-file gists (`punchin-data.json`) are detected by `findExistingPunchInGist` and included in the `fetchAllDeviceData` pull. The legacy file is never written to; it becomes stale naturally as the device file takes over.
+
+---
+
 ## Data Flow & State Management
 
 **No Redux or global Context.** State flows as:
