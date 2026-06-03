@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Clock, Briefcase, Calendar, BarChart2, Settings } from 'lucide-react'
 import { usePlatformContext } from '../hooks/usePlatformContext'
+import { useSettings } from '../hooks/useSettings'
+import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
+import { hasWaitingUpdate } from '../utils/pwa'
 
 const NAV = [
   { id: 'timer',      label: 'Timer',     Icon: Clock      },
@@ -22,13 +25,29 @@ function useAdaptiveStyles(isStandalone, os) {
 
 export default function Layout({ activeView, onNavigate, children }) {
   const { isStandalone, os } = usePlatformContext()
+  const { settings } = useSettings()
   const adaptive = useAdaptiveStyles(isStandalone, os)
+
+  const hapticsOn = isStandalone && settings.hapticFeedback !== false
+  const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
+
+  // Fire the tap haptic synchronously in the click handler (iOS needs the
+  // gesture context) before delegating to the parent's navigation.
+  const navigate = (id) => { hapticTrigger(); onNavigate(id) }
 
   const [hasUpdate, setHasUpdate] = useState(() => !!window.__pwaUpdateAvailable)
   useEffect(() => {
     const handler = () => setHasUpdate(true)
     window.addEventListener('pwa:update-ready', handler)
     return () => window.removeEventListener('pwa:update-ready', handler)
+  }, [])
+
+  // A worker may already be waiting from a previous page load (the in-memory
+  // flag resets on mount); show the badge so the pending update stays visible.
+  useEffect(() => {
+    let cancelled = false
+    hasWaitingUpdate().then(waiting => { if (waiting && !cancelled) setHasUpdate(true) })
+    return () => { cancelled = true }
   }, [])
 
   return (
@@ -38,8 +57,9 @@ export default function Layout({ activeView, onNavigate, children }) {
         style={adaptive.header}
         className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-appBorderLight"
       >
+        {hapticEl}
         <button
-          onClick={() => onNavigate('timer')}
+          onClick={() => navigate('timer')}
           aria-label="PunchIn — go to Timer"
           className="flex items-center gap-2 rounded-lg transition-opacity active:opacity-70"
         >
@@ -67,7 +87,7 @@ export default function Layout({ activeView, onNavigate, children }) {
           return (
             <button
               key={id}
-              onClick={() => onNavigate(id)}
+              onClick={() => navigate(id)}
               aria-current={active ? 'page' : undefined}
               aria-label={id === 'settings' && hasUpdate ? 'Settings — update available' : undefined}
               className={`relative flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors

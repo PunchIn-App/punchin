@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.12.0] — 2026-06-03
+
+### Added
+- Settings — new **Haptic feedback** toggle (on by default, shown on phones); vibration now fires on navigation, punch-in, and punch-out, not just inside a couple of modals.
+- Navigation — the device **Back button/gesture now moves between tabs** instead of immediately closing the installed app.
+- Sync — the connected card shows an explicit **Connected** badge (or **Reconnect** when the session token has expired) so it's clear when sync is set up.
+
+### Changed
+- App — the installed PWA now **rotates with your device** instead of being locked to portrait.
+- Sync — disconnecting now uses the standard in-app confirmation dialog, so it works reliably when installed to the home screen.
+
+### Fixed
+- Settings — **Factory Reset** now restores the default blue accent color instead of switching it to amber.
+- Settings — **Check for updates** now recognizes an update that already downloaded in a previous session (e.g. after a reset/reload), so it can be applied instead of reporting "Already up to date".
+- iPad — Safari requests the desktop site by default, which previously hid the install instructions entirely; iPads are now detected correctly and shown the **Add to Home Screen** guidance (and the haptics toggle is hidden, since iPads have no vibration).
+
 ## [0.11.4] — 2026-06-02
 
 ### Changed

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Layout from './components/Layout'
 import ErrorBoundary  from './components/ErrorBoundary'
 import InstallPromptModal from './components/InstallPromptModal'
@@ -27,9 +27,37 @@ function hexToRgb(hex) {
   return `${r} ${g} ${b}`
 }
 
+const DEFAULT_VIEW = 'timer'
+
 export default function App() {
-  const [activeView, setActiveView] = useState('timer')
+  const [activeView, setActiveView] = useState(DEFAULT_VIEW)
   const { settings } = useSettings()
+
+  // Track the live view for the navigate callback without re-creating it.
+  const activeViewRef = useRef(activeView)
+  useEffect(() => { activeViewRef.current = activeView }, [activeView])
+
+  // Hardware/gesture Back navigates between tabs instead of leaving the app.
+  // Each tab change pushes a history entry tagged with the view; popstate
+  // restores it. Modals manage their own {modal:true} entries on top of these,
+  // so closing a modal with Back pops to the same view (a harmless no-op here).
+  const navigate = useCallback((view) => {
+    if (view === activeViewRef.current) return
+    history.pushState({ piView: view }, '')
+    setActiveView(view)
+  }, [])
+
+  useEffect(() => {
+    if (!history.state?.piView) {
+      history.replaceState({ piView: DEFAULT_VIEW }, '')
+    }
+    const onPop = (e) => {
+      const view = e.state?.piView
+      if (view) setActiveView(view)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   const theme       = settings.theme       || 'auto'
   const accentColor = settings.accentColor || '#1f6feb'
@@ -73,7 +101,7 @@ export default function App() {
     const params = new URLSearchParams(hash.slice(1))
 
     if (params.has('sync_error')) {
-      history.replaceState(null, '', window.location.pathname + window.location.search)
+      history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
       db.settings.put({ key: 'syncError', value: params.get('sync_error') })
       return
     }
@@ -88,7 +116,7 @@ export default function App() {
         { key: 'syncFileId', value: null },
         { key: 'syncError', value: null },
       ]).then(() => {
-        history.replaceState(null, '', window.location.pathname + window.location.search)
+        history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
       })
       return
     }
@@ -106,7 +134,7 @@ export default function App() {
         { key: 'syncFileId', value: null },
         { key: 'syncError', value: null },
       ]).then(() => {
-        history.replaceState(null, '', window.location.pathname + window.location.search)
+        history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
       })
     }
   }, [])
@@ -165,7 +193,7 @@ export default function App() {
   }
 
   return (
-    <Layout activeView={activeView} onNavigate={setActiveView}>
+    <Layout activeView={activeView} onNavigate={navigate}>
       <ErrorBoundary key={activeView}>
         {views[activeView]}
       </ErrorBoundary>

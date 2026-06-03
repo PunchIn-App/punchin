@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useId } from 'react'
 import { X, MonitorDown, Share, Plus, Compass } from 'lucide-react'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
+import { useSettings } from '../hooks/useSettings'
 
 // ---------------------------------------------------------------------------
 // Swipe-down-to-dismiss (iOS bottom sheet) — mirrors StartTimerModal.
@@ -77,12 +78,14 @@ function useSheetStyles(isStandalone, os) {
 //                 the user to open the page in Safari instead.
 export default function InstallPromptModal({ mode = 'native', onInstall, onClose }) {
   const { isStandalone, os } = usePlatformContext()
+  const { settings } = useSettings()
   // Native install lands in different places per platform — avoid "home screen"
   // wording on desktop, where it installs as an app window.
   const nativeDesc = os === 'android'
     ? 'Add PunchIn to your home screen for faster access and a full-screen, app-like experience. Your data stays on this device.'
     : 'Install PunchIn for faster access and a dedicated, app-like window. Your data stays on this device.'
-  const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(isStandalone ? os : 'web')
+  const hapticsOn = isStandalone && settings.hapticFeedback !== false
+  const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
 
   const uid = useId()
   const titleId = `${uid}-title`

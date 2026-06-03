@@ -3,10 +3,18 @@ import { Square, Pencil, AlertTriangle } from 'lucide-react'
 import { db } from '../db'
 import { formatElapsed, formatTime } from '../utils/time'
 import EditEntryModal from './EditEntryModal'
+import { usePlatformContext } from '../hooks/usePlatformContext'
+import { useSettings } from '../hooks/useSettings'
+import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 
 export default function TimerCard({ entry, job, laborType }) {
   const [elapsed, setElapsed] = useState(Date.now() - new Date(entry.punchIn).getTime())
   const [showEditModal, setShowEditModal] = useState(false)
+
+  const { isStandalone, os } = usePlatformContext()
+  const { settings } = useSettings()
+  const hapticsOn = isStandalone && settings.hapticFeedback !== false
+  const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -16,6 +24,8 @@ export default function TimerCard({ entry, job, laborType }) {
   }, [entry.punchIn])
 
   const punchOut = async () => {
+    // Fire synchronously in the gesture context — iOS Taptic no-ops otherwise.
+    hapticTrigger()
     await db.entries.update(entry.id, { punchOut: new Date() })
   }
 
@@ -26,6 +36,7 @@ export default function TimerCard({ entry, job, laborType }) {
     <div className={`relative rounded-xl border bg-appCard overflow-hidden transition-all duration-300 ${
       isOvernight ? 'border-appAccent/40 shadow-lg shadow-appAccent/5 animate-pulse' : 'border-appBorder'
     }`}>
+      {hapticEl}
       {/* Color accent bar */}
       <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
 

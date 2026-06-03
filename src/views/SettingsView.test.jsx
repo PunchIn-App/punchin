@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import SettingsView from './SettingsView'
 
 const mockUpdateSetting       = vi.fn()
@@ -331,6 +331,18 @@ describe('SettingsView — Danger Zone', () => {
     })
   })
 
+  it('re-seeds the default blue accent (#1f6feb), not amber, after factory reset (#69)', async () => {
+    render(<SettingsView />)
+    fireEvent.click(screen.getByText(/danger zone/i))
+    fireEvent.click(screen.getByText('Factory Reset'))
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /yes, wipe everything/i }))
+    await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalled())
+    const seeded = mockDbSettingsBulkPut.mock.calls.at(-1)[0]
+    const accent = seeded.find(s => s.key === 'accentColor')
+    expect(accent.value).toBe('#1f6feb')
+  })
+
   it('returns to null stage after factory reset completes', async () => {
     render(<SettingsView />)
     fireEvent.click(screen.getByText(/danger zone/i))
@@ -391,6 +403,24 @@ describe('SettingsView — check for updates (service worker)', () => {
     fireEvent.click(screen.getByText('Check for updates'))
     await waitFor(() => expect(screen.getByText('Already up to date')).toBeInTheDocument())
     // restore: remove the mock so other tests see no serviceWorker
+    Object.defineProperty(navigator, 'serviceWorker', { value: undefined, configurable: true })
+  })
+
+  it('surfaces "Update available" on mount when a worker is already waiting (issue #57)', async () => {
+    // Simulates an update that downloaded in a previous page load: the in-memory
+    // flag is gone after a reload/factory reset, but reg.waiting still holds it.
+    window.__pwaUpdateAvailable = false
+    Object.defineProperty(navigator, 'serviceWorker', {
+      value: { getRegistration: vi.fn().mockResolvedValue({ waiting: {} }) },
+      configurable: true,
+    })
+    render(<SettingsView />)
+    await waitFor(() => expect(screen.getByText('Update available')).toBeInTheDocument())
+    const button = screen.getByText('Update available').closest('button')
+    expect(button).not.toBeDisabled()
+
+    // cleanup
+    window.__pwaUpdateAvailable = false
     Object.defineProperty(navigator, 'serviceWorker', { value: undefined, configurable: true })
   })
 
@@ -520,6 +550,15 @@ describe('SettingsView — Sync section', () => {
     expect(screen.getByRole('button', { name: /Disconnect/i })).toBeInTheDocument()
   })
 
+  it('shows a clear "Connected" indicator when a provider is connected (issue #76)', async () => {
+    mockDbSettingsToArray.mockResolvedValue([
+      { key: 'syncProvider', value: 'github' },
+      { key: 'lastSyncedAt', value: null },
+    ])
+    render(<SettingsView />)
+    await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument())
+  })
+
   it('shows connected state for Google Drive', async () => {
     mockDbSettingsToArray.mockResolvedValue([
       { key: 'syncProvider', value: 'google' },
@@ -571,27 +610,32 @@ describe('SettingsView — Sync section', () => {
     await waitFor(() => expect(mockRunSync).toHaveBeenCalled())
   })
 
-  it('calls disconnectSync when Disconnect is clicked and confirmed', async () => {
+  it('calls disconnectSync when Disconnect is confirmed in the modal (issue #76)', async () => {
     mockDbSettingsToArray.mockResolvedValue([
       { key: 'syncProvider', value: 'github' },
       { key: 'lastSyncedAt', value: null },
     ])
-    global.confirm = vi.fn().mockReturnValue(true)
     render(<SettingsView />)
     await waitFor(() => screen.getByRole('button', { name: /Disconnect/i }))
     fireEvent.click(screen.getByRole('button', { name: /Disconnect/i }))
+    // A confirmation dialog appears (replaces the old window.confirm)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Disconnect sync?')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Disconnect$/i }))
     await waitFor(() => expect(mockDisconnectSync).toHaveBeenCalled())
   })
 
-  it('does not call disconnectSync when Disconnect is cancelled', async () => {
+  it('does not call disconnectSync when the confirmation is cancelled (issue #76)', async () => {
     mockDbSettingsToArray.mockResolvedValue([
       { key: 'syncProvider', value: 'github' },
       { key: 'lastSyncedAt', value: null },
     ])
-    global.confirm = vi.fn().mockReturnValue(false)
     render(<SettingsView />)
     await waitFor(() => screen.getByRole('button', { name: /Disconnect/i }))
     fireEvent.click(screen.getByRole('button', { name: /Disconnect/i }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cancel/i }))
     expect(mockDisconnectSync).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

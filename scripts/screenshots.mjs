@@ -39,10 +39,20 @@ if (existsSync(GLOBAL_PW)) {
 const ROOT     = dirname(dirname(fileURLToPath(import.meta.url)))
 const BASE_URL = process.env.SCREENSHOT_URL ?? 'http://localhost:5173'
 
+// A realistic per-device userAgent is required so the app's OS detection
+// (usePlatformContext → detectOS) resolves to android / ios rather than the
+// default desktop Chromium UA. Without it, mobile-only surfaces (e.g. the
+// Haptic feedback toggle, the iOS install guidance) never render in captures.
 const DEVICES = [
-  { name: 'phone',   width: 412,  height: 916,  dpr: 2.625, isMobile: true  },
-  { name: 'tablet',  width: 1194, height: 834,  dpr: 2,     isMobile: true  },
-  { name: 'desktop', width: 1920, height: 1080, dpr: 1,     isMobile: false },
+  {
+    name: 'phone', width: 412, height: 916, dpr: 2.625, isMobile: true,
+    userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 10 Pro XL) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36',
+  },
+  {
+    name: 'tablet', width: 1194, height: 834, dpr: 2, isMobile: true,
+    userAgent: 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+  },
+  { name: 'desktop', width: 1920, height: 1080, dpr: 1, isMobile: false },
 ]
 
 const THEMES = ['dark', 'light']
@@ -144,7 +154,7 @@ async function seedData(theme) {
 
 // ── Per-device-and-theme capture ─────────────────────────────────────────────
 async function captureDevice(browser, device, theme) {
-  const { name, width, height, dpr, isMobile } = device
+  const { name, width, height, dpr, isMobile, userAgent } = device
   const outDir = join(ROOT, 'docs', 'screenshots', `${name}-${theme}`)
   mkdirSync(outDir, { recursive: true })
 
@@ -153,6 +163,7 @@ async function captureDevice(browser, device, theme) {
     deviceScaleFactor: dpr,
     isMobile,
     colorScheme:       theme,
+    ...(userAgent ? { userAgent } : {}),
   })
 
   const page = await ctx.newPage()
@@ -164,6 +175,10 @@ async function captureDevice(browser, device, theme) {
   // configuration causes Chromium to 404 on the ../src/main.jsx module script path.
   await page.waitForSelector('nav[aria-label="Main navigation"]')
   await page.evaluate(seedData, theme)
+  // Suppress the first-run install nudge: with a mobile UA it becomes eligible
+  // once the reload below bumps the open count past the threshold, and would
+  // otherwise pop a bottom sheet over every captured view.
+  await page.evaluate(() => localStorage.setItem('pi.installNudgeDismissed', '1'))
   await page.reload()
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(600)

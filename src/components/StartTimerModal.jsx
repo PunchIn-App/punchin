@@ -113,7 +113,8 @@ export default function StartTimerModal({ onClose }) {
 
   const { settings }             = useSettings()
   const { isStandalone, os }     = usePlatformContext()
-  const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(isStandalone ? os : 'web')
+  const hapticsOn = isStandalone && settings.hapticFeedback !== false
+  const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
 
   const jobs       = useLiveQuery(() => db.jobs.filter(j => j.isActive !== false && j.isDeleted !== true).toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.orderBy('name').filter(lt => !lt.isArchived).toArray(), [])
@@ -169,6 +170,8 @@ export default function StartTimerModal({ onClose }) {
     if (!jobId)       { setError('Please select a job'); return }
     if (!laborTypeId) { setError('Please select a labor type'); return }
 
+    // Fire synchronously in the gesture context — iOS Taptic no-ops otherwise.
+    hapticTrigger()
     setSubmitting(true)
     try {
       await db.transaction('rw', db.entries, async () => {

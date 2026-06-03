@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import App from './App'
 
 const mockUseSettings = vi.fn()
@@ -18,7 +18,13 @@ vi.mock('./db', () => ({
   },
 }))
 vi.mock('./components/Layout', () => ({
-  default: ({ children }) => <div data-testid="layout">{children}</div>,
+  default: ({ children, onNavigate }) => (
+    <div data-testid="layout">
+      <button onClick={() => onNavigate('jobs')}>go-jobs</button>
+      <button onClick={() => onNavigate('settings')}>go-settings</button>
+      {children}
+    </div>
+  ),
 }))
 vi.mock('./components/ErrorBoundary', () => ({
   default: ({ children }) => <>{children}</>,
@@ -87,6 +93,31 @@ describe('App — theme class', () => {
 describe('App — default view', () => {
   it('renders the Timer view by default', () => {
     render(<App />)
+    expect(screen.getByText('TimerView')).toBeInTheDocument()
+  })
+})
+
+describe('App — back-button navigation (#65)', () => {
+  it('seeds a history entry tagged with the default view on mount', () => {
+    render(<App />)
+    expect(history.state?.piView).toBe('timer')
+  })
+
+  it('pushes a history entry when navigating to another tab', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('go-jobs'))
+    expect(screen.getByText('JobsView')).toBeInTheDocument()
+    expect(history.state?.piView).toBe('jobs')
+  })
+
+  it('restores the previous view on popstate (hardware/gesture Back)', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('go-jobs'))
+    expect(screen.getByText('JobsView')).toBeInTheDocument()
+    // Browser Back fires popstate with the previous entry's state.
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { piView: 'timer' } }))
+    })
     expect(screen.getByText('TimerView')).toBeInTheDocument()
   })
 })

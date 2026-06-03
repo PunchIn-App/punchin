@@ -7,8 +7,13 @@ function setUA(ua) {
   Object.defineProperty(navigator, 'userAgent', { value: ua, writable: true, configurable: true })
 }
 
+function setTouch(n) {
+  Object.defineProperty(navigator, 'maxTouchPoints', { value: n, writable: true, configurable: true })
+}
+
 afterEach(() => {
   setUA('')
+  setTouch(0)
   Object.defineProperty(navigator, 'userAgentData', { value: undefined, writable: true, configurable: true })
   Object.defineProperty(navigator, 'standalone', { value: undefined, writable: true, configurable: true })
   window.matchMedia = originalMatchMedia
@@ -55,6 +60,44 @@ describe('usePlatformContext — OS detection', () => {
     })
     const { result } = renderHook(() => usePlatformContext())
     expect(result.current.os).toBe('android')
+  })
+})
+
+describe('usePlatformContext — iPad detection (incl. desktop-mode Safari)', () => {
+  it('detects a desktop-mode iPad (touch-capable "Macintosh" UA) as ios', () => {
+    setUA('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15')
+    setTouch(5)
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.os).toBe('ios')
+    expect(result.current.isIPad).toBe(true)
+  })
+
+  it('treats a real Mac (Macintosh UA, no touch) as web, not iPad', () => {
+    setUA('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15')
+    setTouch(0)
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.os).toBe('web')
+    expect(result.current.isIPad).toBe(false)
+  })
+
+  it('sets isIPad=true for the mobile-mode iPad UA', () => {
+    setUA('Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIPad).toBe(true)
+  })
+
+  it('sets isIPad=false for an iPhone (so haptics stay enabled there)', () => {
+    setUA('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.os).toBe('ios')
+    expect(result.current.isIPad).toBe(false)
+  })
+
+  it('treats a desktop-mode iPad as iOS Safari so install guidance shows', () => {
+    setUA('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15')
+    setTouch(5)
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIOSSafari).toBe(true)
   })
 })
 

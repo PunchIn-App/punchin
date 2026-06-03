@@ -5,6 +5,7 @@ import {
   notifyUpdateAvailable,
   setPwaUpdateFn,
   applyUpdate,
+  hasWaitingUpdate,
 } from './pwa'
 
 beforeEach(() => {
@@ -37,6 +38,46 @@ describe('notifyUpdateAvailable', () => {
     notifyUpdateAvailable()
     window.removeEventListener('pwa:update-ready', handler)
     expect(handler).toHaveBeenCalledOnce()
+  })
+})
+
+describe('hasWaitingUpdate', () => {
+  const original = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker')
+  const setSW = value =>
+    Object.defineProperty(navigator, 'serviceWorker', { value, configurable: true })
+  const restore = () => {
+    if (original) Object.defineProperty(navigator, 'serviceWorker', original)
+    else setSW(undefined)
+  }
+
+  it('returns false when serviceWorker is unsupported', async () => {
+    setSW(undefined)
+    expect(await hasWaitingUpdate()).toBe(false)
+    restore()
+  })
+
+  it('returns false when there is no registration', async () => {
+    setSW({ getRegistration: vi.fn().mockResolvedValue(null) })
+    expect(await hasWaitingUpdate()).toBe(false)
+    restore()
+  })
+
+  it('returns false when the registration has no waiting worker', async () => {
+    setSW({ getRegistration: vi.fn().mockResolvedValue({ waiting: null }) })
+    expect(await hasWaitingUpdate()).toBe(false)
+    restore()
+  })
+
+  it('returns true when a worker is waiting to activate', async () => {
+    setSW({ getRegistration: vi.fn().mockResolvedValue({ waiting: {} }) })
+    expect(await hasWaitingUpdate()).toBe(true)
+    restore()
+  })
+
+  it('returns false (does not throw) when getRegistration rejects', async () => {
+    setSW({ getRegistration: vi.fn().mockRejectedValue(new Error('boom')) })
+    expect(await hasWaitingUpdate()).toBe(false)
+    restore()
   })
 })
 

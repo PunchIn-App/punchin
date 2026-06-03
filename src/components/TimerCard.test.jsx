@@ -11,6 +11,10 @@ vi.mock('../db', () => ({
   },
 }))
 
+vi.mock('../hooks/useSettings', () => ({
+  useSettings: () => ({ settings: { hapticFeedback: true }, updateSetting: vi.fn() }),
+}))
+
 vi.mock('./EditEntryModal', () => ({
   default: ({ onClose }) => (
     <div data-testid="edit-modal">

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
 import ColorPicker from '../components/ColorPicker'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut, Check, Share, Plus, Compass } from 'lucide-react'
-import { applyUpdate } from '../utils/pwa'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut, Check, Share, Plus, Compass, Vibrate } from 'lucide-react'
+import { applyUpdate, hasWaitingUpdate } from '../utils/pwa'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { format } from 'date-fns'
 import { db } from '../db'
@@ -130,7 +130,7 @@ function formatLastSync(ts) {
 
 export default function SettingsView() {
   const { settings, updateSetting } = useSettings()
-  const { isStandalone, os } = usePlatformContext()
+  const { isStandalone, os, isIPad } = usePlatformContext()
   const fileInputRef = useRef(null)
   const [resetStage, setResetStage] = useState(null) // null | 'warn' | 'final'
   const [dangerOpen, setDangerOpen] = useState(false)
@@ -140,6 +140,7 @@ export default function SettingsView() {
   const [updateAvailable, setUpdateAvailable] = useState(() => !!window.__pwaUpdateAvailable)
   const [iosHelpOpen, setIosHelpOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
   const { canInstall, isInstalled, isIOS, isIOSSafari, os: installOs, promptInstall } = useInstallPrompt()
 
   const syncSettings = useLiveQuery(async () => {
@@ -151,6 +152,20 @@ export default function SettingsView() {
     const onUpdateReady = () => setUpdateAvailable(true)
     window.addEventListener('pwa:update-ready', onUpdateReady)
     return () => window.removeEventListener('pwa:update-ready', onUpdateReady)
+  }, [])
+
+  // An update may have downloaded in a previous page load and still be waiting
+  // to activate, but the in-memory flag resets on mount. Re-surface it so the
+  // "Update available" affordance survives reloads / factory reset (issue #57).
+  useEffect(() => {
+    let cancelled = false
+    hasWaitingUpdate().then(waiting => {
+      if (waiting && !cancelled) {
+        window.__pwaUpdateAvailable = true
+        setUpdateAvailable(true)
+      }
+    })
+    return () => { cancelled = true }
   }, [])
 
   const exportData = async () => {
@@ -320,13 +335,22 @@ export default function SettingsView() {
       // Wait long enough for the new SW to download and trigger onNeedRefresh.
       await new Promise(r => setTimeout(r, 2500))
 
-      if (!window.__pwaUpdateAvailable) {
+      // Treat the update as available if either onNeedRefresh fired during the
+      // wait OR a worker is already sitting in reg.waiting (downloaded earlier,
+      // e.g. before a reload, so the in-memory flag never got set). Without the
+      // reg.waiting check, a pending update reports "Already up to date" and
+      // can never be applied (issue #57).
+      const updateReady = window.__pwaUpdateAvailable || await hasWaitingUpdate()
+
+      if (!updateReady) {
         setUpdateStatus('latest')
         setTimeout(() => setUpdateStatus(null), 3000)
       } else {
-        // An update was found during the wait. Clear the 'checking' status so
-        // the button re-enables — otherwise it stays disabled/greyed out and
-        // the user can't tap again to apply the update.
+        // An update is ready. Surface it and clear the 'checking' status so the
+        // button re-enables — otherwise it stays disabled/greyed out and the
+        // user can't tap again to apply the update.
+        window.__pwaUpdateAvailable = true
+        setUpdateAvailable(true)
         setUpdateStatus(null)
       }
     } catch {
@@ -354,12 +378,14 @@ export default function SettingsView() {
         { key: 'allowConcurrentTimers', value: false },
         { key: 'weekStartsMonday',      value: true  },
         { key: 'theme',                 value: 'auto' },
-        { key: 'accentColor',           value: '#F59E0B' },
+        { key: 'accentColor',           value: '#1f6feb' },
+        { key: 'hapticFeedback',        value: true  },
         { key: 'syncProvider',          value: null },
         { key: 'syncToken',             value: null },
         { key: 'syncTokenExpiry',       value: null },
         { key: 'syncFileId',            value: null },
         { key: 'lastSyncedAt',          value: null },
+        { key: 'syncError',             value: null },
       ])
     })
     setResetStage(null)
@@ -378,11 +404,16 @@ export default function SettingsView() {
   }
 
   const handleDisconnect = async () => {
-    if (!window.confirm('Disconnect sync? Your local data is kept.')) return
     await disconnectSync()
+    setShowDisconnectConfirm(false)
   }
 
   const tokenExpired = syncSettings?.syncTokenExpiry && Date.now() > syncSettings.syncTokenExpiry
+
+  // Haptics only fire on phones (iPhone via the Taptic polyfill, Android via
+  // vibrate). iPads have no vibration motor and desktop has none, so hide the
+  // toggle there.
+  const canHaptic = os === 'android' || (os === 'ios' && !isIPad)
 
   return (
     <div className="h-full scrollable px-4 pt-4 pb-24 space-y-6 lg:max-w-2xl lg:mx-auto lg:w-full">
@@ -473,6 +504,27 @@ export default function SettingsView() {
           </div>
         </div>
       </section>
+
+      {/* Feedback — haptics only surface where the device can vibrate */}
+      {canHaptic && (
+        <section>
+          <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Feedback</p>
+          <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
+            <SettingsRow
+              icon={Vibrate}
+              title="Haptic feedback"
+              subtitle="Vibrate on key actions and navigation"
+              right={
+                <Toggle
+                  ariaLabel="Haptic feedback"
+                  value={settings.hapticFeedback !== false}
+                  onChange={v => updateSetting('hapticFeedback', v)}
+                />
+              }
+            />
+          </div>
+        </section>
+      )}
 
       {/* Install — behaviour adapts to the platform's install capabilities */}
       {(isInstalled || canInstall || isIOS) && (
@@ -600,11 +652,22 @@ export default function SettingsView() {
           {syncSettings?.syncProvider ? (
             <>
               <div className="flex items-center gap-3 px-4 py-4 border-b border-appBorderLight">
-                <Cloud className={`w-4 h-4 flex-shrink-0 ${tokenExpired ? 'text-red-400' : 'text-amber-400'}`} />
+                <Cloud className={`w-4 h-4 flex-shrink-0 ${tokenExpired ? 'text-red-400' : 'text-green-400'}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-appText font-medium">
-                    {PROVIDER_LABEL[syncSettings.syncProvider] ?? syncSettings.syncProvider}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm text-appText font-medium">
+                      {PROVIDER_LABEL[syncSettings.syncProvider] ?? syncSettings.syncProvider}
+                    </p>
+                    {tokenExpired ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-400 uppercase tracking-wide">
+                        Reconnect
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-400 uppercase tracking-wide">
+                        <Check className="w-3 h-3" aria-hidden="true" /> Connected
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-appTextMuted mt-0.5">
                     {tokenExpired
                       ? 'Token expired — reconnect to continue syncing'
@@ -625,7 +688,7 @@ export default function SettingsView() {
                   {syncing ? 'Syncing…' : 'Sync Now'}
                 </button>
                 <button
-                  onClick={handleDisconnect}
+                  onClick={() => setShowDisconnectConfirm(true)}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 hover:bg-appInput transition-colors text-sm text-appTextMuted hover:text-red-400"
                 >
                   <LogOut className="w-4 h-4" />
@@ -854,6 +917,16 @@ export default function SettingsView() {
           confirmLabel="Clear entries"
           onConfirm={clearEntries}
           onCancel={() => setShowClearConfirm(false)}
+        />
+      )}
+
+      {showDisconnectConfirm && (
+        <ConfirmModal
+          title="Disconnect sync?"
+          message="Your local data is kept on this device. You can reconnect any time."
+          confirmLabel="Disconnect"
+          onConfirm={handleDisconnect}
+          onCancel={() => setShowDisconnectConfirm(false)}
         />
       )}
 

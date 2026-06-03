@@ -5,6 +5,10 @@ vi.mock('../hooks/usePlatformContext', () => ({
   usePlatformContext: () => ({ isStandalone: false, os: 'web' }),
 }))
 
+vi.mock('../hooks/useSettings', () => ({
+  useSettings: () => ({ settings: { hapticFeedback: true }, updateSetting: vi.fn() }),
+}))
+
 describe('Layout — structure', () => {
   it('renders the PunchIn logo header button', () => {
     render(<Layout activeView="timer" onNavigate={vi.fn()}><div /></Layout>)

@@ -1,6 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import InstallPromptModal from './InstallPromptModal'
 
+vi.mock('../hooks/useSettings', () => ({
+  useSettings: () => ({ settings: { hapticFeedback: true }, updateSetting: vi.fn() }),
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
 })

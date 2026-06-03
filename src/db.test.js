@@ -24,9 +24,9 @@ describe('db — schema', () => {
 })
 
 describe('db — populate seed', () => {
-  it('seeds exactly 4 default settings', async () => {
+  it('seeds exactly 5 default settings', async () => {
     const all = await db.settings.toArray()
-    expect(all).toHaveLength(4)
+    expect(all).toHaveLength(5)
   })
 
   it('seeds allowConcurrentTimers = false', async () => {
@@ -47,6 +47,11 @@ describe('db — populate seed', () => {
   it('seeds accentColor = "#1f6feb"', async () => {
     const s = await db.settings.get('accentColor')
     expect(s?.value).toBe('#1f6feb')
+  })
+
+  it('seeds hapticFeedback = true', async () => {
+    const s = await db.settings.get('hapticFeedback')
+    expect(s?.value).toBe(true)
   })
 
   it('seeds zero jobs', async () => {

@@ -51,6 +51,7 @@ db.on('populate', async () => {
     { key: 'weekStartsMonday',      value: true  },
     { key: 'theme',                 value: 'auto' },
     { key: 'accentColor',           value: '#1f6feb' },
+    { key: 'hapticFeedback',        value: true  },
   ])
 })
 

@@ -24,6 +24,22 @@ export function notifyUpdateAvailable() {
   window.dispatchEvent(new Event('pwa:update-ready'))
 }
 
+// Detects a service worker that has already downloaded and is waiting to
+// activate. onNeedRefresh only fires once per page load, so after a reload
+// (or anything that re-mounts the app, like a factory reset) the in-memory
+// __pwaUpdateAvailable flag is lost even though reg.waiting still holds a
+// ready update. Checking reg.waiting directly lets the UI re-surface it so
+// the user can still apply the update instead of seeing "Already up to date".
+export async function hasWaitingUpdate() {
+  if (!('serviceWorker' in navigator)) return false
+  try {
+    const reg = await navigator.serviceWorker.getRegistration()
+    return !!reg?.waiting
+  } catch {
+    return false
+  }
+}
+
 // Stored by main.jsx so components can trigger skipWaiting without needing
 // a direct reference to the registerSW return value.
 export function setPwaUpdateFn(fn) {
