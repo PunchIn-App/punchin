@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.11.3] — 2026-06-02
+
+### Fixed
+- **Settings — "Check for updates" no longer gets stuck.** When a check found a new version, the button greyed out and couldn't be tapped to apply it (you had to leave Settings and come back). It now re-enables immediately so you can tap "Update available" to reload into the new version.
+
+---
+
 ## [0.11.2] — 2026-06-02
 
 ### Fixed

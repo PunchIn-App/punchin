@@ -323,9 +323,12 @@ export default function SettingsView() {
       if (!window.__pwaUpdateAvailable) {
         setUpdateStatus('latest')
         setTimeout(() => setUpdateStatus(null), 3000)
+      } else {
+        // An update was found during the wait. Clear the 'checking' status so
+        // the button re-enables — otherwise it stays disabled/greyed out and
+        // the user can't tap again to apply the update.
+        setUpdateStatus(null)
       }
-      // If an update was found during the wait, updateAvailable is already
-      // true and the button will reflect it — no further action needed here.
     } catch {
       setUpdateStatus('latest')
       setTimeout(() => setUpdateStatus(null), 3000)

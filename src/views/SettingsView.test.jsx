@@ -393,6 +393,32 @@ describe('SettingsView — check for updates (service worker)', () => {
     // restore: remove the mock so other tests see no serviceWorker
     Object.defineProperty(navigator, 'serviceWorker', { value: undefined, configurable: true })
   })
+
+  it('re-enables the button when an update is found during the check (issue #57)', async () => {
+    // reg.update() simulates the browser discovering a new SW: it sets the
+    // global and dispatches the event the same way main.jsx's onNeedRefresh does.
+    const update = vi.fn().mockImplementation(async () => {
+      window.__pwaUpdateAvailable = true
+      window.dispatchEvent(new Event('pwa:update-ready'))
+    })
+    Object.defineProperty(navigator, 'serviceWorker', {
+      value: { getRegistration: vi.fn().mockResolvedValue({ update }) },
+      configurable: true,
+    })
+    render(<SettingsView />)
+    fireEvent.click(screen.getByText('Check for updates'))
+
+    // Once the update is found the button must reflect "Update available"...
+    await waitFor(() => expect(screen.getByText('Update available')).toBeInTheDocument())
+    // ...and after the post-check settle must NOT remain stuck disabled
+    // (the bug: updateStatus stayed 'checking' forever, greying the button out).
+    const button = screen.getByText('Update available').closest('button')
+    await waitFor(() => expect(button).not.toBeDisabled(), { timeout: 4000 })
+
+    // cleanup
+    window.__pwaUpdateAvailable = false
+    Object.defineProperty(navigator, 'serviceWorker', { value: undefined, configurable: true })
+  })
 })
 
 // ─── Data import: edge cases ──────────────────────────────────────────────────
