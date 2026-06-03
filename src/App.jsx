@@ -37,13 +37,32 @@ export default function App() {
   const activeViewRef = useRef(activeView)
   useEffect(() => { activeViewRef.current = activeView }, [activeView])
 
-  // Hardware/gesture Back navigates between tabs instead of leaving the app.
-  // Each tab change pushes a history entry tagged with the view; popstate
-  // restores it. Modals manage their own {modal:true} entries on top of these,
-  // so closing a modal with Back pops to the same view (a harmless no-op here).
+  // Hardware/gesture Back navigates between tabs instead of leaving the app,
+  // but the back stack is kept shallow: we keep at most one app-managed history
+  // entry above the launch entry, no matter how many tabs the user visits.
+  // Pressing Back from any non-default tab returns to the default view; Back
+  // again exits the app. This stops the stack from growing without bound across
+  // a long session (issue #80). Modals manage their own {modal:true} entries on
+  // top of these and pop themselves, which composes cleanly with this scheme.
+  const hasPushedRef = useRef(false)
   const navigate = useCallback((view) => {
     if (view === activeViewRef.current) return
-    history.pushState({ piView: view }, '')
+    if (view === DEFAULT_VIEW) {
+      // Returning home: unwind our single pushed entry so Back from home exits
+      // the app. popstate restores the default view for us.
+      if (hasPushedRef.current) {
+        hasPushedRef.current = false
+        history.back()
+        return
+      }
+    } else if (hasPushedRef.current) {
+      // Already on the pushed entry: swap views in place, don't grow the stack.
+      history.replaceState({ piView: view }, '')
+    } else {
+      // First step away from home: push the single entry that captures Back.
+      history.pushState({ piView: view }, '')
+      hasPushedRef.current = true
+    }
     setActiveView(view)
   }, [])
 
@@ -53,7 +72,11 @@ export default function App() {
     }
     const onPop = (e) => {
       const view = e.state?.piView
-      if (view) setActiveView(view)
+      if (view) {
+        setActiveView(view)
+        // The launch entry is the default view; anything else is our pushed one.
+        hasPushedRef.current = view !== DEFAULT_VIEW
+      }
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)

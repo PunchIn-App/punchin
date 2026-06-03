@@ -47,6 +47,15 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
+      workbox: {
+        // The OAuth callback (/oauth/github/callback) must reach the Cloudflare
+        // Worker that performs the code→token exchange. Without this denylist
+        // the SPA navigation fallback serves the precached index.html for that
+        // in-scope navigation, so the Worker never runs and GitHub sync login
+        // silently fails inside the installed PWA (issue #79). Let any /oauth/*
+        // navigation fall through to the network instead of the app shell.
+        navigateFallbackDenylist: [/^\/oauth\//],
+      },
       manifest: {
         name: 'PunchIn',
         short_name: 'PunchIn',

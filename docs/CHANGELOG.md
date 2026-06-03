@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.12.1] — 2026-06-03
+
+### Fixed
+- Sync — **GitHub Gist login now works in the installed app.** Inside the home-screen PWA the GitHub sign-in could never complete: the service worker was answering the OAuth callback with the cached app shell, so the token exchange never ran and you were left unable to connect, see sync status, or disconnect. The callback now passes straight through to the network, so connecting, syncing, and disconnecting all work again. ([#79](https://github.com/PunchIn-App/punchin/issues/79))
+- Navigation — the device **Back button no longer piles up history across a session.** Tapping through tabs used to add a new Back step every time, so leaving the app meant pressing Back many times. Back now returns to the Timer home from any tab, and once more exits — no matter how many tabs you visited. ([#80](https://github.com/PunchIn-App/punchin/issues/80))
+
+---
+
 ## [0.12.0] — 2026-06-03
 
 ### Added

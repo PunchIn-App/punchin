@@ -120,6 +120,21 @@ describe('App — back-button navigation (#65)', () => {
     })
     expect(screen.getByText('TimerView')).toBeInTheDocument()
   })
+
+  it('keeps the back stack bounded across many tab switches (#80)', () => {
+    render(<App />)
+    const before = history.length
+    // First step away from home pushes exactly one entry...
+    fireEvent.click(screen.getByText('go-jobs'))
+    expect(history.length).toBe(before + 1)
+    expect(history.state?.piView).toBe('jobs')
+    // ...and every further tab switch replaces it rather than growing the stack.
+    fireEvent.click(screen.getByText('go-settings'))
+    fireEvent.click(screen.getByText('go-jobs'))
+    fireEvent.click(screen.getByText('go-settings'))
+    expect(history.length).toBe(before + 1)
+    expect(history.state?.piView).toBe('settings')
+  })
 })
 
 describe('App — OAuth callback handling', () => {
