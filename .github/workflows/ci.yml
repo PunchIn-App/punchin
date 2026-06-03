@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# Restrict the default GITHUB_TOKEN to read-only. This workflow only checks out
+# code, builds, tests, and uploads an artifact — none of which need write scopes.
+permissions:
+  contents: read
+
 jobs:
   ci:
     name: Build & Test
