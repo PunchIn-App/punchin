@@ -32,9 +32,16 @@ punchin/
 │   └── tailwind.config.js  # Custom fonts (Noto Sans, Noto Sans Display, Noto Sans Mono) + CSS-variable-backed color tokens
 ├── scripts/
 │   ├── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
-│   └── icons.mjs           # Generates app/public icon set (Clock mark on accent square) via sharp; run to regenerate brand icons
+│   ├── icons.mjs           # Generates app/public icon set (Clock mark on accent square) via sharp; run to regenerate brand icons
+│   └── social-preview.py   # Regenerates docs/social-preview*.svg + .png (Noto wordmark/tagline as outlined paths via fontTools; PNG via sharp). Build-time only — no font binary committed
 ├── docs/
 │   ├── CHANGELOG.md        # Version history; imported at build time by ChangelogModal via ?raw import
+│   ├── THIRD-PARTY-LICENSES.md # Attribution + license terms for bundled/used third-party assets (the Noto fonts, OFL-1.1)
+│   ├── social-preview.svg      # GitHub README header / repo social card (dark); transparent bg, Noto wordmark outlined
+│   ├── social-preview-light.svg # Light-mode variant of the header card
+│   ├── social-preview.png      # Raster repo social card (1280×640) flattened on brand navy
+│   ├── licenses/
+│   │   └── OFL-1.1.txt     # SIL Open Font License 1.1 — covers Noto Sans / Display / Mono
 │   └── screenshots/
 │       ├── phone-dark/     # Phone · dark theme (412×916 CSS px @2.625×) — 7 views
 │       ├── phone-light/    # Phone · light theme — 7 views
@@ -445,6 +452,20 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 - **Accent:** `appAccent` / `text-appAccent` tokens — active nav, buttons, highlights (user-configurable; defaults to `#1f6feb`)
 - **Stop/end actions:** red (`red-500`, `red-600`) — punch-out buttons and other irreversible-but-non-destructive actions; also used for destructive confirmations
 - **Labor type colors:** 9 preset hex values defined in `JobsView.jsx` (`#6366F1 #F59E0B #22C55E #3B82F6 #EF4444 #EC4899 #8B5CF6 #14B8A6 #F97316`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
+
+### Typography & Fonts
+
+The UI uses Google's **Noto** type family, mapped to Tailwind tokens in `tailwind.config.js`:
+
+| Tailwind class | Family | Use |
+|---|---|---|
+| `font-sans` | Noto Sans | Default body / UI text |
+| `font-display` | Noto Sans Display (falls back to Noto Sans) | Headings, the brand wordmark |
+| `font-mono` | Noto Sans Mono | Timers / numerals |
+
+- The fonts are **loaded from the Google Fonts CDN** via the `<link>` in `app/index.html` — they are **not** self-hosted or committed. The repo redistributes no font binaries.
+- All three Noto families are licensed under the **SIL Open Font License 1.1**. The license text lives at `docs/licenses/OFL-1.1.txt`, and `docs/THIRD-PARTY-LICENSES.md` records the attribution and how the fonts are used. If you ever switch to self-hosting (committing the binaries), the OFL then requires shipping that license alongside them — it already is.
+- The social-preview cards render the wordmark/tagline as **outlined vector paths** (not `<text>` + font, and not embedded font binaries) so they show Noto on GitHub without a webfont. Regenerate them with `scripts/social-preview.py` whenever the wordmark, tagline, or brand mark changes — never hand-edit the `<path>` data.
 
 ### Tailwind Custom Color Tokens
 

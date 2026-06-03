@@ -246,6 +246,7 @@ A `usePlatformContext()` hook detects standalone mode and the host OS at runtime
 | Database | Dexie 4 (IndexedDB) |
 | Charts | Recharts 3 |
 | Date utilities | date-fns 4 |
+| Typography | Noto Sans / Display / Mono (via Google Fonts, OFL-1.1) |
 | Icons | lucide-react |
 | PWA | vite-plugin-pwa |
 | Hosting | Cloudflare Workers |
@@ -328,6 +329,12 @@ All contributors must agree to the [Contributor License Agreement](.github/CLA.m
 ## Security
 
 Found a security vulnerability? Please report it privately — see [SECURITY.md](SECURITY.md) for how. Do **not** open a public issue for security reports.
+
+---
+
+## Credits
+
+PunchIn's interface is set in Google's **Noto** type family — **Noto Sans** (UI text), **Noto Sans Display** (headings and the wordmark), and **Noto Sans Mono** (timers) — served from the Google Fonts CDN. The Noto fonts are licensed under the [SIL Open Font License 1.1](docs/licenses/OFL-1.1.txt); see [docs/THIRD-PARTY-LICENSES.md](docs/THIRD-PARTY-LICENSES.md) for full attribution.
 
 ---
 
