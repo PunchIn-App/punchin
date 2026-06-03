@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.15.1] — 2026-06-03
+
+### Changed
+- Sync — GitHub Gist now uses a **multi-file gist** structure: a `- PunchIn Sync` marker file (identifies the gist as PunchIn's, sorts first) plus a separate `punchin-data-{deviceId}.json` per device. Each device only writes its own file, so concurrent pushes from different devices can never overwrite each other. Existing single-file gists are read and merged automatically on first sync with the new format. Disconnecting deletes your device's file from the gist. ([#83](https://github.com/PunchIn-App/punchin/issues/83))
+
+### Fixed
+- Sync — GitHub Gist: after connecting on a second device the app now searches for an existing PunchIn gist before creating a new one, so both devices share the same gist. ([#83](https://github.com/PunchIn-App/punchin/issues/83))
+- Sync — after completing GitHub / Google / OneDrive OAuth, the app now returns to the **Settings** tab (Sync section) instead of jumping to the Timer view. ([#83](https://github.com/PunchIn-App/punchin/issues/83))
+- Sync — GitHub Gist: the connected status now shows your GitHub username (e.g. **@username**) so you can confirm which account is linked. ([#83](https://github.com/PunchIn-App/punchin/issues/83))
+- Sync — GitHub Gist: after the OAuth redirect, a confirmation dialog now shows which GitHub account was used before saving anything — so you can catch a wrong account (GitHub silently uses whichever account is signed in to your browser) and Cancel to sign in to a different one first. ([#83](https://github.com/PunchIn-App/punchin/issues/83))
+
+---
+
 ## [0.15.0] — 2026-06-03
 
 ### Added

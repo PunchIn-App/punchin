@@ -465,6 +465,7 @@ export default function SettingsView() {
         { key: 'syncFileId',            value: null },
         { key: 'lastSyncedAt',          value: null },
         { key: 'syncError',             value: null },
+        { key: 'syncUsername',          value: null },
       ])
     })
     setResetStage(null)
@@ -929,6 +930,9 @@ export default function SettingsView() {
                       </span>
                     )}
                   </div>
+                  {syncSettings.syncUsername && (
+                    <p className="text-xs text-appTextMuted mt-0.5">@{syncSettings.syncUsername}</p>
+                  )}
                   <p className="text-xs text-appTextMuted mt-0.5">
                     {tokenExpired
                       ? 'Token expired — reconnect to continue syncing'

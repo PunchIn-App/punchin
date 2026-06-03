@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.15.0
+**Version:** 0.15.1
 
 ---
 
@@ -49,7 +49,7 @@ punchin/
 │   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
 │   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), importSnapshot (public merge for transfer links, issue #77), runSync (pull→merge→push), disconnectSync
 │   │   └── providers/
-│   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, createGist, updateGist, fetchGist (handles truncated files via raw_url)
+│   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, fetchGitHubUser, findExistingPunchInGist, createGist (marker + device file), fetchAllDeviceData (reads all punchin-data-*.json + legacy file), pushDeviceData (writes marker + own device file), deleteDeviceFile (nulls file on disconnect), updateGist/fetchGist (legacy, kept for backward compat)
 │   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope), pushToDrive, pullFromDrive
 │   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (implicit flow, AppFolder scope), pushToOneDrive, pullFromOneDrive
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
@@ -84,6 +84,7 @@ punchin/
 │       ├── notifications.js    # Browser Notification API wrappers: notificationsSupported, notificationPermission, requestNotificationPermission, showNotification (prefers the SW registration, falls back to the Notification constructor)
 │       ├── reminders.js        # Pure evaluateReminders({now, settings, activeEntries, jobs, state}) → {fire, state}; the testable reminder rules (long-running timer, idle, still-running, daily/weekly timesheet) + parseHHMM/dayKey helpers
 │       ├── transfer.js         # Device-to-device transfer codec (issue #77): encodeSnapshot/decodeSnapshot (gzip via CompressionStream + base64url, 'g'/'r' flag), buildShareUrl, parseImportCode, parseImportFromHash
+│       ├── deviceId.js         # Stable per-device identifier: getDeviceId() generates an 8-char hex ID on first call and persists it in localStorage (pi.deviceId); survives factory resets intentionally
 │       └── pwa.js              # PWA state bridge: beforeinstallprompt capture, update notification, applyUpdate(), hasWaitingUpdate() (detects an already-downloaded SW waiting to activate)
 ```
 
@@ -120,6 +121,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/utils/notifications.test.js` | `notificationsSupported`, `notificationPermission`, `requestNotificationPermission`, `showNotification` (permission gate, SW-registration path, constructor fallback) |
 | `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules) |
 | `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |
+| `src/utils/deviceId.test.js` | `getDeviceId` — generates 8-char hex, persists across calls, falls back to `'default'` when localStorage is unavailable |
 | `src/db.test.js` | Schema validation, default settings seed, basic CRUD for jobs/labor types/entries |
 | `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), `isIOSSafari` (Safari vs CriOS/FxiOS/EdgiOS), `isIPad` incl. desktop-mode iPad (touch-capable "Macintosh" → iOS) vs real Mac, standalone mode detection |
@@ -148,12 +150,12 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles |
 | `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
 | `src/views/TimesheetsView.test.jsx` | Daily/weekly tabs, period nav, search/filter, CSV/print, edit/delete |
-| `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks, first-run install nudge gating (mobile-only, ios-other mode, desktop suppression), back-button history navigation (seed/push/popstate, issue #65), transfer-link import prompt (confirm/cancel/corrupt, issue #77) |
+| `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks (incl. GitHub username fetch + Settings navigation, issue #83), first-run install nudge gating (mobile-only, ios-other mode, desktop suppression), back-button history navigation (seed/push/popstate, issue #65), transfer-link import prompt (confirm/cancel/corrupt, issue #77) |
 | `src/sync/config.test.js` | `SYNC_CONFIG` shape and env-var fallbacks |
-| `src/sync/providers/github.test.js` | `buildGitHubOAuthUrl`, `createGist`, `updateGist`, `fetchGist` (incl. truncated-content `raw_url` path) |
+| `src/sync/providers/github.test.js` | `buildGitHubOAuthUrl`, `fetchGitHubUser`, `findExistingPunchInGist` (pagination, marker file, device prefix, legacy file), `getDeviceFilename`, `createGist` (marker + device file), `fetchAllDeviceData` (multi-device, truncated, legacy, malformed), `pushDeviceData`, `deleteDeviceFile`, `updateGist`, `fetchGist` |
 | `src/sync/providers/google.test.js` | `buildGoogleOAuthUrl`, `pushToDrive` (create + update path), `pullFromDrive` |
 | `src/sync/providers/onedrive.test.js` | `buildOneDriveOAuthUrl`, `pushToOneDrive`, `pullFromOneDrive` (404 → null) |
-| `src/sync/syncManager.test.js` | `exportSnapshot`, `disconnectSync`, `runSync` (auth guards, per-provider dispatch, merge, full dedup) |
+| `src/sync/syncManager.test.js` | `exportSnapshot`, `disconnectSync` (deletes device file, clears all settings incl. syncUsername), `runSync` (auth guards, per-provider dispatch, multi-device merge via `fetchAllDeviceData`, existing-gist discovery, per-device push, create with marker) |
 
 When adding new behaviour to any source file, add a test alongside it.
 
@@ -361,6 +363,7 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `syncFileId` | string \| `null` | `null` — GitHub Gist ID; unused for Google/OneDrive |
 | `lastSyncedAt` | number (ms epoch) \| `null` | `null` |
 | `syncError` | string \| `null` | `null` — set when the OAuth callback returns a `sync_error` fragment |
+| `syncUsername` | string \| `null` | `null` — GitHub login name fetched after OAuth; shown in the connected status UI; null for Google/OneDrive |
 
 ### Fresh Install / Zero State
 

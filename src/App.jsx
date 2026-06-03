@@ -14,6 +14,7 @@ import { useReminders } from './hooks/useReminders'
 import { updateFavicon } from './utils/favicon'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
+import { fetchGitHubUser } from './sync/providers/github'
 import { db } from './db'
 
 // localStorage keys for the first-run install nudge. Kept out of the Dexie
@@ -32,6 +33,67 @@ function hexToRgb(hex) {
 }
 
 const DEFAULT_VIEW = 'timer'
+
+function GitHubAccountConfirm({ username, onConfirm, onDismiss }) {
+  const dialogRef = useRef(null)
+
+  useEffect(() => {
+    dialogRef.current?.querySelector('[data-autofocus]')?.focus()
+    const onKey = (e) => {
+      if (e.key === 'Escape') { onDismiss(); return }
+      if (e.key !== 'Tab') return
+      const focusable = Array.from(dialogRef.current?.querySelectorAll('button') ?? [])
+      if (!focusable.length) return
+      const first = focusable[0], last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onDismiss])
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+      onClick={e => e.target === e.currentTarget && onDismiss()}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gh-confirm-title"
+        className="w-full max-w-sm bg-appCard rounded-2xl border border-appBorder shadow-xl p-5 space-y-4"
+      >
+        <div>
+          <p id="gh-confirm-title" className="font-display font-semibold text-appText">
+            Connect{username ? ` as @${username}` : ' GitHub account'}?
+          </p>
+          <p className="text-sm text-appTextMuted mt-1">
+            {username
+              ? `Your data will sync to a private gist owned by @${username}.`
+              : 'Your data will sync to a private gist in this GitHub account.'
+            }{' '}If this isn&apos;t the right account, tap Cancel, sign out of GitHub in your browser, then try connecting again.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            data-autofocus
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-appAccent hover:opacity-90 text-white font-semibold text-sm transition-opacity focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:outline-none"
+          >
+            Connect
+          </button>
+          <button
+            onClick={onDismiss}
+            className="flex-1 py-2.5 rounded-xl bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:outline-none"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   const [activeView, setActiveView] = useState(DEFAULT_VIEW)
@@ -130,6 +192,28 @@ export default function App() {
   // link shouldn't silently change the user's data.
   const [importPrompt, setImportPrompt] = useState(null) // { snapshot, jobs, entries }
 
+  // GitHub OAuth: token is held here until the user confirms which account to
+  // use (#83). We fetch the username before asking so the dialog can show it.
+  // The token is never written to the DB until the user taps Connect.
+  const [pendingGitHubAuth, setPendingGitHubAuth] = useState(null) // { token, username }
+
+  const confirmGitHubConnect = useCallback(async () => {
+    if (!pendingGitHubAuth) return
+    await db.settings.bulkPut([
+      { key: 'syncProvider', value: 'github' },
+      { key: 'syncToken', value: pendingGitHubAuth.token },
+      { key: 'syncTokenExpiry', value: null },
+      { key: 'syncFileId', value: null },
+      { key: 'syncError', value: null },
+      { key: 'syncUsername', value: pendingGitHubAuth.username },
+    ])
+    setPendingGitHubAuth(null)
+  }, [pendingGitHubAuth])
+
+  const dismissGitHubConnect = useCallback(() => {
+    setPendingGitHubAuth(null)
+  }, [])
+
   // Handle OAuth callback tokens written into the URL hash by the provider
   useEffect(() => {
     const hash = window.location.hash
@@ -152,18 +236,15 @@ export default function App() {
       return
     }
 
-    // GitHub: token comes via our Cloudflare Worker callback
+    // GitHub: hold the token in memory and show a confirmation dialog before
+    // saving — GitHub may silently use the already-signed-in account without
+    // showing an account chooser, so we ask the user to confirm it's right.
     if (params.has('sync_token') && params.get('sync_provider') === 'github') {
       const token = params.get('sync_token')
-      db.settings.bulkPut([
-        { key: 'syncProvider', value: 'github' },
-        { key: 'syncToken', value: token },
-        { key: 'syncTokenExpiry', value: null },
-        { key: 'syncFileId', value: null },
-        { key: 'syncError', value: null },
-      ]).then(() => {
-        history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
-      })
+      history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)
+      setActiveView('settings')
+      fetchGitHubUser(token)
+        .then(user => setPendingGitHubAuth({ token, username: user?.login ?? null }))
       return
     }
 
@@ -180,10 +261,11 @@ export default function App() {
         { key: 'syncFileId', value: null },
         { key: 'syncError', value: null },
       ]).then(() => {
-        history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
+        history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)
+        setActiveView('settings')
       })
     }
-  }, [])
+  }, [setActiveView])
 
   // --- First-run install nudge -------------------------------------------
   const { canInstall, isIOS, isIOSSafari, isInstalled, os, promptInstall } = useInstallPrompt()
@@ -257,6 +339,13 @@ export default function App() {
           confirmLabel="Import"
           onConfirm={async () => { await importSnapshot(importPrompt.snapshot); setImportPrompt(null) }}
           onCancel={() => setImportPrompt(null)}
+        />
+      )}
+      {pendingGitHubAuth && (
+        <GitHubAccountConfirm
+          username={pendingGitHubAuth.username}
+          onConfirm={confirmGitHubConnect}
+          onDismiss={dismissGitHubConnect}
         />
       )}
     </Layout>

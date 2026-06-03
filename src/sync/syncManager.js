@@ -1,5 +1,12 @@
 import { db } from '../db'
-import { createGist, updateGist, fetchGist } from './providers/github'
+import { getDeviceId } from '../utils/deviceId'
+import {
+  createGist,
+  fetchAllDeviceData,
+  pushDeviceData,
+  deleteDeviceFile,
+  findExistingPunchInGist,
+} from './providers/github'
 import { pushToDrive, pullFromDrive } from './providers/google'
 import { pushToOneDrive, pullFromOneDrive } from './providers/onedrive'
 
@@ -89,31 +96,38 @@ export async function runSync() {
   if (!s.syncProvider || !s.syncToken) throw new Error('Not connected')
   if (s.syncTokenExpiry && Date.now() > s.syncTokenExpiry) throw new Error('TOKEN_EXPIRED')
 
-  let remote = null
   let fileId = s.syncFileId ?? null
 
   if (s.syncProvider === 'github') {
-    if (fileId) remote = await fetchGist(s.syncToken, fileId)
-  } else if (s.syncProvider === 'google') {
-    remote = await pullFromDrive(s.syncToken)
-  } else if (s.syncProvider === 'onedrive') {
-    remote = await pullFromOneDrive(s.syncToken)
-  }
+    const deviceId = getDeviceId()
 
-  if (remote) await mergeSnapshot(remote)
+    if (!fileId) {
+      fileId = await findExistingPunchInGist(s.syncToken)
+      if (fileId) await db.settings.put({ key: 'syncFileId', value: fileId })
+    }
 
-  const snapshot = await exportSnapshot()
-
-  if (s.syncProvider === 'github') {
     if (fileId) {
-      await updateGist(s.syncToken, fileId, snapshot)
+      const snapshots = await fetchAllDeviceData(s.syncToken, fileId)
+      for (const snapshot of snapshots) await mergeSnapshot(snapshot)
+    }
+
+    const snapshot = await exportSnapshot()
+
+    if (fileId) {
+      await pushDeviceData(s.syncToken, fileId, deviceId, snapshot)
     } else {
-      fileId = await createGist(s.syncToken, snapshot)
+      fileId = await createGist(s.syncToken, deviceId, snapshot)
       await db.settings.put({ key: 'syncFileId', value: fileId })
     }
   } else if (s.syncProvider === 'google') {
+    const remote = await pullFromDrive(s.syncToken)
+    if (remote) await mergeSnapshot(remote)
+    const snapshot = await exportSnapshot()
     await pushToDrive(s.syncToken, snapshot)
   } else if (s.syncProvider === 'onedrive') {
+    const remote = await pullFromOneDrive(s.syncToken)
+    if (remote) await mergeSnapshot(remote)
+    const snapshot = await exportSnapshot()
     await pushToOneDrive(s.syncToken, snapshot)
   }
 
@@ -123,11 +137,19 @@ export async function runSync() {
 }
 
 export async function disconnectSync() {
+  const s = await getSettings()
+
+  // Best-effort: delete this device's file from the gist before clearing credentials
+  if (s.syncProvider === 'github' && s.syncToken && s.syncFileId) {
+    try { await deleteDeviceFile(s.syncToken, s.syncFileId, getDeviceId()) } catch {}
+  }
+
   await db.settings.bulkPut([
     { key: 'syncProvider', value: null },
     { key: 'syncToken', value: null },
     { key: 'syncTokenExpiry', value: null },
     { key: 'syncFileId', value: null },
     { key: 'lastSyncedAt', value: null },
+    { key: 'syncUsername', value: null },
   ])
 }

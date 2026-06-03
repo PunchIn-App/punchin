@@ -5,11 +5,18 @@ import * as github from './providers/github'
 import * as google from './providers/google'
 import * as onedrive from './providers/onedrive'
 
+vi.mock('../utils/deviceId', () => ({
+  getDeviceId: vi.fn(() => 'testdevice'),
+}))
+
 vi.mock('./providers/github', () => ({
   buildGitHubOAuthUrl: vi.fn(),
   createGist: vi.fn(),
-  updateGist: vi.fn(),
-  fetchGist: vi.fn(),
+  fetchAllDeviceData: vi.fn(),
+  pushDeviceData: vi.fn(),
+  deleteDeviceFile: vi.fn(),
+  findExistingPunchInGist: vi.fn(),
+  fetchGitHubUser: vi.fn(),
 }))
 
 vi.mock('./providers/google', () => ({
@@ -42,7 +49,7 @@ beforeEach(async () => {
   await db.jobs.clear()
   await db.laborTypes.clear()
   await db.entries.clear()
-  for (const key of ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt']) {
+  for (const key of ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt', 'syncUsername']) {
     await db.settings.delete(key)
   }
 })
@@ -111,14 +118,38 @@ describe('exportSnapshot', () => {
 // ---------------------------------------------------------------------------
 
 describe('disconnectSync', () => {
-  it('sets all 5 sync settings to null', async () => {
+  it('sets all sync settings (including syncUsername) to null', async () => {
     await seedSyncSettings({ syncProvider: 'google', syncToken: 'tok', lastSyncedAt: 12345 })
+    await db.settings.put({ key: 'syncUsername', value: 'octocat' })
     await disconnectSync()
-    const keys = ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt']
+    const keys = ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt', 'syncUsername']
     for (const key of keys) {
       const row = await db.settings.get(key)
       expect(row?.value).toBeNull()
     }
+  })
+
+  it('calls deleteDeviceFile before clearing settings for GitHub', async () => {
+    await seedSyncSettings({ syncProvider: 'github', syncToken: 'gh-token', syncFileId: 'gist-del' })
+    github.deleteDeviceFile.mockResolvedValueOnce(undefined)
+    await disconnectSync()
+    expect(github.deleteDeviceFile).toHaveBeenCalledWith('gh-token', 'gist-del', 'testdevice')
+    const row = await db.settings.get('syncProvider')
+    expect(row?.value).toBeNull()
+  })
+
+  it('does not call deleteDeviceFile for non-GitHub providers', async () => {
+    await seedSyncSettings({ syncProvider: 'google', syncToken: 'goog-token', syncFileId: null })
+    await disconnectSync()
+    expect(github.deleteDeviceFile).not.toHaveBeenCalled()
+  })
+
+  it('still clears settings even if deleteDeviceFile throws', async () => {
+    await seedSyncSettings({ syncProvider: 'github', syncToken: 'gh-token', syncFileId: 'gist-id' })
+    github.deleteDeviceFile.mockRejectedValueOnce(new Error('network'))
+    await disconnectSync()
+    const row = await db.settings.get('syncProvider')
+    expect(row?.value).toBeNull()
   })
 })
 
@@ -143,15 +174,15 @@ describe('runSync — auth guards', () => {
 
   it('does not throw for a token that has not expired', async () => {
     await seedSyncSettings({ syncTokenExpiry: Date.now() + 60_000 })
-    github.fetchGist.mockResolvedValueOnce(null)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await expect(runSync()).resolves.not.toThrow()
   })
 
   it('does not throw when syncTokenExpiry is null (GitHub tokens never expire)', async () => {
     await seedSyncSettings({ syncTokenExpiry: null })
-    github.fetchGist.mockResolvedValueOnce(null)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await expect(runSync()).resolves.not.toThrow()
   })
 })
@@ -161,36 +192,93 @@ describe('runSync — auth guards', () => {
 // ---------------------------------------------------------------------------
 
 describe('runSync — GitHub provider', () => {
-  it('calls fetchGist with the stored token and fileId', async () => {
+  it('calls fetchAllDeviceData with the stored token and fileId', async () => {
     await seedSyncSettings({ syncFileId: 'existing-gist' })
-    github.fetchGist.mockResolvedValueOnce(null)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
-    expect(github.fetchGist).toHaveBeenCalledWith('test-token', 'existing-gist')
+    expect(github.fetchAllDeviceData).toHaveBeenCalledWith('test-token', 'existing-gist')
   })
 
-  it('calls updateGist when a fileId is already stored', async () => {
+  it('calls pushDeviceData when a fileId is already stored', async () => {
     await seedSyncSettings({ syncFileId: 'existing-gist' })
-    github.fetchGist.mockResolvedValueOnce(null)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
-    expect(github.updateGist).toHaveBeenCalledWith('test-token', 'existing-gist', expect.any(Object))
+    expect(github.pushDeviceData).toHaveBeenCalledWith('test-token', 'existing-gist', 'testdevice', expect.any(Object))
   })
 
-  it('calls createGist and saves the new id when no fileId is stored', async () => {
+  it('does not call findExistingPunchInGist when syncFileId is already stored', async () => {
+    await seedSyncSettings({ syncFileId: 'existing-gist' })
+    github.fetchAllDeviceData.mockResolvedValueOnce([])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+    expect(github.findExistingPunchInGist).not.toHaveBeenCalled()
+  })
+
+  it('searches for an existing gist on first sync (no syncFileId)', async () => {
     await seedSyncSettings({ syncFileId: null })
+    github.findExistingPunchInGist.mockResolvedValueOnce('found-gist-id')
+    github.fetchAllDeviceData.mockResolvedValueOnce([])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+    expect(github.findExistingPunchInGist).toHaveBeenCalledWith('test-token')
+    expect(github.fetchAllDeviceData).toHaveBeenCalledWith('test-token', 'found-gist-id')
+    expect(github.pushDeviceData).toHaveBeenCalledWith('test-token', 'found-gist-id', 'testdevice', expect.any(Object))
+    const stored = await db.settings.get('syncFileId')
+    expect(stored?.value).toBe('found-gist-id')
+  })
+
+  it('creates a new gist when no existing one is found', async () => {
+    await seedSyncSettings({ syncFileId: null })
+    github.findExistingPunchInGist.mockResolvedValueOnce(null)
     github.createGist.mockResolvedValueOnce('brand-new-gist-id')
     await runSync()
-    expect(github.createGist).toHaveBeenCalled()
+    expect(github.createGist).toHaveBeenCalledWith('test-token', 'testdevice', expect.any(Object))
     const stored = await db.settings.get('syncFileId')
     expect(stored?.value).toBe('brand-new-gist-id')
   })
 
-  it('does not call fetchGist when no fileId is stored', async () => {
+  it('does not call fetchAllDeviceData when no fileId exists and no existing gist is found', async () => {
     await seedSyncSettings({ syncFileId: null })
+    github.findExistingPunchInGist.mockResolvedValueOnce(null)
     github.createGist.mockResolvedValueOnce('new-id')
     await runSync()
-    expect(github.fetchGist).not.toHaveBeenCalled()
+    expect(github.fetchAllDeviceData).not.toHaveBeenCalled()
+  })
+
+  it('merges all snapshots returned by fetchAllDeviceData', async () => {
+    await seedSyncSettings({ syncFileId: 'gist-123' })
+    const snap1 = {
+      version: 1,
+      laborTypes: [{ id: 1, name: 'Design', color: '#6366F1' }],
+      jobs: [{ id: 10, name: 'Project Alpha', laborTypeId: 1, isActive: true }],
+      entries: [{
+        jobId: 10, laborTypeId: 1,
+        punchIn: '2025-01-01T09:00:00.000Z',
+        punchOut: '2025-01-01T10:00:00.000Z',
+        notes: null,
+      }],
+    }
+    const snap2 = {
+      version: 1,
+      laborTypes: [{ id: 2, name: 'Dev', color: '#F59E0B' }],
+      jobs: [{ id: 20, name: 'Project Beta', laborTypeId: 2, isActive: true }],
+      entries: [{
+        jobId: 20, laborTypeId: 2,
+        punchIn: '2025-01-02T09:00:00.000Z',
+        punchOut: '2025-01-02T10:00:00.000Z',
+        notes: null,
+      }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([snap1, snap2])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const jobs = await db.jobs.toArray()
+    expect(jobs.map(j => j.name)).toEqual(expect.arrayContaining(['Project Alpha', 'Project Beta']))
+    const entries = await db.entries.toArray()
+    expect(entries).toHaveLength(2)
   })
 })
 
@@ -213,7 +301,7 @@ describe('runSync — Google provider', () => {
     google.pullFromDrive.mockResolvedValueOnce(null)
     google.pushToDrive.mockResolvedValueOnce('id')
     await runSync()
-    expect(github.fetchGist).not.toHaveBeenCalled()
+    expect(github.fetchAllDeviceData).not.toHaveBeenCalled()
     expect(github.createGist).not.toHaveBeenCalled()
   })
 })
@@ -237,7 +325,7 @@ describe('runSync — OneDrive provider', () => {
     onedrive.pullFromOneDrive.mockResolvedValueOnce(null)
     onedrive.pushToOneDrive.mockResolvedValueOnce('id')
     await runSync()
-    expect(github.fetchGist).not.toHaveBeenCalled()
+    expect(github.fetchAllDeviceData).not.toHaveBeenCalled()
   })
 })
 
@@ -248,8 +336,8 @@ describe('runSync — OneDrive provider', () => {
 describe('runSync — timestamp and lastSyncedAt', () => {
   it('returns a millisecond timestamp', async () => {
     await seedSyncSettings()
-    github.fetchGist.mockResolvedValueOnce(null)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     const before = Date.now()
     const ts = await runSync()
     const after = Date.now()
@@ -259,8 +347,8 @@ describe('runSync — timestamp and lastSyncedAt', () => {
 
   it('persists lastSyncedAt in the DB matching the returned timestamp', async () => {
     await seedSyncSettings()
-    github.fetchGist.mockResolvedValueOnce(null)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     const ts = await runSync()
     const stored = await db.settings.get('lastSyncedAt')
     expect(stored?.value).toBe(ts)
@@ -286,8 +374,8 @@ describe('runSync — merge new remote data', () => {
         notes: null,
       }],
     }
-    github.fetchGist.mockResolvedValueOnce(remoteSnapshot)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
 
     const lts = await db.laborTypes.toArray()
@@ -300,7 +388,6 @@ describe('runSync — merge new remote data', () => {
 
   it('re-maps remote IDs to local IDs correctly', async () => {
     await seedSyncSettings()
-    // Pre-seed a labor type with a different local ID than the remote
     const localLtId = await db.laborTypes.add({ name: 'Development', color: '#F59E0B', isArchived: false })
 
     const remoteSnapshot = {
@@ -315,8 +402,8 @@ describe('runSync — merge new remote data', () => {
         notes: null,
       }],
     }
-    github.fetchGist.mockResolvedValueOnce(remoteSnapshot)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
 
     const entries = await db.entries.toArray()
@@ -340,8 +427,8 @@ describe('runSync — merge deduplication', () => {
       jobs: [],
       entries: [],
     }
-    github.fetchGist.mockResolvedValueOnce(remoteSnapshot)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
 
     const lts = await db.laborTypes.toArray()
@@ -358,8 +445,8 @@ describe('runSync — merge deduplication', () => {
       jobs: [{ id: 200, name: 'Client Project', laborTypeId: null, isActive: true }],
       entries: [],
     }
-    github.fetchGist.mockResolvedValueOnce(remoteSnapshot)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
 
     const jobs = await db.jobs.toArray()
@@ -388,8 +475,8 @@ describe('runSync — merge deduplication', () => {
         notes: null,
       }],
     }
-    github.fetchGist.mockResolvedValueOnce(remoteSnapshot)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
 
     const entries = await db.entries.toArray()
@@ -418,8 +505,8 @@ describe('runSync — merge deduplication', () => {
         notes: null,
       }],
     }
-    github.fetchGist.mockResolvedValueOnce(remoteSnapshot)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
 
     const entries = await db.entries.toArray()
@@ -434,15 +521,15 @@ describe('runSync — merge deduplication', () => {
       laborTypes: [],
       jobs: [],
       entries: [{
-        jobId: 9999, // no matching job
+        jobId: 9999,
         laborTypeId: null,
         punchIn: '2025-01-01T09:00:00.000Z',
         punchOut: '2025-01-01T10:00:00.000Z',
         notes: null,
       }],
     }
-    github.fetchGist.mockResolvedValueOnce(remoteSnapshot)
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
 
     const entries = await db.entries.toArray()
@@ -451,11 +538,9 @@ describe('runSync — merge deduplication', () => {
 
   it('returns 0 and does nothing when remote snapshot has no version', async () => {
     await seedSyncSettings()
-    // fetchGist returns an invalid snapshot (no version field)
-    github.fetchGist.mockResolvedValueOnce({ jobs: [], entries: [], laborTypes: [] })
-    github.updateGist.mockResolvedValueOnce(undefined)
+    github.fetchAllDeviceData.mockResolvedValueOnce([{ jobs: [], entries: [], laborTypes: [] }])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
     await runSync()
-    // Nothing imported
     const entries = await db.entries.toArray()
     expect(entries).toHaveLength(0)
   })

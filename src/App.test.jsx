@@ -26,6 +26,11 @@ vi.mock('./sync/syncManager', () => ({
   importSnapshot: (...a) => mockImportSnapshot(...a),
 }))
 
+const mockFetchGitHubUser = vi.fn().mockResolvedValue({ login: 'octocat' })
+vi.mock('./sync/providers/github', () => ({
+  fetchGitHubUser: (...a) => mockFetchGitHubUser(...a),
+}))
+
 vi.mock('./db', () => ({
   db: {
     settings: {
@@ -54,6 +59,7 @@ vi.mock('./views/SettingsView',   () => ({ default: () => <div>SettingsView</div
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockFetchGitHubUser.mockResolvedValue({ login: 'octocat' })
   document.documentElement.classList.remove('light')
   document.documentElement.style.removeProperty('--accent-rgb')
   window.location.hash = ''
@@ -155,15 +161,59 @@ describe('App — back-button navigation (#65)', () => {
 })
 
 describe('App — OAuth callback handling', () => {
-  it('stores GitHub token when hash contains sync_token + sync_provider=github', async () => {
+  beforeEach(() => { mockFetchGitHubUser.mockResolvedValue({ login: 'octocat' }) })
+
+  it('navigates to Settings and shows account confirmation dialog after GitHub OAuth', async () => {
     window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
     render(<App />)
-    await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
+    await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
+    expect(screen.getByText(/Connect as @octocat/)).toBeInTheDocument()
+    // token must NOT be saved to DB until user confirms
+    expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
+  })
+
+  it('saves GitHub token and username when the user confirms the account', async () => {
+    window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
+    render(<App />)
+    await waitFor(() => screen.getByRole('dialog'))
+    await act(async () => { screen.getByRole('button', { name: 'Connect' }).click() })
+    expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
       expect.arrayContaining([
         { key: 'syncProvider', value: 'github' },
         { key: 'syncToken',    value: 'ghtoken123' },
+        { key: 'syncUsername', value: 'octocat'    },
       ])
-    ))
+    )
+  })
+
+  it('saves syncUsername as null when GitHub user fetch returns null', async () => {
+    mockFetchGitHubUser.mockResolvedValueOnce(null)
+    window.location.hash = '#sync_token=tok&sync_provider=github'
+    render(<App />)
+    await waitFor(() => screen.getByRole('dialog'))
+    await act(async () => { screen.getByRole('button', { name: 'Connect' }).click() })
+    expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
+      expect.arrayContaining([{ key: 'syncUsername', value: null }])
+    )
+  })
+
+  it('does not save anything when the user cancels the account confirmation', async () => {
+    window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
+    render(<App />)
+    await waitFor(() => screen.getByRole('dialog'))
+    await act(async () => { screen.getByRole('button', { name: 'Cancel' }).click() })
+    expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('closes the confirmation on Escape without saving', async () => {
+    window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
+    render(<App />)
+    await waitFor(() => screen.getByRole('dialog'))
+    await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('stores Google token when hash has access_token + state=google', async () => {
@@ -175,6 +225,12 @@ describe('App — OAuth callback handling', () => {
         { key: 'syncToken',    value: 'googletoken' },
       ])
     ))
+  })
+
+  it('navigates to Settings after Google OAuth callback', async () => {
+    window.location.hash = '#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google'
+    render(<App />)
+    await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
   })
 
   it('stores OneDrive token when hash has access_token + state=onedrive', async () => {
