@@ -3,7 +3,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
 import ColorPicker from '../components/ColorPicker'
 import DataTransfer from '../components/DataTransfer'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut, Check, Share, Plus, Compass, Vibrate, SlidersHorizontal, Database, Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck, Share2 } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, LogOut, Check, Share, Plus, Compass, Vibrate, SlidersHorizontal, Database, Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck, Share2 } from 'lucide-react'
 import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../utils/notifications'
 import { applyUpdate, hasWaitingUpdate } from '../utils/pwa'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -976,7 +976,7 @@ export default function SettingsView() {
                     onClick={() => { window.location.href = buildGitHubOAuthUrl(SYNC_CONFIG.github.clientId, SYNC_CONFIG.github.callbackBase) }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
                   >
-                    <Github className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+                    <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />
                     <div>
                       <p className="text-sm text-appText font-medium">GitHub Gist</p>
                       <p className="text-xs text-appTextMuted">Private gist in your GitHub account</p>
