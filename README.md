@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://react.dev"><img src="https://img.shields.io/badge/React-18-1f6feb?style=flat&logo=react&logoColor=white" alt="React 18" /></a>
   <a href="https://dexie.org"><img src="https://img.shields.io/badge/Dexie-3-1f6feb?style=flat" alt="Dexie 3" /></a>
-  <a href="https://recharts.org"><img src="https://img.shields.io/badge/Recharts-2-1f6feb?style=flat" alt="Recharts 2" /></a>
+  <a href="https://recharts.org"><img src="https://img.shields.io/badge/Recharts-3-1f6feb?style=flat" alt="Recharts 3" /></a>
   <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-6-1f6feb?style=flat&logo=vite&logoColor=white" alt="Vite 6" /></a>
   <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-3-1f6feb?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 3" /></a>
   <a href="https://workers.cloudflare.com"><img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-1f6feb?style=flat&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" /></a>
@@ -221,7 +221,7 @@ A `usePlatformContext()` hook detects standalone mode and the host OS at runtime
 | Build | Vite 6 |
 | Styling | Tailwind CSS 3 + CSS custom properties |
 | Database | Dexie 3 (IndexedDB) |
-| Charts | Recharts 2 |
+| Charts | Recharts 3 |
 | Date utilities | date-fns 3 |
 | Icons | lucide-react |
 | PWA | vite-plugin-pwa |
@@ -286,7 +286,15 @@ punchin/
 
 See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for setup instructions, workflow, and conventions.
 
+This project follows a [Code of Conduct](CODE_OF_CONDUCT.md) — by participating, you agree to uphold it.
+
 All contributors must agree to the [Contributor License Agreement](.github/CLA.md) before their pull request can be merged.
+
+---
+
+## Security
+
+Found a security vulnerability? Please report it privately — see [SECURITY.md](SECURITY.md) for how. Do **not** open a public issue for security reports.
 
 ---
 

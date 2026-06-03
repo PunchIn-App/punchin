@@ -14,10 +14,18 @@ PR description or as a comment:
 
 Please **do not** open a public GitHub issue for security vulnerabilities.
 
-Instead, use GitHub's private advisory system:
+Instead, report them privately by emailing
+[cve@trackmytime.today](mailto:cve@trackmytime.today) or using GitHub's private
+advisory system:
 **[Report a vulnerability →](https://github.com/PunchIn-App/punchin/security/advisories/new)**
 
 See [SECURITY.md](../SECURITY.md) for the full policy, supported versions, and response timeline.
+
+## Code of Conduct
+
+This project follows a [Code of Conduct](../CODE_OF_CONDUCT.md). By participating, you
+agree to uphold it. Report unacceptable behavior privately to
+[abuse@trackmytime.today](mailto:abuse@trackmytime.today).
 
 ---
 

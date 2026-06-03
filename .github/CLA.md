@@ -101,5 +101,7 @@ statement in your pull request description or as a comment:
 > I have read and agree to the PunchIn Time Tracker Contributor License
 > Agreement.
 
-For questions or to submit a signed copy, contact the Project Owner at
-licensing@trackmytime.today.
+For questions about this agreement, contact the Project Owner at
+[cla@trackmytime.today](mailto:cla@trackmytime.today).
+You sign by including the statement above in your pull request description or as a
+comment — no separate copy needs to be sent.
