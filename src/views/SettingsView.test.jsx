@@ -56,6 +56,25 @@ vi.mock('../db', () => ({
   },
 }))
 
+// dexie-react-hooks v4's useLiveQuery relies on Dexie's observability, which
+// does not fire against the plain `db` mock above (v1 simply ran the querier and
+// returned its result). Re-create that v1 behavior so the mocked db still drives
+// the component: run the querier and re-render when it resolves.
+vi.mock('dexie-react-hooks', async () => {
+  const React = await vi.importActual('react')
+  return {
+    useLiveQuery: (querier, deps = []) => {
+      const [value, setValue] = React.useState(undefined)
+      React.useEffect(() => {
+        let active = true
+        Promise.resolve(querier()).then((v) => { if (active) setValue(v) })
+        return () => { active = false }
+      }, deps)
+      return value
+    },
+  }
+})
+
 vi.mock('../components/ColorPicker', () => ({
   default: ({ value, onChange, label }) => (
     <button data-testid="color-picker" aria-label={label} onClick={() => onChange('#FF0000')}>{value}</button>
