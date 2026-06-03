@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.11.0
+**Version:** 0.11.1
 
 ---
 
@@ -44,7 +44,7 @@ punchin/
 │       └── desktop-light/  # 1920×1080 @1× · light theme — 7 views
 ├── src/
 │   ├── main.jsx            # React entry point; registers service worker and PWA install prompt listener
-│   ├── App.jsx             # Root: tab state, theme application, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated)
+│   ├── App.jsx             # Root: tab state, theme application, accent → CSS var + dynamic favicon, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated)
 │   ├── sync/
 │   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
 │   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), runSync (pull→merge→push), disconnectSync
@@ -78,6 +78,7 @@ punchin/
 │   │   └── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
 │   └── utils/
 │       ├── time.js             # Date/time helpers (format, range, sum)
+│       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon)
 │       └── pwa.js              # PWA state bridge: beforeinstallprompt capture, update notification, applyUpdate()
 ```
 
@@ -110,6 +111,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 |------|---------------|
 | `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `getEntryDuration`, `formatTime`, `formatDate`, `getDayRange`, `getWeekRange`, `getWeekDays`, `isEntryInRange`, `sumDurations` |
 | `src/utils/pwa.test.js` | `getInstallPrompt`, `notifyUpdateAvailable`, `setPwaUpdateFn`, `applyUpdate`, `initPwaInstallPrompt` |
+| `src/utils/favicon.test.js` | `drawFaviconDataUrl` (accent color, null-context fallback), `updateFavicon` (link creation, static-link replacement, idempotent updates) |
 | `src/db.test.js` | Schema validation, default settings seed, basic CRUD for jobs/labor types/entries |
 | `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), standalone mode detection |

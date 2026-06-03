@@ -9,6 +9,7 @@ import AnalyticsView  from './views/AnalyticsView'
 import SettingsView   from './views/SettingsView'
 import { useSettings } from './hooks/useSettings'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
+import { updateFavicon } from './utils/favicon'
 import { db } from './db'
 
 // localStorage keys for the first-run install nudge. Kept out of the Dexie
@@ -57,6 +58,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.style.setProperty('--accent-rgb', hexToRgb(accentColor))
+    updateFavicon(accentColor)
   }, [accentColor])
 
   useEffect(() => {

@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.11.1] — 2026-06-02
+
+### Changed
+- **Appearance — the browser-tab icon now follows your accent color.** The favicon is rendered live from your chosen accent, so the tab icon matches the in-app logo. (The installed home-screen icon stays the fixed brand mark — platforms bake that at install time and it can't track the accent.)
+
+---
+
 ## [0.11.0] — 2026-06-02
 
 ### Added
