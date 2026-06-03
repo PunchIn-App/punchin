@@ -42,24 +42,44 @@ The provider buttons only appear when the matching `VITE_<provider>_CLIENT_ID` i
 
 All `VITE_*` values are **public client IDs** — never put secrets in them. See [`.env.example`](../.env.example) for the full list and per-provider OAuth app setup notes.
 
+### Build vs runtime — the part that trips people up
+
+Cloudflare's Worker settings have **two** separate sections, and each variable belongs in exactly one:
+
+- **Build** ("variables and secrets used during the build") — Vite reads these when `npm run build` runs and **inlines them into the JavaScript bundle**. All `VITE_*` variables go here. If a `VITE_*` value is only in the runtime section, the build never sees it and the provider button stays hidden.
+- **Runtime** ("variables and secrets used at runtime") — read by the Worker *while it serves a request* ([`worker/oauth.js`](../worker/oauth.js) reads `env.*`). These are never compiled into the frontend. Only GitHub needs runtime values, and `GITHUB_CLIENT_SECRET` **must** live here as a secret — never in the build section.
+
+After changing any **build** variable you must trigger a fresh deploy — Vite only re-inlines on a new build; an already-deployed bundle won't pick up the change.
+
 ### GitHub Gist (recommended — token never expires; worker already built)
 
-GitHub is the only provider with a server-side token exchange, handled by [`worker/oauth.js`](../worker/oauth.js). It needs **both** build variables and runtime secrets:
+GitHub is the only provider with a server-side token exchange, so it needs entries in **both** sections. Register a GitHub OAuth App at <https://github.com/settings/developers> with callback URL `https://<your-app>.workers.dev/oauth/github/callback`, generate a client secret, then set:
 
-1. Register a GitHub OAuth App at <https://github.com/settings/developers> with callback URL `https://<your-app>.workers.dev/oauth/github/callback`, then generate a client secret.
-2. In your Cloudflare Worker → Settings → Variables and Secrets, set:
-   - **Build variables** (inlined into the bundle): `VITE_GITHUB_CLIENT_ID`, `VITE_APP_URL`
-   - **Runtime secrets** (read by the worker): `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `APP_URL`
-3. Redeploy so Vite re-inlines the build variable.
+| Variable | Section | Value | Secret? |
+|---|---|---|---|
+| `VITE_GITHUB_CLIENT_ID` | Build | your client ID | no (public) |
+| `VITE_APP_URL` | Build | `https://<your-app>.workers.dev` | no |
+| `GITHUB_CLIENT_ID` | Runtime | your client ID (same value) | no (public) |
+| `GITHUB_CLIENT_SECRET` | Runtime | your generated secret | **yes** |
+| `APP_URL` | Runtime | `https://<your-app>.workers.dev` | no |
 
-### Google Drive / OneDrive (implicit flow — no worker, no secret)
+> Setting everything in **runtime only** → the button never appears (build didn't get the `VITE_*` vars). Setting everything in **build only** → the OAuth callback fails when GitHub redirects back (the worker can't exchange the code without its runtime secret). You need both.
 
-These use browser-side implicit OAuth, so they need **only** their build variable plus a registered OAuth app:
+### Google Drive (implicit flow — build only, no worker, no secret)
 
-- **Google Drive** — `VITE_GOOGLE_CLIENT_ID` (Web app, Drive API + `drive.appdata` scope, redirect URI `https://<your-app>.workers.dev/`)
-- **OneDrive** — `VITE_ONEDRIVE_CLIENT_ID` (SPA redirect `https://<your-app>.workers.dev/`, permissions `Files.ReadWrite.AppFolder` + `User.Read`)
+Browser-side implicit OAuth, so there's no runtime value and no client secret. Register a Web application OAuth client at <https://console.cloud.google.com> (enable the Google Drive API, scope `drive.appdata`, authorized redirect URI `https://<your-app>.workers.dev/`), then set:
 
-> The most common setup mistake is setting only the build variable **or** only the runtime secret for GitHub — both are required.
+| Variable | Section | Value | Secret? |
+|---|---|---|---|
+| `VITE_GOOGLE_CLIENT_ID` | Build | your client ID | no (public) |
+
+### OneDrive (implicit flow — build only, no worker, no secret)
+
+Also browser-side implicit OAuth. Register an app at <https://portal.azure.com> (personal Microsoft accounts, SPA redirect `https://<your-app>.workers.dev/`, API permissions `Files.ReadWrite.AppFolder` + `User.Read`), then set:
+
+| Variable | Section | Value | Secret? |
+|---|---|---|---|
+| `VITE_ONEDRIVE_CLIENT_ID` | Build | your client ID | no (public) |
 
 ---
 
