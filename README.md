@@ -10,11 +10,11 @@
 </p>
 
 <p align="center">
-  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-18-1f6feb?style=flat&logo=react&logoColor=white" alt="React 18" /></a>
-  <a href="https://dexie.org"><img src="https://img.shields.io/badge/Dexie-3-1f6feb?style=flat" alt="Dexie 3" /></a>
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-1f6feb?style=flat&logo=react&logoColor=white" alt="React 19" /></a>
+  <a href="https://dexie.org"><img src="https://img.shields.io/badge/Dexie-4-1f6feb?style=flat" alt="Dexie 4" /></a>
   <a href="https://recharts.org"><img src="https://img.shields.io/badge/Recharts-3-1f6feb?style=flat" alt="Recharts 3" /></a>
-  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-6-1f6feb?style=flat&logo=vite&logoColor=white" alt="Vite 6" /></a>
-  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-3-1f6feb?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 3" /></a>
+  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-8-1f6feb?style=flat&logo=vite&logoColor=white" alt="Vite 8" /></a>
+  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-4-1f6feb?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4" /></a>
   <a href="https://workers.cloudflare.com"><img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-1f6feb?style=flat&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" /></a>
 </p>
 
@@ -157,12 +157,35 @@ Provider buttons only appear when the app is deployed with the corresponding `VI
 </details>
 
 <details>
+<summary><strong>Account-Free Device Transfer</strong></summary>
+
+Move your data between devices with **no account and no cloud provider**. In Settings → **Transfer**, tap **Create share link** to snapshot your database into a compressed link plus a scannable **QR code** — then open the link or scan the QR on the other device. **Import from a link** lets you paste a link or code directly. Imports show a confirmation with a summary ("Includes N jobs / M entries") before merging, and reuse the same smart deduplication as cloud sync so nothing is duplicated. Histories too large for a QR/URL fall back to a copyable link with a clear note. Everything happens client-side — no server is involved.
+
+</details>
+
+<details>
+<summary><strong>Reminders</strong></summary>
+
+Opt-in local notifications keep you on top of your tracking — no account or server required. In Settings → **Reminders**, enable the master toggle (which requests notification permission) and choose any combination of:
+
+- **Long-running timer** — alerts when an active timer exceeds a configurable number of minutes
+- **No timer running** — nudges you by a chosen time of day if nothing is tracking
+- **Timer still running** — alerts at a chosen time if a timer is still going
+- **Daily** / **Weekly timesheet** — reminders to log or review your time
+
+Because there's no backend, reminders fire only while PunchIn is open or installed and running in the background — the Settings copy makes this clear and points iPhone/iPad users to add the app to their Home Screen first.
+
+</details>
+
+<details>
 <summary><strong>Settings &amp; Data Portability</strong></summary>
 
 - **Concurrent timers** — toggle on or off; when off, starting a new timer automatically stops any running one
 - **Week start** — choose whether your week starts on Monday or Sunday
 - **Theme** — switch between **Auto / Light / Dark** (auto follows your OS preference)
-- **Accent color** — pick from 5 preset highlight colors (Blue, Amber, Orange, Lime, Teal); updates the entire app instantly
+- **Accent color** — choose from preset highlight swatches or pick any custom hex color; updates the entire app (and the browser-tab favicon) instantly
+- **Haptic feedback** — toggle vibration on navigation and punch actions (shown only on phones, where a vibration motor exists)
+- **Install** — add PunchIn to your home screen, with platform-aware guidance for Android, iOS Safari, and other iOS browsers
 - **Export JSON** — full backup of all data (jobs, labor types, entries)
 - **Export CSV** — all completed entries as a spreadsheet ready for import into bookkeeping apps
 - **Import JSON** — restore from a backup file (smart deduplication prevents duplicates)
@@ -217,12 +240,12 @@ A `usePlatformContext()` hook detects standalone mode and the host OS at runtime
 
 | Layer | Technology |
 |---|---|
-| Framework | React 18 |
-| Build | Vite 6 |
-| Styling | Tailwind CSS 3 + CSS custom properties |
-| Database | Dexie 3 (IndexedDB) |
+| Framework | React 19 |
+| Build | Vite 8 |
+| Styling | Tailwind CSS 4 + CSS custom properties |
+| Database | Dexie 4 (IndexedDB) |
 | Charts | Recharts 3 |
-| Date utilities | date-fns 3 |
+| Date utilities | date-fns 4 |
 | Icons | lucide-react |
 | PWA | vite-plugin-pwa |
 | Hosting | Cloudflare Workers |
@@ -263,7 +286,9 @@ punchin/
     │   ├── InvoiceModal.jsx    # Invoice generator with CSV/print export
     │   ├── ConfirmModal.jsx    # Accessible confirmation dialog
     │   ├── ColorPicker.jsx     # Preset swatches + custom hex input
-    │   └── ChangelogModal.jsx  # Changelog viewer (built from docs/CHANGELOG.md)
+    │   ├── ChangelogModal.jsx  # Changelog viewer (built from docs/CHANGELOG.md)
+    │   ├── DataTransfer.jsx    # Account-free device-to-device transfer (link + QR)
+    │   └── InstallPromptModal.jsx # First-run install bottom sheet (platform-aware)
     ├── views/
     │   ├── TimerView.jsx       # Active timers list
     │   ├── JobsView.jsx        # Jobs & Labor Types CRUD
@@ -273,9 +298,17 @@ punchin/
     ├── hooks/
     │   ├── useSettings.js          # Reactive settings hook
     │   ├── usePlatformContext.js   # Standalone + OS detection
+    │   ├── useInstallPrompt.js     # PWA install state + prompt
+    │   ├── useReminders.js         # Local reminder scheduler (no backend)
     │   └── useHapticFeedback.jsx  # Platform-routed haptic trigger
     └── utils/
-        └── time.js             # Date/time helpers
+        ├── time.js             # Date/time helpers
+        ├── favicon.js          # Accent-colored tab favicon
+        ├── notifications.js    # Browser Notification API wrappers
+        ├── reminders.js        # Pure reminder-rule evaluation
+        ├── transfer.js         # Device-transfer codec (gzip + base64url, QR)
+        ├── deviceId.js         # Stable per-device identifier
+        └── pwa.js              # PWA install/update state bridge
 ```
 
 </details>

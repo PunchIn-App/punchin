@@ -4,7 +4,7 @@
 
 PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Users punch in/out of jobs, categorize work by labor type, review timesheets, and analyze time trends. All data is stored locally in IndexedDB (no backend/auth).
 
-**Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
+**Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
 **Version:** 0.15.2
 
