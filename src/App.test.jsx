@@ -9,6 +9,23 @@ vi.mock('./hooks/useSettings', () => ({
   useSettings: () => mockUseSettings(),
 }))
 
+// Reminders run their own live queries against Dexie; exercised in
+// useReminders.test.js, mocked here so App tests stay focused.
+vi.mock('./hooks/useReminders', () => ({
+  useReminders: () => {},
+}))
+
+// Transfer-link import (issue #77): mock the decode + merge so the App test can
+// drive the confirmation prompt without real Dexie/compression.
+const mockDecodeSnapshot = vi.fn()
+const mockImportSnapshot = vi.fn().mockResolvedValue(3)
+vi.mock('./utils/transfer', () => ({
+  decodeSnapshot: (...a) => mockDecodeSnapshot(...a),
+}))
+vi.mock('./sync/syncManager', () => ({
+  importSnapshot: (...a) => mockImportSnapshot(...a),
+}))
+
 vi.mock('./db', () => ({
   db: {
     settings: {
@@ -264,5 +281,41 @@ describe('App — first-run install nudge', () => {
     window.__pwaInstallPrompt = { prompt: vi.fn() }
     render(<App />)
     expect(nudge()).not.toBeInTheDocument()
+  })
+})
+
+describe('App — transfer link import (#77)', () => {
+  it('shows an import confirmation when opened with an #import= link', async () => {
+    mockDecodeSnapshot.mockResolvedValue({ jobs: [{}], entries: [{}, {}], laborTypes: [] })
+    window.location.hash = '#import=gABCDEF'
+    render(<App />)
+    expect(await screen.findByText('Import shared data?')).toBeInTheDocument()
+    expect(mockDecodeSnapshot).toHaveBeenCalledWith('gABCDEF')
+  })
+
+  it('merges the snapshot when the import is confirmed', async () => {
+    const snap = { jobs: [{}], entries: [{}, {}], laborTypes: [] }
+    mockDecodeSnapshot.mockResolvedValue(snap)
+    window.location.hash = '#import=gABCDEF'
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /^import$/i }))
+    await waitFor(() => expect(mockImportSnapshot).toHaveBeenCalledWith(snap))
+  })
+
+  it('does not import when the confirmation is cancelled', async () => {
+    mockDecodeSnapshot.mockResolvedValue({ jobs: [], entries: [], laborTypes: [] })
+    window.location.hash = '#import=gABCDEF'
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /^cancel$/i }))
+    expect(mockImportSnapshot).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByText('Import shared data?')).not.toBeInTheDocument())
+  })
+
+  it('ignores a corrupt transfer link silently', async () => {
+    mockDecodeSnapshot.mockRejectedValue(new Error('bad'))
+    window.location.hash = '#import=gBAD'
+    render(<App />)
+    await new Promise(r => setTimeout(r, 20))
+    expect(screen.queryByText('Import shared data?')).not.toBeInTheDocument()
   })
 })

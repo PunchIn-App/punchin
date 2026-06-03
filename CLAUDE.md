@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 18 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.12.1
+**Version:** 0.15.0
 
 ---
 
@@ -29,7 +29,7 @@ punchin/
 ├── config/
 │   ├── vite.config.js      # Vite + Vitest + PWA config; root=app/, outDir=../dist, test.root=..
 │   ├── postcss.config.js   # PostCSS pipeline (Tailwind + autoprefixer)
-│   └── tailwind.config.js  # Custom fonts (Syne, DM Sans, JetBrains Mono) + CSS-variable-backed color tokens
+│   └── tailwind.config.js  # Custom fonts (Noto Sans, Noto Sans Display, Noto Sans Mono) + CSS-variable-backed color tokens
 ├── scripts/
 │   ├── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
 │   └── icons.mjs           # Generates app/public icon set (Clock mark on accent square) via sharp; run to regenerate brand icons
@@ -47,7 +47,7 @@ punchin/
 │   ├── App.jsx             # Root: tab state, theme application, accent → CSS var + dynamic favicon, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated)
 │   ├── sync/
 │   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
-│   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), runSync (pull→merge→push), disconnectSync
+│   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), importSnapshot (public merge for transfer links, issue #77), runSync (pull→merge→push), disconnectSync
 │   │   └── providers/
 │   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, createGist, updateGist, fetchGist (handles truncated files via raw_url)
 │   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope), pushToDrive, pullFromDrive
@@ -64,21 +64,26 @@ punchin/
 │   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
 │   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
 │   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets
+│   │   ├── DataTransfer.jsx     # Account-free device-to-device transfer (issue #77): "Create share link" snapshots the DB → compressed #import= link + QR (qrcode-generator); "Import from a link" pastes a link/code and merges via importSnapshot
 │   │   └── InstallPromptModal.jsx # First-run install bottom sheet; mode = 'native' (Chrome/Edge one-tap), 'ios-safari' (Share→Add-to-Home-Screen), or 'ios-other' (open-in-Safari guidance for Chrome/Firefox on iOS)
 │   ├── views/
 │   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
-│   │   └── SettingsView.jsx    # Settings: theme/accent, JSON/CSV backup, changelog, install prompt, check-for-updates, Sync (GitHub Gist / Google Drive / OneDrive), Danger Zone
+│   │   └── SettingsView.jsx    # Settings as a single-open accordion (AccordionSection): General (concurrent timers, week start, haptics), Appearance (theme/accent), Install, Data (JSON/CSV backup), Sync (GitHub Gist / Google Drive / OneDrive), Danger Zone, About (changelog, bug report, check-for-updates)
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web) + isIOSSafari (true only in iOS Safari, where Add to Home Screen works) + isIPad (treats a touch-capable "Macintosh" UA — iPadOS Safari's default desktop mode — as iOS, and distinguishes iPad from iPhone)
 │   │   ├── useInstallPrompt.js     # PWA install state: canInstall/isInstalled/isIOS/isIOSSafari + promptInstall(); shared by SettingsView and the install nudge
-│   │   └── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
+│   │   ├── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
+│   │   └── useReminders.js        # Reminder scheduler (issue #54): watches settings + live timers, evaluates evaluateReminders on a 30s interval (and on tab focus), fires local notifications while reminders are enabled and permission granted. No backend / Web Push
 │   └── utils/
 │       ├── time.js             # Date/time helpers (format, range, sum)
 │       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon)
+│       ├── notifications.js    # Browser Notification API wrappers: notificationsSupported, notificationPermission, requestNotificationPermission, showNotification (prefers the SW registration, falls back to the Notification constructor)
+│       ├── reminders.js        # Pure evaluateReminders({now, settings, activeEntries, jobs, state}) → {fire, state}; the testable reminder rules (long-running timer, idle, still-running, daily/weekly timesheet) + parseHHMM/dayKey helpers
+│       ├── transfer.js         # Device-to-device transfer codec (issue #77): encodeSnapshot/decodeSnapshot (gzip via CompressionStream + base64url, 'g'/'r' flag), buildShareUrl, parseImportCode, parseImportFromHash
 │       └── pwa.js              # PWA state bridge: beforeinstallprompt capture, update notification, applyUpdate(), hasWaitingUpdate() (detects an already-downloaded SW waiting to activate)
 ```
 
@@ -112,15 +117,20 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `getEntryDuration`, `formatTime`, `formatDate`, `getDayRange`, `getWeekRange`, `getWeekDays`, `isEntryInRange`, `sumDurations` |
 | `src/utils/pwa.test.js` | `getInstallPrompt`, `notifyUpdateAvailable`, `setPwaUpdateFn`, `applyUpdate`, `initPwaInstallPrompt`, `hasWaitingUpdate` (reg.waiting detection) |
 | `src/utils/favicon.test.js` | `drawFaviconDataUrl` (accent color, null-context fallback), `updateFavicon` (link creation, static-link replacement, idempotent updates) |
+| `src/utils/notifications.test.js` | `notificationsSupported`, `notificationPermission`, `requestNotificationPermission`, `showNotification` (permission gate, SW-registration path, constructor fallback) |
+| `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules) |
+| `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |
 | `src/db.test.js` | Schema validation, default settings seed, basic CRUD for jobs/labor types/entries |
 | `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), `isIOSSafari` (Safari vs CriOS/FxiOS/EdgiOS), `isIPad` incl. desktop-mode iPad (touch-capable "Macintosh" → iOS) vs real Mac, standalone mode detection |
 | `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
+| `src/hooks/useReminders.test.js` | fires a notification when an enabled reminder condition is met; no-ops when reminders disabled or permission not granted |
 | `src/hooks/useInstallPrompt.test.js` | `canInstall`/`isInstalled` state from `pwa:install-ready`/`pwa:installed`; `promptInstall` accept/dismiss outcomes |
 | `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap |
 | `src/components/InstallPromptModal.test.jsx` | All three modes (native / ios-safari / ios-other), dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
 | `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
 | `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management |
+| `src/components/DataTransfer.test.jsx` | Share-link + QR generation, "Includes N jobs/entries" summary, import junk rejection, end-to-end import of a real encoded link with count (issue #77) |
 | `src/components/EditEntryModal.test.jsx` | Add/edit/active-timer modes, validation, save/delete flows, keyboard |
 | `src/components/EditEntryModal.helpers.test.js` | `formatDateToYYYYMMDD`, `formatTimeToHHMM`, `combineDateAndTime` |
 | `src/components/ErrorBoundary.test.jsx` | Children render, fallback UI on throw, "Try again" reset |
@@ -135,9 +145,10 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/views/SettingsView.syncUnconfigured.test.jsx` | Sync section with empty client IDs: friendly "not set up" message, no env-var jargon, no provider buttons (issue #59) |
 | `src/views/SettingsView.dedup.test.js` | `isEntryDuplicate` (backup import dedup logic) |
 | `src/views/SettingsView.haptics.test.jsx` | `hapticFeedback` toggle shown on iPhone/Android, hidden on iPad (no vibration motor) and web, toggles the setting (issue #65) |
+| `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles |
 | `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
 | `src/views/TimesheetsView.test.jsx` | Daily/weekly tabs, period nav, search/filter, CSV/print, edit/delete |
-| `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks, first-run install nudge gating (mobile-only, ios-other mode, desktop suppression), back-button history navigation (seed/push/popstate, issue #65) |
+| `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks, first-run install nudge gating (mobile-only, ios-other mode, desktop suppression), back-button history navigation (seed/push/popstate, issue #65), transfer-link import prompt (confirm/cancel/corrupt, issue #77) |
 | `src/sync/config.test.js` | `SYNC_CONFIG` shape and env-var fallbacks |
 | `src/sync/providers/github.test.js` | `buildGitHubOAuthUrl`, `createGist`, `updateGist`, `fetchGist` (incl. truncated-content `raw_url` path) |
 | `src/sync/providers/google.test.js` | `buildGoogleOAuthUrl`, `pushToDrive` (create + update path), `pullFromDrive` |
@@ -332,6 +343,18 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
 | `accentColor` | hex string | `"#1f6feb"` |
 | `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
+| `remindersEnabled` | boolean | `false` — master switch for local reminder notifications (issue #54); enabling it requests notification permission |
+| `remindLongRunning` | boolean | `true` — alert when an active timer exceeds the threshold |
+| `remindLongRunningMinutes` | number | `60` — long-running timer threshold (minutes) |
+| `remindIdle` | boolean | `false` — alert if no timer is running by `remindIdleTime` |
+| `remindIdleTime` | string (`"HH:MM"`) | `"09:00"` |
+| `remindStillRunning` | boolean | `false` — alert if a timer is still running at `remindStillRunningTime` |
+| `remindStillRunningTime` | string (`"HH:MM"`) | `"17:00"` |
+| `remindTimesheetDaily` | boolean | `false` — daily timesheet reminder |
+| `remindTimesheetDailyTime` | string (`"HH:MM"`) | `"17:00"` |
+| `remindTimesheetWeekly` | boolean | `false` — weekly timesheet reminder |
+| `remindTimesheetWeeklyDay` | number (0=Sun … 6=Sat) | `5` (Friday) |
+| `remindTimesheetWeeklyTime` | string (`"HH:MM"`) | `"16:00"` |
 | `syncProvider` | `"github"` \| `"google"` \| `"onedrive"` \| `null` | `null` |
 | `syncToken` | string \| `null` | `null` |
 | `syncTokenExpiry` | number (ms epoch) \| `null` | `null` — GitHub tokens do not expire; Google/OneDrive implicit tokens expire after ~1 hour |
@@ -537,7 +560,7 @@ The script (`scripts/screenshots.mjs`):
 
 ## What NOT to Do
 
-- Do not introduce a backend or server-side authentication without explicit scope agreement. Cloud sync via OAuth + provider-hosted storage (GitHub Gist, Google Drive, OneDrive) is in scope as of v0.10.0 — but adding a new sync provider requires a separate Cloudflare Worker secret and explicit agreement on the OAuth flow
+- Do not introduce a backend or server-side authentication without explicit scope agreement. Cloud sync via OAuth + provider-hosted storage (GitHub Gist, Google Drive, OneDrive) is in scope as of v0.10.0 — but adding a new sync provider requires a separate Cloudflare Worker secret and explicit agreement on the OAuth flow. Account-free, client-only device-to-device transfer via a compressed `#import=` link + QR code is in scope as of v0.15.0 (no backend involved)
 - Do not add a URL router — the tab-state approach is intentional for PWA standalone mode
 - Do not import new heavy libraries without checking bundle size impact (current bundle is intentionally small)
 - Do not store sensitive data in Dexie (it is plaintext in browser storage)

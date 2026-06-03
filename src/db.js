@@ -52,6 +52,20 @@ db.on('populate', async () => {
     { key: 'theme',                 value: 'auto' },
     { key: 'accentColor',           value: '#1f6feb' },
     { key: 'hapticFeedback',        value: true  },
+    // Reminder notifications (issue #54) — all off by default; the master
+    // toggle requests notification permission when first enabled.
+    { key: 'remindersEnabled',          value: false   },
+    { key: 'remindLongRunning',         value: true    },
+    { key: 'remindLongRunningMinutes',  value: 60      },
+    { key: 'remindIdle',                value: false   },
+    { key: 'remindIdleTime',            value: '09:00' },
+    { key: 'remindStillRunning',        value: false   },
+    { key: 'remindStillRunningTime',    value: '17:00' },
+    { key: 'remindTimesheetDaily',      value: false   },
+    { key: 'remindTimesheetDailyTime',  value: '17:00' },
+    { key: 'remindTimesheetWeekly',     value: false   },
+    { key: 'remindTimesheetWeeklyDay',  value: 5       },
+    { key: 'remindTimesheetWeeklyTime', value: '16:00' },
   ])
 })
 

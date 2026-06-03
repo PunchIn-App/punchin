@@ -24,9 +24,9 @@ describe('db — schema', () => {
 })
 
 describe('db — populate seed', () => {
-  it('seeds exactly 5 default settings', async () => {
+  it('seeds exactly 17 default settings', async () => {
     const all = await db.settings.toArray()
-    expect(all).toHaveLength(5)
+    expect(all).toHaveLength(17)
   })
 
   it('seeds allowConcurrentTimers = false', async () => {
@@ -52,6 +52,16 @@ describe('db — populate seed', () => {
   it('seeds hapticFeedback = true', async () => {
     const s = await db.settings.get('hapticFeedback')
     expect(s?.value).toBe(true)
+  })
+
+  it('seeds remindersEnabled = false (reminders off by default)', async () => {
+    const s = await db.settings.get('remindersEnabled')
+    expect(s?.value).toBe(false)
+  })
+
+  it('seeds remindLongRunningMinutes = 60', async () => {
+    const s = await db.settings.get('remindLongRunningMinutes')
+    expect(s?.value).toBe(60)
   })
 
   it('seeds zero jobs', async () => {

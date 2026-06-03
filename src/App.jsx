@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Layout from './components/Layout'
 import ErrorBoundary  from './components/ErrorBoundary'
 import InstallPromptModal from './components/InstallPromptModal'
+import ConfirmModal from './components/ConfirmModal'
 import TimerView      from './views/TimerView'
 import JobsView       from './views/JobsView'
 import TimesheetsView from './views/TimesheetsView'
@@ -9,7 +10,10 @@ import AnalyticsView  from './views/AnalyticsView'
 import SettingsView   from './views/SettingsView'
 import { useSettings } from './hooks/useSettings'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
+import { useReminders } from './hooks/useReminders'
 import { updateFavicon } from './utils/favicon'
+import { decodeSnapshot } from './utils/transfer'
+import { importSnapshot } from './sync/syncManager'
 import { db } from './db'
 
 // localStorage keys for the first-run install nudge. Kept out of the Dexie
@@ -32,6 +36,10 @@ const DEFAULT_VIEW = 'timer'
 export default function App() {
   const [activeView, setActiveView] = useState(DEFAULT_VIEW)
   const { settings } = useSettings()
+
+  // Drive local reminder notifications (issue #54). No-op unless the user has
+  // enabled reminders and granted notification permission.
+  useReminders()
 
   // Track the live view for the navigate callback without re-creating it.
   const activeViewRef = useRef(activeView)
@@ -117,11 +125,26 @@ export default function App() {
     if (meta) meta.setAttribute('content', resolvedTheme === 'light' ? '#F3F4F6' : '#0F1117')
   }, [resolvedTheme])
 
+  // A snapshot shared from another device via a #import=… transfer link (issue
+  // #77). Decoded asynchronously, then confirmed before merging since opening a
+  // link shouldn't silently change the user's data.
+  const [importPrompt, setImportPrompt] = useState(null) // { snapshot, jobs, entries }
+
   // Handle OAuth callback tokens written into the URL hash by the provider
   useEffect(() => {
     const hash = window.location.hash
     if (!hash || hash === '#') return
     const params = new URLSearchParams(hash.slice(1))
+
+    // Device-to-device transfer link (issue #77)
+    if (params.has('import')) {
+      const code = params.get('import')
+      history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
+      decodeSnapshot(code)
+        .then(snapshot => setImportPrompt({ snapshot, jobs: snapshot.jobs.length, entries: snapshot.entries.length }))
+        .catch(() => { /* invalid/corrupt link — ignore silently */ })
+      return
+    }
 
     if (params.has('sync_error')) {
       history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
@@ -225,6 +248,15 @@ export default function App() {
           mode={installMode}
           onInstall={handleInstall}
           onClose={dismissInstall}
+        />
+      )}
+      {importPrompt && (
+        <ConfirmModal
+          title="Import shared data?"
+          message={`This link contains ${importPrompt.jobs} ${importPrompt.jobs === 1 ? 'job' : 'jobs'} and ${importPrompt.entries} ${importPrompt.entries === 1 ? 'entry' : 'entries'}. They'll be merged into this device — your existing data is kept and duplicates are skipped.`}
+          confirmLabel="Import"
+          onConfirm={async () => { await importSnapshot(importPrompt.snapshot); setImportPrompt(null) }}
+          onCancel={() => setImportPrompt(null)}
         />
       )}
     </Layout>

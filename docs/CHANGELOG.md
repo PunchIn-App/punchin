@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.15.0] — 2026-06-03
+
+### Added
+- Transfer — a new **Transfer** section in Settings to move your data between devices **without an account**: tap **Create share link** to get a compressed link plus a **QR code**, then open or scan it on the other device. ([#77](https://github.com/PunchIn-App/punchin/issues/77))
+- Transfer — opening a PunchIn share link shows an **import confirmation** before merging, and you can also paste a link into **Import from a link**. Imports reuse the same dedup as cloud sync, so nothing is duplicated. Large histories that exceed QR/URL limits fall back to the copyable link with a clear note.
+
+---
+
+## [0.14.0] — 2026-06-03
+
+### Added
+- Reminders — a new **Reminders** section in Settings with opt-in local notifications: a **long-running timer** alert (after a configurable number of minutes), a **no timer running** nudge by a chosen time, a **timer still running** alert at a chosen time, and **daily** / **weekly** timesheet reminders. Turning reminders on asks for notification permission. ([#54](https://github.com/PunchIn-App/punchin/issues/54))
+- Reminders work without any account or server, so they only fire while PunchIn is open or installed and running in the background — the Settings copy makes this clear and points iPhone/iPad users to add the app to their Home Screen first.
+
+---
+
+## [0.13.0] — 2026-06-03
+
+### Changed
+- Settings — the settings screen is now organised into **collapsible sections** that open one at a time, so the list stays tidy instead of one long scroll. Opening a section automatically closes the previously open one. ([#60](https://github.com/PunchIn-App/punchin/issues/60))
+- Settings — the single-item **Timer** and **Calendar** groups (and the Haptic feedback toggle on phones) are consolidated into one **General** section, removing the lonely one-row categories. ([#60](https://github.com/PunchIn-App/punchin/issues/60))
+
+---
+
+## [0.12.2] — 2026-06-03
+
+### Changed
+- Appearance — **refreshed the app's typography to the Noto family** (Noto Sans for text, Noto Sans Display for headings, Noto Sans Mono for timer digits) for a cleaner, more legible look across every screen. ([#74](https://github.com/PunchIn-App/punchin/issues/74))
+
+---
+
 ## [0.12.1] — 2026-06-03
 
 ### Fixed

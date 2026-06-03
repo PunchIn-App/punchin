@@ -46,15 +46,22 @@ beforeEach(() => {
   mockIsIPad = false
 })
 
+// Haptic feedback now lives inside the collapsible "General" group (issue #60),
+// so expand it before asserting the toggle's presence/absence.
+const expandGeneral = () =>
+  fireEvent.click(screen.getByRole('button', { name: /^general$/i }))
+
 describe('SettingsView — haptic feedback toggle (#65)', () => {
   it('shows the Haptic feedback toggle on a phone', () => {
     render(<SettingsView />)
+    expandGeneral()
     expect(screen.getByText('Haptic feedback')).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: /Haptic feedback/i })).toBeInTheDocument()
   })
 
   it('toggles the hapticFeedback setting when tapped', () => {
     render(<SettingsView />)
+    expandGeneral()
     fireEvent.click(screen.getByRole('switch', { name: /Haptic feedback/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('hapticFeedback', false)
   })
@@ -63,6 +70,7 @@ describe('SettingsView — haptic feedback toggle (#65)', () => {
     mockOs = 'ios'
     mockIsIPad = false
     render(<SettingsView />)
+    expandGeneral()
     expect(screen.getByText('Haptic feedback')).toBeInTheDocument()
   })
 
@@ -70,12 +78,14 @@ describe('SettingsView — haptic feedback toggle (#65)', () => {
     mockOs = 'ios'
     mockIsIPad = true
     render(<SettingsView />)
+    expandGeneral()
     expect(screen.queryByText('Haptic feedback')).not.toBeInTheDocument()
   })
 
   it('hides the toggle on the web (no device haptics)', () => {
     mockOs = 'web'
     render(<SettingsView />)
+    expandGeneral()
     expect(screen.queryByText('Haptic feedback')).not.toBeInTheDocument()
   })
 })

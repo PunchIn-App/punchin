@@ -17,6 +17,13 @@ export async function exportSnapshot() {
   return { version: 1, exportedAt: new Date().toISOString(), jobs, entries, laborTypes }
 }
 
+// Merge an externally-provided snapshot (e.g. a transfer link, issue #77) into
+// the local database, reusing the same name-based dedup as cloud sync. Returns
+// the number of new time entries added.
+export async function importSnapshot(remote) {
+  return mergeSnapshot(remote)
+}
+
 async function mergeSnapshot(remote) {
   if (!remote?.version || !Array.isArray(remote.jobs)) return 0
 

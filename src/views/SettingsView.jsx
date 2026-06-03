@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
 import ColorPicker from '../components/ColorPicker'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut, Check, Share, Plus, Compass, Vibrate } from 'lucide-react'
+import DataTransfer from '../components/DataTransfer'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, Github, LogOut, Check, Share, Plus, Compass, Vibrate, SlidersHorizontal, Database, Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck, Share2 } from 'lucide-react'
+import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../utils/notifications'
 import { applyUpdate, hasWaitingUpdate } from '../utils/pwa'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { format } from 'date-fns'
@@ -52,6 +54,57 @@ function SettingsRow({ icon: Icon, title, subtitle, right }) {
       </div>
       {right}
     </div>
+  )
+}
+
+// A reminder sub-option: a labelled toggle row with an optional control area
+// (time / minutes / weekday) revealed when the toggle is on (issue #54).
+function ReminderRow({ icon: Icon, title, subtitle, enabled, onToggle, children }) {
+  return (
+    <div className="px-4 py-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Icon className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="text-sm text-appText font-medium">{title}</p>
+            {subtitle && <p className="text-xs text-appTextMuted mt-0.5">{subtitle}</p>}
+          </div>
+        </div>
+        <Toggle value={enabled} onChange={onToggle} ariaLabel={title} />
+      </div>
+      {enabled && children && <div className="mt-3 pl-7 flex flex-wrap items-center gap-2">{children}</div>}
+    </div>
+  )
+}
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+const reminderInputClass = 'bg-appBg border border-appBorder text-appText rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-appAccent/50'
+
+// Collapsible settings group. Only one section is open at a time (single-open
+// accordion) — the parent owns the open state and closes siblings when one
+// opens. Keeps the long settings list decluttered (issue #60).
+function AccordionSection({ title, icon: Icon, danger, badge, open, onToggle, children }) {
+  const borderColor = danger ? 'border-red-500/30' : 'border-appBorder'
+  const titleColor = danger ? 'text-red-400' : 'text-appText'
+  const iconColor = danger ? 'text-red-400/80' : 'text-appTextMuted'
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl border ${borderColor} bg-appCard hover:bg-appInput transition-colors text-left`}
+      >
+        <span className="flex items-center gap-3 min-w-0">
+          {Icon && <Icon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} aria-hidden="true" />}
+          <span className={`text-sm font-medium ${titleColor}`}>{title}</span>
+          {badge && <span className="w-2 h-2 rounded-full bg-appAccent flex-shrink-0" aria-hidden="true" />}
+        </span>
+        <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${iconColor} ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {open && <div className="mt-2">{children}</div>}
+    </section>
   )
 }
 
@@ -133,7 +186,12 @@ export default function SettingsView() {
   const { isStandalone, os, isIPad } = usePlatformContext()
   const fileInputRef = useRef(null)
   const [resetStage, setResetStage] = useState(null) // null | 'warn' | 'final'
-  const [dangerOpen, setDangerOpen] = useState(false)
+  // Single-open accordion: which section is expanded (null = all collapsed).
+  // Open straight to About when an update is already waiting so the user can
+  // act on it without hunting (the header also shows a dot — see badge below).
+  const [openSection, setOpenSection] = useState(() =>
+    (typeof window !== 'undefined' && window.__pwaUpdateAvailable) ? 'about' : null
+  )
   const [updateStatus, setUpdateStatus] = useState(null) // null | 'checking' | 'latest'
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showChangelog, setShowChangelog] = useState(false)
@@ -141,7 +199,16 @@ export default function SettingsView() {
   const [iosHelpOpen, setIosHelpOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
+  const [notifPerm, setNotifPerm] = useState(() => notificationPermission())
   const { canInstall, isInstalled, isIOS, isIOSSafari, os: installOs, promptInstall } = useInstallPrompt()
+
+  const toggleSection = (id) => setOpenSection(cur => (cur === id ? null : id))
+
+  // Reset the multi-stage factory-reset flow whenever the Danger Zone collapses,
+  // so re-opening it always starts from the neutral state.
+  useEffect(() => {
+    if (openSection !== 'danger') setResetStage(null)
+  }, [openSection])
 
   const syncSettings = useLiveQuery(async () => {
     const rows = await db.settings.toArray()
@@ -380,6 +447,18 @@ export default function SettingsView() {
         { key: 'theme',                 value: 'auto' },
         { key: 'accentColor',           value: '#1f6feb' },
         { key: 'hapticFeedback',        value: true  },
+        { key: 'remindersEnabled',          value: false   },
+        { key: 'remindLongRunning',         value: true    },
+        { key: 'remindLongRunningMinutes',  value: 60      },
+        { key: 'remindIdle',                value: false   },
+        { key: 'remindIdleTime',            value: '09:00' },
+        { key: 'remindStillRunning',        value: false   },
+        { key: 'remindStillRunningTime',    value: '17:00' },
+        { key: 'remindTimesheetDaily',      value: false   },
+        { key: 'remindTimesheetDailyTime',  value: '17:00' },
+        { key: 'remindTimesheetWeekly',     value: false   },
+        { key: 'remindTimesheetWeeklyDay',  value: 5       },
+        { key: 'remindTimesheetWeeklyTime', value: '16:00' },
         { key: 'syncProvider',          value: null },
         { key: 'syncToken',             value: null },
         { key: 'syncTokenExpiry',       value: null },
@@ -408,6 +487,22 @@ export default function SettingsView() {
     setShowDisconnectConfirm(false)
   }
 
+  // Turning reminders on requests notification permission first; we only flip
+  // the setting if the user grants it, so an enabled toggle always means alerts
+  // can actually be shown (issue #54).
+  const handleRemindersToggle = async (on) => {
+    if (!on) {
+      await updateSetting('remindersEnabled', false)
+      return
+    }
+    const perm = await requestNotificationPermission()
+    setNotifPerm(perm)
+    await updateSetting('remindersEnabled', perm === 'granted')
+  }
+
+  const notifSupported = notificationsSupported()
+  const remindersOn = !!settings.remindersEnabled && notifPerm === 'granted'
+
   const tokenExpired = syncSettings?.syncTokenExpiry && Date.now() > syncSettings.syncTokenExpiry
 
   // Haptics only fire on phones (iPhone via the Taptic polyfill, Android via
@@ -416,11 +511,16 @@ export default function SettingsView() {
   const canHaptic = os === 'android' || (os === 'ios' && !isIPad)
 
   return (
-    <div className="h-full scrollable px-4 pt-4 pb-24 space-y-6 lg:max-w-2xl lg:mx-auto lg:w-full">
+    <div className="h-full scrollable px-4 pt-4 pb-24 space-y-3 lg:max-w-2xl lg:mx-auto lg:w-full">
 
-      {/* Timer */}
-      <section>
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Timer</p>
+      {/* General — concurrent timers, week start, and (on phones) haptics live
+          together so they aren't lonely one-item categories (issue #60) */}
+      <AccordionSection
+        title="General"
+        icon={SlidersHorizontal}
+        open={openSection === 'general'}
+        onToggle={() => toggleSection('general')}
+      >
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <SettingsRow
             icon={Layers}
@@ -434,13 +534,6 @@ export default function SettingsView() {
               />
             }
           />
-        </div>
-      </section>
-
-      {/* Calendar */}
-      <section>
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Calendar</p>
-        <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <SettingsRow
             icon={Calendar}
             title="Week starts Monday"
@@ -453,12 +546,30 @@ export default function SettingsView() {
               />
             }
           />
+          {canHaptic && (
+            <SettingsRow
+              icon={Vibrate}
+              title="Haptic feedback"
+              subtitle="Vibrate on key actions and navigation"
+              right={
+                <Toggle
+                  ariaLabel="Haptic feedback"
+                  value={settings.hapticFeedback !== false}
+                  onChange={v => updateSetting('hapticFeedback', v)}
+                />
+              }
+            />
+          )}
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Appearance */}
-      <section>
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Appearance</p>
+      <AccordionSection
+        title="Appearance"
+        icon={Palette}
+        open={openSection === 'appearance'}
+        onToggle={() => toggleSection('appearance')}
+      >
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <SettingsRow
             icon={Monitor}
@@ -503,33 +614,175 @@ export default function SettingsView() {
             />
           </div>
         </div>
-      </section>
+      </AccordionSection>
 
-      {/* Feedback — haptics only surface where the device can vibrate */}
-      {canHaptic && (
-        <section>
-          <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Feedback</p>
-          <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
-            <SettingsRow
-              icon={Vibrate}
-              title="Haptic feedback"
-              subtitle="Vibrate on key actions and navigation"
-              right={
-                <Toggle
-                  ariaLabel="Haptic feedback"
-                  value={settings.hapticFeedback !== false}
-                  onChange={v => updateSetting('hapticFeedback', v)}
-                />
-              }
-            />
-          </div>
-        </section>
-      )}
+      {/* Reminders — local notifications (no backend); only deliver while the
+          app is open or installed (issue #54) */}
+      <AccordionSection
+        title="Reminders"
+        icon={Bell}
+        badge={remindersOn}
+        open={openSection === 'reminders'}
+        onToggle={() => toggleSection('reminders')}
+      >
+        <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
+          {!notifSupported ? (
+            <div className="px-4 py-4">
+              <p className="text-sm text-appText font-medium">Reminders aren't available here</p>
+              <p className="text-xs text-appTextMuted mt-0.5">
+                This browser doesn't support notifications. On iPhone or iPad, add PunchIn to your
+                Home Screen first, then reminders become available.
+              </p>
+            </div>
+          ) : (
+            <>
+              <SettingsRow
+                icon={Bell}
+                title="Reminders"
+                subtitle="Alerts fire while PunchIn is open or installed — keep it on your Home Screen for the most reliable nudges"
+                right={
+                  <Toggle
+                    ariaLabel="Enable reminders"
+                    value={remindersOn}
+                    onChange={handleRemindersToggle}
+                  />
+                }
+              />
+
+              {notifPerm === 'denied' && (
+                <div className="px-4 py-3 bg-red-500/5">
+                  <p className="text-xs text-red-400">
+                    Notifications are blocked. Allow notifications for PunchIn in your browser or
+                    device settings, then turn reminders on again.
+                  </p>
+                </div>
+              )}
+
+              {remindersOn && (
+                <>
+                  <ReminderRow
+                    icon={Hourglass}
+                    title="Long-running timer"
+                    subtitle="If a timer runs longer than your chosen time"
+                    enabled={settings.remindLongRunning !== false}
+                    onToggle={v => updateSetting('remindLongRunning', v)}
+                  >
+                    <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                      Notify after
+                      <input
+                        type="number"
+                        min="1"
+                        max="1440"
+                        value={settings.remindLongRunningMinutes ?? 60}
+                        onChange={e => updateSetting('remindLongRunningMinutes', Math.min(1440, Math.max(1, Number(e.target.value) || 60)))}
+                        aria-label="Minutes before a long-running timer reminder"
+                        className={`${reminderInputClass} w-16`}
+                      />
+                      minutes
+                    </label>
+                  </ReminderRow>
+
+                  <ReminderRow
+                    icon={AlarmClock}
+                    title="No timer running"
+                    subtitle="If nothing is tracking by a time of day"
+                    enabled={!!settings.remindIdle}
+                    onToggle={v => updateSetting('remindIdle', v)}
+                  >
+                    <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                      At
+                      <input
+                        type="time"
+                        value={settings.remindIdleTime || '09:00'}
+                        onChange={e => updateSetting('remindIdleTime', e.target.value)}
+                        aria-label="No-timer reminder time"
+                        className={reminderInputClass}
+                      />
+                    </label>
+                  </ReminderRow>
+
+                  <ReminderRow
+                    icon={CalendarClock}
+                    title="Timer still running"
+                    subtitle="If a timer is still going at a time of day"
+                    enabled={!!settings.remindStillRunning}
+                    onToggle={v => updateSetting('remindStillRunning', v)}
+                  >
+                    <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                      At
+                      <input
+                        type="time"
+                        value={settings.remindStillRunningTime || '17:00'}
+                        onChange={e => updateSetting('remindStillRunningTime', e.target.value)}
+                        aria-label="Still-running reminder time"
+                        className={reminderInputClass}
+                      />
+                    </label>
+                  </ReminderRow>
+
+                  <ReminderRow
+                    icon={CalendarCheck}
+                    title="Daily timesheet"
+                    subtitle="A nudge to review today's hours"
+                    enabled={!!settings.remindTimesheetDaily}
+                    onToggle={v => updateSetting('remindTimesheetDaily', v)}
+                  >
+                    <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                      At
+                      <input
+                        type="time"
+                        value={settings.remindTimesheetDailyTime || '17:00'}
+                        onChange={e => updateSetting('remindTimesheetDailyTime', e.target.value)}
+                        aria-label="Daily timesheet reminder time"
+                        className={reminderInputClass}
+                      />
+                    </label>
+                  </ReminderRow>
+
+                  <ReminderRow
+                    icon={CalendarCheck}
+                    title="Weekly timesheet"
+                    subtitle="A weekly nudge to submit your hours"
+                    enabled={!!settings.remindTimesheetWeekly}
+                    onToggle={v => updateSetting('remindTimesheetWeekly', v)}
+                  >
+                    <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                      On
+                      <select
+                        value={settings.remindTimesheetWeeklyDay ?? 5}
+                        onChange={e => updateSetting('remindTimesheetWeeklyDay', Number(e.target.value))}
+                        aria-label="Weekly timesheet reminder day"
+                        className={reminderInputClass}
+                      >
+                        {WEEKDAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                      at
+                      <input
+                        type="time"
+                        value={settings.remindTimesheetWeeklyTime || '16:00'}
+                        onChange={e => updateSetting('remindTimesheetWeeklyTime', e.target.value)}
+                        aria-label="Weekly timesheet reminder time"
+                        className={reminderInputClass}
+                      />
+                    </label>
+                  </ReminderRow>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </AccordionSection>
 
       {/* Install — behaviour adapts to the platform's install capabilities */}
       {(isInstalled || canInstall || isIOS) && (
-        <section>
-          <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Install</p>
+        <AccordionSection
+          title="Install"
+          icon={MonitorDown}
+          open={openSection === 'install'}
+          onToggle={() => toggleSection('install')}
+        >
           <div className="rounded-xl border border-appBorder bg-appCard overflow-hidden">
             {isInstalled ? (
               <SettingsRow
@@ -603,12 +856,16 @@ export default function SettingsView() {
               </>
             )}
           </div>
-        </section>
+        </AccordionSection>
       )}
 
       {/* Data */}
-      <section>
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Data</p>
+      <AccordionSection
+        title="Data"
+        icon={Database}
+        open={openSection === 'data'}
+        onToggle={() => toggleSection('data')}
+      >
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <button onClick={exportData}
             className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left border-b border-appBorderLight">
@@ -643,11 +900,15 @@ export default function SettingsView() {
             className="hidden"
           />
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Sync */}
-      <section>
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">Sync</p>
+      <AccordionSection
+        title="Sync"
+        icon={Cloud}
+        open={openSection === 'sync'}
+        onToggle={() => toggleSection('sync')}
+      >
         <div className="rounded-xl border border-appBorder bg-appCard overflow-hidden">
           {syncSettings?.syncProvider ? (
             <>
@@ -756,97 +1017,107 @@ export default function SettingsView() {
             </>
           )}
         </div>
-      </section>
+      </AccordionSection>
+
+      {/* Transfer — account-free device-to-device data move via link + QR (issue #77) */}
+      <AccordionSection
+        title="Transfer"
+        icon={Share2}
+        open={openSection === 'transfer'}
+        onToggle={() => toggleSection('transfer')}
+      >
+        <DataTransfer />
+      </AccordionSection>
 
       {/* Danger Zone */}
-      <section>
-        <button
-          onClick={() => { setDangerOpen(o => !o); setResetStage(null) }}
-          aria-expanded={dangerOpen}
-          className="flex items-center gap-2 mb-2 px-1 w-full group"
-        >
-          <p className="text-[10px] font-semibold text-red-400/70 uppercase tracking-widest">Danger Zone</p>
-          <ChevronDown className={`w-3 h-3 text-red-400/70 transition-transform ${dangerOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-        </button>
+      <AccordionSection
+        title="Danger Zone"
+        icon={AlertTriangle}
+        danger
+        open={openSection === 'danger'}
+        onToggle={() => toggleSection('danger')}
+      >
+        <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
+          {/* Clear entries */}
+          <button onClick={() => setShowClearConfirm(true)}
+            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group border-b border-appBorderLight">
+            <Trash2 className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-appText font-medium group-hover:text-red-400">Clear time entries</p>
+              <p className="text-xs text-appTextMuted mt-0.5">Permanent — jobs and types are kept</p>
+            </div>
+          </button>
 
-        {dangerOpen && (
-          <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
-            {/* Clear entries */}
-            <button onClick={() => setShowClearConfirm(true)}
-              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group border-b border-appBorderLight">
-              <Trash2 className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
+          {resetStage === null && (
+            <button
+              onClick={() => setResetStage('warn')}
+              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group">
+              <AlertTriangle className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
               <div>
-                <p className="text-sm text-appText font-medium group-hover:text-red-400">Clear time entries</p>
-                <p className="text-xs text-appTextMuted mt-0.5">Permanent — jobs and types are kept</p>
+                <p className="text-sm text-appText font-medium group-hover:text-red-400">Factory Reset</p>
+                <p className="text-xs text-appTextMuted mt-0.5">Erase all data and restore app to default state</p>
               </div>
             </button>
+          )}
 
-            {resetStage === null && (
-              <button
-                onClick={() => setResetStage('warn')}
-                className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group">
-                <AlertTriangle className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
+          {resetStage === 'warn' && (
+            <div className="px-4 py-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm text-appText font-medium group-hover:text-red-400">Factory Reset</p>
-                  <p className="text-xs text-appTextMuted mt-0.5">Erase all data and restore app to default state</p>
-                </div>
-              </button>
-            )}
-
-            {resetStage === 'warn' && (
-              <div className="px-4 py-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-appText font-medium">Reset to factory defaults?</p>
-                    <p className="text-xs text-appTextMuted mt-1">This will permanently delete all time entries, jobs, and labor types. Settings will be reset. This action cannot be undone.</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setResetStage('final')}
-                    className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors">
-                    Continue
-                  </button>
-                  <button
-                    onClick={() => setResetStage(null)}
-                    className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
-                    Cancel
-                  </button>
+                  <p className="text-sm text-appText font-medium">Reset to factory defaults?</p>
+                  <p className="text-xs text-appTextMuted mt-1">This will permanently delete all time entries, jobs, and labor types. Settings will be reset. This action cannot be undone.</p>
                 </div>
               </div>
-            )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setResetStage('final')}
+                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors">
+                  Continue
+                </button>
+                <button
+                  onClick={() => setResetStage(null)}
+                  className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
-            {resetStage === 'final' && (
-              <div className="px-4 py-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-red-400">There is no going back.</p>
-                    <p className="text-xs text-appTextMuted mt-1">Every entry, job, and labor type will be permanently erased. Are you absolutely sure?</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={factoryReset}
-                    className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
-                    Yes, wipe everything
-                  </button>
-                  <button
-                    onClick={() => setResetStage(null)}
-                    className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
-                    Cancel
-                  </button>
+          {resetStage === 'final' && (
+            <div className="px-4 py-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-400">There is no going back.</p>
+                  <p className="text-xs text-appTextMuted mt-1">Every entry, job, and labor type will be permanently erased. Are you absolutely sure?</p>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-      </section>
+              <div className="flex gap-2">
+                <button
+                  onClick={factoryReset}
+                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
+                  Yes, wipe everything
+                </button>
+                <button
+                  onClick={() => setResetStage(null)}
+                  className="flex-1 py-2 rounded-lg bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </AccordionSection>
 
       {/* About */}
-      <section>
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2 px-1">About</p>
+      <AccordionSection
+        title="About"
+        icon={Info}
+        badge={updateAvailable}
+        open={openSection === 'about'}
+        onToggle={() => toggleSection('about')}
+      >
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <a
             href="https://github.com/PunchIn-App/punchin"
@@ -908,7 +1179,7 @@ export default function SettingsView() {
             </div>
           </button>
         </div>
-      </section>
+      </AccordionSection>
 
       {showClearConfirm && (
         <ConfirmModal

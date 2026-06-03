@@ -4,9 +4,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['Syne', 'sans-serif'],
-        sans: ['DM Sans', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'monospace'],
+        display: ['"Noto Sans Display"', '"Noto Sans"', 'sans-serif'],
+        sans: ['"Noto Sans"', 'sans-serif'],
+        mono: ['"Noto Sans Mono"', 'monospace'],
       },
       colors: {
         appBg:           'var(--bg-primary)',

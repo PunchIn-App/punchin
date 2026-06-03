@@ -1,6 +1,12 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import SettingsView from './SettingsView'
 
+// Settings are grouped into a single-open accordion (issue #60); a section's
+// content only renders once its header is expanded. This opens a section by
+// clicking its header button (matched on the exact title).
+const expand = (label) =>
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}$`, 'i') }))
+
 const mockUpdateSetting       = vi.fn()
 const mockDbJobsToArray       = vi.fn().mockResolvedValue([])
 const mockDbEntriesToArray    = vi.fn().mockResolvedValue([])
@@ -96,13 +102,30 @@ beforeEach(() => {
 })
 
 describe('SettingsView — section rendering', () => {
-  it('renders Timer, Calendar, Appearance, Data, and About section labels', () => {
+  it('renders General, Appearance, Data, Sync, and About section headers', () => {
     render(<SettingsView />)
-    expect(screen.getByText('Timer')).toBeInTheDocument()
-    expect(screen.getByText('Calendar')).toBeInTheDocument()
-    expect(screen.getByText('Appearance')).toBeInTheDocument()
-    expect(screen.getByText('Data')).toBeInTheDocument()
-    expect(screen.getByText('About')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^general$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^appearance$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^data$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^sync$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^about$/i })).toBeInTheDocument()
+  })
+
+  it('sections are collapsed by default (single-open accordion)', () => {
+    render(<SettingsView />)
+    // Content from collapsed sections is not rendered until expanded.
+    expect(screen.queryByRole('switch', { name: /allow concurrent timers/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Clear time entries')).not.toBeInTheDocument()
+  })
+
+  it('opening one section closes the previously open one', () => {
+    render(<SettingsView />)
+    expand('General')
+    expect(screen.getByRole('switch', { name: /allow concurrent timers/i })).toBeInTheDocument()
+    expand('Data')
+    // General collapsed when Data opened
+    expect(screen.queryByRole('switch', { name: /allow concurrent timers/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Export data')).toBeInTheDocument()
   })
 
   it('Danger Zone section is collapsed by default', () => {
@@ -114,6 +137,7 @@ describe('SettingsView — section rendering', () => {
 describe('SettingsView — Toggle', () => {
   it('renders Allow concurrent timers switch with aria-checked=false', () => {
     render(<SettingsView />)
+    expand('General')
     const toggle = screen.getByRole('switch', { name: /allow concurrent timers/i })
     expect(toggle).toBeInTheDocument()
     expect(toggle).toHaveAttribute('aria-checked', 'false')
@@ -121,17 +145,20 @@ describe('SettingsView — Toggle', () => {
 
   it('calls updateSetting when concurrent timers toggle is clicked', () => {
     render(<SettingsView />)
+    expand('General')
     fireEvent.click(screen.getByRole('switch', { name: /allow concurrent timers/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('allowConcurrentTimers', true)
   })
 
   it('renders Week starts Monday switch with aria-checked=true', () => {
     render(<SettingsView />)
+    expand('General')
     expect(screen.getByRole('switch', { name: /week starts monday/i })).toHaveAttribute('aria-checked', 'true')
   })
 
   it('calls updateSetting when week start toggle is clicked', () => {
     render(<SettingsView />)
+    expand('General')
     fireEvent.click(screen.getByRole('switch', { name: /week starts monday/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('weekStartsMonday', false)
   })
@@ -140,6 +167,7 @@ describe('SettingsView — Toggle', () => {
 describe('SettingsView — Theme', () => {
   it('renders Auto, Light, and Dark theme buttons', () => {
     render(<SettingsView />)
+    expand('Appearance')
     expect(screen.getByRole('button', { name: /^auto$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^light$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^dark$/i })).toBeInTheDocument()
@@ -147,18 +175,21 @@ describe('SettingsView — Theme', () => {
 
   it('calls updateSetting("theme", "dark") when Dark is clicked', () => {
     render(<SettingsView />)
+    expand('Appearance')
     fireEvent.click(screen.getByRole('button', { name: /^dark$/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('theme', 'dark')
   })
 
   it('calls updateSetting("theme", "light") when Light is clicked', () => {
     render(<SettingsView />)
+    expand('Appearance')
     fireEvent.click(screen.getByRole('button', { name: /^light$/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('theme', 'light')
   })
 
   it('calls updateSetting("theme", "auto") when Auto is clicked', () => {
     render(<SettingsView />)
+    expand('Appearance')
     fireEvent.click(screen.getByRole('button', { name: /^auto$/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('theme', 'auto')
   })
@@ -167,11 +198,13 @@ describe('SettingsView — Theme', () => {
 describe('SettingsView — Accent color', () => {
   it('renders the ColorPicker', () => {
     render(<SettingsView />)
+    expand('Appearance')
     expect(screen.getByTestId('color-picker')).toBeInTheDocument()
   })
 
   it('calls updateSetting("accentColor", ...) when color changes', () => {
     render(<SettingsView />)
+    expand('Appearance')
     fireEvent.click(screen.getByTestId('color-picker'))
     expect(mockUpdateSetting).toHaveBeenCalledWith('accentColor', '#FF0000')
   })
@@ -180,24 +213,28 @@ describe('SettingsView — Accent color', () => {
 describe('SettingsView — Data export', () => {
   it('calls db.jobs.toArray when Export data is clicked', async () => {
     render(<SettingsView />)
+    expand('Data')
     fireEvent.click(screen.getByText('Export data'))
     await waitFor(() => expect(mockDbJobsToArray).toHaveBeenCalled())
   })
 
   it('calls URL.createObjectURL when Export data is clicked', async () => {
     render(<SettingsView />)
+    expand('Data')
     fireEvent.click(screen.getByText('Export data'))
     await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled())
   })
 
   it('calls db.entries.toArray when Export CSV is clicked', async () => {
     render(<SettingsView />)
+    expand('Data')
     fireEvent.click(screen.getByText('Export CSV'))
     await waitFor(() => expect(mockDbEntriesToArray).toHaveBeenCalled())
   })
 
   it('calls URL.createObjectURL when Export CSV is clicked', async () => {
     render(<SettingsView />)
+    expand('Data')
     fireEvent.click(screen.getByText('Export CSV'))
     await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled())
   })
@@ -206,6 +243,7 @@ describe('SettingsView — Data export', () => {
 describe('SettingsView — Data import', () => {
   it('triggers the hidden file input when Import data is clicked', () => {
     render(<SettingsView />)
+    expand('Data')
     const input = document.querySelector('input[type="file"]')
     const clickSpy = vi.spyOn(input, 'click').mockImplementation(() => {})
     fireEvent.click(screen.getByText('Import data'))
@@ -214,6 +252,7 @@ describe('SettingsView — Data import', () => {
 
   it('shows alert for invalid JSON', async () => {
     render(<SettingsView />)
+    expand('Data')
     const input = document.querySelector('input[type="file"]')
     const file = new File(['not json'], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -225,6 +264,7 @@ describe('SettingsView — Data import', () => {
 
   it('shows alert for invalid backup file structure', async () => {
     render(<SettingsView />)
+    expand('Data')
     const input = document.querySelector('input[type="file"]')
     const file = new File([JSON.stringify({ version: 1 })], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -242,6 +282,7 @@ describe('SettingsView — Data import', () => {
       laborTypes: [],
     })
     render(<SettingsView />)
+    expand('Data')
     const input = document.querySelector('input[type="file"]')
     const file = new File([backup], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -358,22 +399,26 @@ describe('SettingsView — Danger Zone', () => {
 describe('SettingsView — About', () => {
   it('renders version info', () => {
     render(<SettingsView />)
+    expand('About')
     expect(screen.getByText(/v\d+\.\d+\.\d+/)).toBeInTheDocument()
   })
 
   it('renders Changelog button', () => {
     render(<SettingsView />)
+    expand('About')
     expect(screen.getByText('Changelog')).toBeInTheDocument()
   })
 
   it('opens ChangelogModal when Changelog is clicked', () => {
     render(<SettingsView />)
+    expand('About')
     fireEvent.click(screen.getByText('Changelog'))
     expect(screen.getByTestId('changelog-modal')).toBeInTheDocument()
   })
 
   it('closes ChangelogModal when it requests close', () => {
     render(<SettingsView />)
+    expand('About')
     fireEvent.click(screen.getByText('Changelog'))
     fireEvent.click(screen.getByText('close-changelog'))
     expect(screen.queryByTestId('changelog-modal')).not.toBeInTheDocument()
@@ -381,11 +426,13 @@ describe('SettingsView — About', () => {
 
   it('renders Check for updates button', () => {
     render(<SettingsView />)
+    expand('About')
     expect(screen.getByText('Check for updates')).toBeInTheDocument()
   })
 
   it('shows "Already up to date" after clicking Check for updates (no service worker)', async () => {
     render(<SettingsView />)
+    expand('About')
     fireEvent.click(screen.getByText('Check for updates'))
     await waitFor(() => expect(screen.getByText('Already up to date')).toBeInTheDocument())
   })
@@ -400,6 +447,7 @@ describe('SettingsView — check for updates (service worker)', () => {
       configurable: true,
     })
     render(<SettingsView />)
+    expand('About')
     fireEvent.click(screen.getByText('Check for updates'))
     await waitFor(() => expect(screen.getByText('Already up to date')).toBeInTheDocument())
     // restore: remove the mock so other tests see no serviceWorker
@@ -415,6 +463,7 @@ describe('SettingsView — check for updates (service worker)', () => {
       configurable: true,
     })
     render(<SettingsView />)
+    expand('About')
     await waitFor(() => expect(screen.getByText('Update available')).toBeInTheDocument())
     const button = screen.getByText('Update available').closest('button')
     expect(button).not.toBeDisabled()
@@ -436,6 +485,7 @@ describe('SettingsView — check for updates (service worker)', () => {
       configurable: true,
     })
     render(<SettingsView />)
+    expand('About')
     fireEvent.click(screen.getByText('Check for updates'))
 
     // Once the update is found the button must reflect "Update available"...
@@ -464,6 +514,7 @@ describe('SettingsView — Data import: edge cases', () => {
       laborTypes: [{ id: 5, name: 'Design', color: '#6366F1' }],
     })
     render(<SettingsView />)
+    expand('Data')
     const input = document.querySelector('input[type="file"]')
     const file = new File([backup], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -493,6 +544,7 @@ describe('SettingsView — Data import: edge cases', () => {
       laborTypes: [],
     })
     render(<SettingsView />)
+    expand('Data')
     const input = document.querySelector('input[type="file"]')
     const file = new File([backup], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -526,13 +578,14 @@ describe('SettingsView — Danger Zone: cancel at final stage', () => {
 })
 
 describe('SettingsView — Sync section', () => {
-  it('renders Sync section label', () => {
+  it('renders Sync section header', () => {
     render(<SettingsView />)
-    expect(screen.getByText('Sync')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^sync$/i })).toBeInTheDocument()
   })
 
   it('shows disconnected state with provider buttons when client IDs are configured', () => {
     render(<SettingsView />)
+    expand('Sync')
     expect(screen.getByText('Sync across devices')).toBeInTheDocument()
     expect(screen.getByText('GitHub Gist')).toBeInTheDocument()
     expect(screen.getByText('Google Drive')).toBeInTheDocument()
@@ -545,8 +598,9 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    await waitFor(() => expect(screen.getByText('GitHub Gist')).toBeInTheDocument())
-    expect(screen.getByRole('button', { name: /Sync Now/i })).toBeInTheDocument()
+    expand('Sync')
+    expect(await screen.findByRole('button', { name: /Sync Now/i })).toBeInTheDocument()
+    expect(screen.getByText('GitHub Gist')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Disconnect/i })).toBeInTheDocument()
   })
 
@@ -556,7 +610,8 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument())
+    expand('Sync')
+    expect(await screen.findByText('Connected')).toBeInTheDocument()
   })
 
   it('shows connected state for Google Drive', async () => {
@@ -565,7 +620,12 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    await waitFor(() => expect(screen.getByText('Google Drive')).toBeInTheDocument())
+    expand('Sync')
+    // Wait on a connected-only sentinel so the async live-query settle is
+    // observed before asserting the provider label (which also appears as a
+    // connect button in the disconnected state).
+    await screen.findByRole('button', { name: /Sync Now/i })
+    expect(screen.getByText('Google Drive')).toBeInTheDocument()
     expect(screen.getByText(/Never synced/)).toBeInTheDocument()
   })
 
@@ -575,7 +635,9 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: Date.now() - 30000 },
     ])
     render(<SettingsView />)
-    await waitFor(() => expect(screen.getByText('OneDrive')).toBeInTheDocument())
+    expand('Sync')
+    await screen.findByRole('button', { name: /Sync Now/i })
+    expect(screen.getByText('OneDrive')).toBeInTheDocument()
     expect(screen.getByText(/Just now/)).toBeInTheDocument()
   })
 
@@ -585,7 +647,8 @@ describe('SettingsView — Sync section', () => {
       { key: 'syncTokenExpiry', value: Date.now() - 1000 },
     ])
     render(<SettingsView />)
-    await waitFor(() => expect(screen.getByText(/Token expired/)).toBeInTheDocument())
+    expand('Sync')
+    expect(await screen.findByText(/Token expired/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sync Now/i })).toBeDisabled()
   })
 
@@ -596,7 +659,8 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    await waitFor(() => expect(screen.getByText('GitHub 401')).toBeInTheDocument())
+    expand('Sync')
+    expect(await screen.findByText('GitHub 401')).toBeInTheDocument()
   })
 
   it('calls runSync when Sync Now is clicked', async () => {
@@ -605,8 +669,8 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    await waitFor(() => screen.getByRole('button', { name: /Sync Now/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Sync Now/i }))
+    expand('Sync')
+    fireEvent.click(await screen.findByRole('button', { name: /Sync Now/i }))
     await waitFor(() => expect(mockRunSync).toHaveBeenCalled())
   })
 
@@ -616,8 +680,8 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    await waitFor(() => screen.getByRole('button', { name: /Disconnect/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Disconnect/i }))
+    expand('Sync')
+    fireEvent.click(await screen.findByRole('button', { name: /Disconnect/i }))
     // A confirmation dialog appears (replaces the old window.confirm)
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Disconnect sync?')).toBeInTheDocument()
@@ -631,8 +695,8 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    await waitFor(() => screen.getByRole('button', { name: /Disconnect/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Disconnect/i }))
+    expand('Sync')
+    fireEvent.click(await screen.findByRole('button', { name: /Disconnect/i }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /Cancel/i }))
     expect(mockDisconnectSync).not.toHaveBeenCalled()

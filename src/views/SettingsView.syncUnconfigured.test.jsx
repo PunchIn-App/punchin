@@ -1,5 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import SettingsView from './SettingsView'
+
+// Sync now lives inside a collapsible accordion section (issue #60); expand it
+// before asserting on its contents.
+const expandSync = () =>
+  fireEvent.click(screen.getByRole('button', { name: /^sync$/i }))
 
 // Mirrors a production build with NO VITE_*_CLIENT_ID set — every provider
 // clientId is empty, so the Sync section must fall back to the friendly
@@ -49,18 +54,21 @@ vi.mock('../sync/providers/onedrive', () => ({ buildOneDriveOAuthUrl: () => '' }
 describe('SettingsView — Sync section with no providers configured', () => {
   it('shows the friendly "not set up" message instead of env-var instructions', () => {
     render(<SettingsView />)
+    expandSync()
     expect(screen.getByText(/Sync isn’t set up on this version/)).toBeInTheDocument()
     expect(screen.getByText(/hasn’t been configured for this deployment/)).toBeInTheDocument()
   })
 
   it('does not leak developer env-var names into the UI', () => {
     render(<SettingsView />)
+    expandSync()
     expect(screen.queryByText(/VITE_GITHUB_CLIENT_ID/)).not.toBeInTheDocument()
     expect(screen.queryByText(/\.env\.example/)).not.toBeInTheDocument()
   })
 
   it('renders no provider connect buttons', () => {
     render(<SettingsView />)
+    expandSync()
     expect(screen.queryByText('GitHub Gist')).not.toBeInTheDocument()
     expect(screen.queryByText('Google Drive')).not.toBeInTheDocument()
     expect(screen.queryByText('OneDrive')).not.toBeInTheDocument()
