@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.15.2] — 2026-06-03
+
+### Changed
+- Internal — upgraded core dependencies to their latest major versions: React 19, Vite 8, Tailwind CSS 4, Dexie 4, Recharts 3, date-fns 4, lucide-react 1, and @vitejs/plugin-react 6. No user-facing changes. (internal)
+
+---
+
 ## [0.15.1] — 2026-06-03
 
 ### Changed
