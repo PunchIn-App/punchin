@@ -61,4 +61,21 @@ describe('useReminders', () => {
     await new Promise(r => setTimeout(r, 20))
     expect(mockShow).not.toHaveBeenCalled()
   })
+
+  it('starts firing when permission is granted mid-session (#160)', async () => {
+    h.settings = { remindersEnabled: true, remindLongRunning: true, remindLongRunningMinutes: 60 }
+    h.entries = [{ id: 1, jobId: 1, punchIn: new Date(Date.now() - 90 * 60000) }]
+    h.jobs = [{ id: 1, name: 'Acme' }]
+    h.perm = 'default'
+    renderHook(() => useReminders())
+    await new Promise(r => setTimeout(r, 20))
+    expect(mockShow).not.toHaveBeenCalled() // not granted yet — but the scheduler is installed
+
+    // Grant permission, then a visibility change re-runs the scheduler (which the
+    // old code never installed because the effect early-returned on permission).
+    h.perm = 'granted'
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(mockShow).toHaveBeenCalled())
+  })
 })
