@@ -63,6 +63,9 @@ beforeEach(() => {
   document.documentElement.classList.remove('light')
   document.documentElement.style.removeProperty('--accent-rgb')
   window.location.hash = ''
+  // Reset the global history state so back-button / OAuth tests can't leak state
+  // into each other and become order-dependent.
+  window.history.replaceState(null, '')
   mockUseSettings.mockReturnValue({
     settings: { theme: 'dark', accentColor: '#F59E0B' },
     updateSetting: vi.fn(),
@@ -210,7 +213,10 @@ describe('App — OAuth callback handling', () => {
   it('closes the confirmation on Escape without saving', async () => {
     window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
     render(<App />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
+    // Flush effects so the dialog's document-level Escape listener is attached
+    // before we dispatch the key — otherwise the keydown can race the listener.
+    await act(async () => {})
     await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -371,7 +377,10 @@ describe('App — transfer link import (#77)', () => {
     mockDecodeSnapshot.mockRejectedValue(new Error('bad'))
     window.location.hash = '#import=gBAD'
     render(<App />)
-    await new Promise(r => setTimeout(r, 20))
+    // Deterministic: wait for the decode to be attempted, then let its rejection
+    // settle, instead of sleeping a fixed time and asserting a negative.
+    await waitFor(() => expect(mockDecodeSnapshot).toHaveBeenCalledWith('gBAD'))
+    await act(async () => {})
     expect(screen.queryByText('Import shared data?')).not.toBeInTheDocument()
   })
 })
