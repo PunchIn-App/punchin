@@ -700,3 +700,73 @@ describe('runSync — merge with delete tombstones', () => {
     expect(await db.entries.toArray()).toHaveLength(1) // newer local edit wins
   })
 })
+
+// ---------------------------------------------------------------------------
+// runSync — merge: edit last-write-wins (issue #119)
+// ---------------------------------------------------------------------------
+
+describe('runSync — merge entry edits (last-write-wins)', () => {
+  async function seedEntry(updatedAt, notes = 'old') {
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false })
+    const jobId = await db.jobs.add({ name: 'Client Project', isActive: true, laborRates: {} })
+    const id = await db.entries.add({
+      jobId, laborTypeId: ltId,
+      punchIn: new Date('2025-01-01T09:00:00.000Z'),
+      punchOut: new Date('2025-01-01T10:00:00.000Z'),
+      notes, updatedAt,
+    })
+    const [lt, job, entry] = await Promise.all([
+      db.laborTypes.get(ltId), db.jobs.get(jobId), db.entries.get(id),
+    ])
+    return { id, lt, job, entry }
+  }
+
+  it('applies a remote edit in place when its updatedAt is newer (edit propagates, no duplicate)', async () => {
+    await seedSyncSettings()
+    const { lt, job, entry } = await seedEntry(1000)
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Design', color: '#6366F1' }],
+      jobs: [{ id: 200, uuid: job.uuid, name: 'Client Project', laborTypeId: 100, isActive: true }],
+      entries: [{
+        uuid: entry.uuid, jobId: 200, laborTypeId: 100,
+        punchIn: '2025-01-01T09:30:00.000Z', // edited
+        punchOut: '2025-01-01T11:00:00.000Z', // edited
+        notes: 'edited', updatedAt: 5000,
+      }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const entries = await db.entries.toArray()
+    expect(entries).toHaveLength(1) // updated in place, not duplicated
+    expect(entries[0].notes).toBe('edited')
+    expect(new Date(entries[0].punchIn).toISOString()).toBe('2025-01-01T09:30:00.000Z')
+    expect(entries[0].updatedAt).toBe(5000)
+  })
+
+  it('ignores a remote edit that is older than the local copy', async () => {
+    await seedSyncSettings()
+    const { lt, job, entry } = await seedEntry(5000, 'local-newer')
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Design', color: '#6366F1' }],
+      jobs: [{ id: 200, uuid: job.uuid, name: 'Client Project', laborTypeId: 100, isActive: true }],
+      entries: [{
+        uuid: entry.uuid, jobId: 200, laborTypeId: 100,
+        punchIn: '2025-01-01T08:00:00.000Z', punchOut: '2025-01-01T09:00:00.000Z',
+        notes: 'stale', updatedAt: 1000,
+      }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const entries = await db.entries.toArray()
+    expect(entries).toHaveLength(1)
+    expect(entries[0].notes).toBe('local-newer') // local kept
+  })
+})

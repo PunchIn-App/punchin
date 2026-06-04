@@ -115,9 +115,16 @@ async function mergeSnapshot(remote) {
         const deletedAt = tomb.get(entry.uuid)
         if (deletedAt != null && deletedAt >= (entry.updatedAt ?? 0)) continue
       }
-      const dup = entry.uuid
-        ? liveEntries.some(e => e.uuid === entry.uuid)
-        : liveEntries.some(e =>
+      const fields = {
+        jobId: newJobId,
+        laborTypeId: newLtId,
+        punchIn: new Date(entry.punchIn),
+        punchOut: entry.punchOut ? new Date(entry.punchOut) : null,
+        notes: entry.notes ?? null,
+      }
+      const local = entry.uuid
+        ? liveEntries.find(e => e.uuid === entry.uuid)
+        : liveEntries.find(e =>
             e.jobId === newJobId &&
             e.laborTypeId === newLtId &&
             new Date(e.punchIn).getTime() === new Date(entry.punchIn).getTime() &&
@@ -125,18 +132,20 @@ async function mergeSnapshot(remote) {
               ? new Date(e.punchOut).getTime() === new Date(entry.punchOut).getTime()
               : e.punchOut === entry.punchOut)
           )
-      if (!dup) {
-        const newId = await db.entries.add({
-          jobId: newJobId,
-          laborTypeId: newLtId,
-          punchIn: new Date(entry.punchIn),
-          punchOut: entry.punchOut ? new Date(entry.punchOut) : null,
-          notes: entry.notes ?? null,
-          uuid: entry.uuid, updatedAt: entry.updatedAt,
-        })
-        liveEntries.push({ id: newId, uuid: entry.uuid, jobId: newJobId, laborTypeId: newLtId, punchIn: new Date(entry.punchIn), punchOut: entry.punchOut ? new Date(entry.punchOut) : null })
-        imported++
+      if (local) {
+        // Last-write-wins (issue #119): apply the remote edit in place when it is
+        // newer than the local copy. Only uuid-matched records can resolve this;
+        // legacy value-matched entries are left as-is (a field change wouldn't
+        // value-match anyway, and they carry no updatedAt to compare).
+        if (entry.uuid && (entry.updatedAt ?? 0) > (local.updatedAt ?? 0)) {
+          await db.entries.update(local.id, { ...fields, updatedAt: entry.updatedAt })
+          Object.assign(local, fields, { updatedAt: entry.updatedAt })
+        }
+        continue
       }
+      const newId = await db.entries.add({ ...fields, uuid: entry.uuid, updatedAt: entry.updatedAt })
+      liveEntries.push({ id: newId, uuid: entry.uuid, updatedAt: entry.updatedAt, ...fields })
+      imported++
     }
     return imported
   })
