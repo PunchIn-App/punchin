@@ -14,7 +14,7 @@ import { db, defaultSettingsRows } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { runSync, disconnectSync } from '../sync/syncManager'
+import { runSync, disconnectSync, importSnapshot } from '../sync/syncManager'
 import { buildGitHubOAuthUrl } from '../sync/providers/github'
 import { buildGoogleOAuthUrl } from '../sync/providers/google'
 import { buildOneDriveOAuthUrl } from '../sync/providers/onedrive'
@@ -176,18 +176,6 @@ function PanelGroup({ title, danger, children }) {
   )
 }
 
-// Exported for unit testing — pure predicate with no DB dependency
-export function isEntryDuplicate(backupEntry, existingEntries, newJobId, newLtId) {
-  return existingEntries.some(e =>
-    e.jobId === newJobId &&
-    e.laborTypeId === newLtId &&
-    new Date(e.punchIn).getTime() === new Date(backupEntry.punchIn).getTime() &&
-    (e.punchOut && backupEntry.punchOut
-      ? new Date(e.punchOut).getTime() === new Date(backupEntry.punchOut).getTime()
-      : e.punchOut === backupEntry.punchOut)
-  )
-}
-
 const PROVIDER_LABEL = { github: 'GitHub Gist', google: 'Google Drive', onedrive: 'OneDrive' }
 
 function formatLastSync(ts) {
@@ -332,70 +320,11 @@ export default function SettingsView() {
         return
       }
 
-      await db.transaction('rw', [db.laborTypes, db.jobs, db.entries], async () => {
-        // 1. Import Labor Types
-        const ltMap = {} // oldID -> newID
-        const existingLts = await db.laborTypes.toArray()
-
-        for (const backupLt of data.laborTypes) {
-          const matched = existingLts.find(lt => lt.name.toLowerCase() === backupLt.name.toLowerCase())
-          if (matched) {
-            ltMap[backupLt.id] = matched.id
-          } else {
-            const newId = await db.laborTypes.add({
-              name: backupLt.name,
-              color: backupLt.color
-            })
-            ltMap[backupLt.id] = newId
-          }
-        }
-
-        // 2. Import Jobs
-        const jobMap = {} // oldID -> newID
-        const existingJobs = await db.jobs.toArray()
-
-        for (const backupJob of data.jobs) {
-          const matched = existingJobs.find(j => j.name.toLowerCase() === backupJob.name.toLowerCase())
-          if (matched) {
-            jobMap[backupJob.id] = matched.id
-          } else {
-            const newLtId = backupJob.laborTypeId ? ltMap[backupJob.laborTypeId] : null
-            const newId = await db.jobs.add({
-              name: backupJob.name,
-              clientName: backupJob.clientName || null,
-              laborTypeId: newLtId,
-              isActive: backupJob.isActive !== false
-            })
-            jobMap[backupJob.id] = newId
-          }
-        }
-
-        // 3. Import Entries
-        const existingEntries = await db.entries.toArray()
-        let importedCount = 0
-
-        for (const backupEntry of data.entries) {
-          const newJobId = jobMap[backupEntry.jobId]
-          const newLtId = backupEntry.laborTypeId ? ltMap[backupEntry.laborTypeId] : null
-
-          if (!newJobId) continue
-
-          const isDuplicate = isEntryDuplicate(backupEntry, existingEntries, newJobId, newLtId)
-
-          if (!isDuplicate) {
-            await db.entries.add({
-              jobId: newJobId,
-              laborTypeId: newLtId,
-              punchIn: new Date(backupEntry.punchIn),
-              punchOut: backupEntry.punchOut ? new Date(backupEntry.punchOut) : null,
-              notes: backupEntry.notes || null
-            })
-            importedCount++
-          }
-        }
-
-        alert(`Import successful!\nRestored: ${importedCount} new time entries.`)
-      })
+      // Reuse the cloud-sync merge instead of a second hand-rolled dedup: same
+      // {version,jobs,entries,laborTypes} shape, and a single place to maintain
+      // the uuid/name matching, tombstones and last-write-wins (issue #145).
+      const importedCount = await importSnapshot(data)
+      alert(`Import successful!\nRestored: ${importedCount} new time entries.`)
     } catch (err) {
       console.error(err)
       alert('Error importing data: ' + err.message)

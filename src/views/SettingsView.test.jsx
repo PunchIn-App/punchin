@@ -107,10 +107,12 @@ vi.mock('../components/ChangelogModal', () => ({
 
 const mockRunSync = vi.fn().mockResolvedValue(Date.now())
 const mockDisconnectSync = vi.fn().mockResolvedValue(undefined)
+const mockImportSnapshot = vi.fn().mockResolvedValue(0)
 
 vi.mock('../sync/syncManager', () => ({
   runSync: (...args) => mockRunSync(...args),
   disconnectSync: (...args) => mockDisconnectSync(...args),
+  importSnapshot: (...args) => mockImportSnapshot(...args),
 }))
 
 vi.mock('../sync/config', () => ({
@@ -340,7 +342,10 @@ describe('SettingsView — Data import', () => {
     )
   })
 
-  it('shows success alert and adds job for a valid backup', async () => {
+  it('delegates a valid backup to importSnapshot and reports the restored count', async () => {
+    // Dedup/merge now lives solely in syncManager.mergeSnapshot (issue #145);
+    // handleImport just validates the shape and forwards the snapshot.
+    mockImportSnapshot.mockResolvedValueOnce(2)
     const backup = JSON.stringify({
       version: 1,
       jobs: [{ id: 1, name: 'Imported Job', isActive: true }],
@@ -354,11 +359,12 @@ describe('SettingsView — Data import', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     fireEvent.change(input)
     await waitFor(() =>
-      expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('Import successful'))
+      expect(mockImportSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({ version: 1, jobs: expect.any(Array), entries: expect.any(Array), laborTypes: expect.any(Array) })
+      )
     )
-    expect(mockDbJobsAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Imported Job' })
-    )
+    expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('Import successful'))
+    expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('2 new time entries'))
   })
 })
 
@@ -628,62 +634,8 @@ describe('SettingsView — check for updates (service worker)', () => {
   })
 })
 
-// ─── Data import: edge cases ──────────────────────────────────────────────────
-
-describe('SettingsView — Data import: edge cases', () => {
-  it('does not call db.laborTypes.add when labor type name matches an existing one', async () => {
-    // Existing DB already has a labor type named 'Design' — backup has same name → matched, no add
-    mockDbLaborTypesToArray.mockResolvedValue([{ id: 1, name: 'Design', color: '#6366F1' }])
-    const backup = JSON.stringify({
-      version: 1,
-      jobs: [],
-      entries: [],
-      laborTypes: [{ id: 5, name: 'Design', color: '#6366F1' }],
-    })
-    render(<SettingsView />)
-    expand('Data & Sync')
-    const input = document.querySelector('input[type="file"]')
-    const file = new File([backup], 'backup.json', { type: 'application/json' })
-    Object.defineProperty(input, 'files', { value: [file], configurable: true })
-    fireEvent.change(input)
-    await waitFor(() =>
-      expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('Import successful'))
-    )
-    expect(mockDbLaborTypesAdd).not.toHaveBeenCalled()
-  })
-
-  it('imports an entry when its job matches an existing job by name', async () => {
-    // Existing DB has 'Acme Corp'; backup has same job name and an entry for it
-    mockDbJobsToArray.mockResolvedValue([{ id: 1, name: 'Acme Corp', isActive: true }])
-    mockDbLaborTypesToArray.mockResolvedValue([])
-    mockDbEntriesToArray.mockResolvedValue([])
-    const backup = JSON.stringify({
-      version: 1,
-      jobs: [{ id: 1, name: 'Acme Corp', isActive: true }],
-      entries: [
-        {
-          jobId: 1,
-          laborTypeId: null,
-          punchIn: '2025-06-01T09:00:00.000Z',
-          punchOut: '2025-06-01T10:00:00.000Z',
-        },
-      ],
-      laborTypes: [],
-    })
-    render(<SettingsView />)
-    expand('Data & Sync')
-    const input = document.querySelector('input[type="file"]')
-    const file = new File([backup], 'backup.json', { type: 'application/json' })
-    Object.defineProperty(input, 'files', { value: [file], configurable: true })
-    fireEvent.change(input)
-    await waitFor(() =>
-      expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('1 new time entries'))
-    )
-    expect(mockDbEntriesAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ jobId: 1 })
-    )
-  })
-})
+// Merge/dedup edge cases (name matching, entry dedup) now live with the single
+// implementation in src/sync/syncManager.test.js (issue #145).
 
 // ─── Danger Zone: cancel at final stage ──────────────────────────────────────
 

@@ -155,9 +155,8 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/views/AnalyticsView.test.jsx` | Loading state, period toggle, summary cards, empty state, charts |
 | `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
 | `src/views/SettingsView.test.jsx` | Drill-in root list + sub-pages, device-Back/Settings-tab-reselect returns to root, Data & Sync consolidation, toggles, theme, export/import, sync UI, danger zone, About rows (help-improve, License modal, Support link) |
-| `src/views/SettingsView.bugReport.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` (template/scope/URL) — browser/OS/device/install-type detection |
+| `src/utils/issueUrl.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` (template/scope/URL) — browser/OS/device/install-type detection |
 | `src/views/SettingsView.syncUnconfigured.test.jsx` | Sync section with empty client IDs: friendly "not set up" message, no env-var jargon, no provider buttons (issue #59) |
-| `src/views/SettingsView.dedup.test.js` | `isEntryDuplicate` (backup import dedup logic) |
 | `src/views/SettingsView.haptics.test.jsx` | `hapticFeedback` toggle shown on iPhone/Android, hidden on iPad (no vibration motor) and web, toggles the setting (issue #65) |
 | `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles, per-reminder `WeekdayPicker` (renders, toggling a day, clearing the last day turns the reminder off + restores all days) |
 | `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
