@@ -33,23 +33,42 @@ export async function fetchGitHubUser(token) {
   return res.json()
 }
 
+// Safety bound on how many gist pages to scan (~10k gists). Prevents an
+// unbounded loop while being far above any realistic account size — replaces
+// the old hard 3-page (300-gist) cap that could miss a PunchIn gist for users
+// with many gists.
+const MAX_GIST_PAGES = 100
+
 export async function findExistingPunchInGist(token) {
-  for (let page = 1; page <= 3; page++) {
+  // The marker file (`- PunchIn Sync`) is the authoritative signal that a gist
+  // is PunchIn's. A gist that merely contains a `punchin-data-*` file (e.g. an
+  // unrelated `punchin-data-notes.json`) or the legacy `punchin-data.json` is
+  // only a *fallback* — adopted solely when no marker-bearing gist exists
+  // anywhere in the account. So we must scan every page before settling for a
+  // fallback, but can return a marker match the moment we see one.
+  let fallback = null
+  for (let page = 1; page <= MAX_GIST_PAGES; page++) {
     const res = await fetch(`https://api.github.com/gists?per_page=100&page=${page}`, {
       headers: { Authorization: `Bearer ${token}`, ...GH_HEADERS },
     })
     if (!res.ok) throw new Error(`GitHub ${res.status}`)
     const gists = await res.json()
     if (gists.length === 0) break
-    const found = gists.find(g =>
-      MARKER_FILENAME in g.files ||
-      LEGACY_FILENAME in g.files ||
-      Object.keys(g.files).some(f => f.startsWith(DATA_PREFIX + '-'))
-    )
-    if (found) return found.id
+
+    const marker = gists.find(g => MARKER_FILENAME in g.files)
+    if (marker) return marker.id
+
+    if (!fallback) {
+      const legacy = gists.find(g =>
+        LEGACY_FILENAME in g.files ||
+        Object.keys(g.files).some(f => f.startsWith(DATA_PREFIX + '-'))
+      )
+      if (legacy) fallback = legacy.id
+    }
+
     if (gists.length < 100) break
   }
-  return null
+  return fallback
 }
 
 export async function createGist(token, deviceId, data) {

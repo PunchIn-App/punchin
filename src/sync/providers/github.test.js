@@ -147,6 +147,57 @@ describe('findExistingPunchInGist', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('prefers a marker gist over an unrelated punchin-data-* gist on the same page', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        // An unrelated gist that merely happens to contain a punchin-data-* file
+        { id: 'gist-unrelated', files: { 'punchin-data-notes.json': {} } },
+        // The real PunchIn gist, identified by its marker file
+        { id: 'gist-marker', files: { '- PunchIn Sync': {}, 'punchin-data-abc12345.json': {} } },
+      ],
+    })
+    const id = await findExistingPunchInGist('token')
+    expect(id).toBe('gist-marker')
+  })
+
+  it('prefers a marker gist on a later page over a punchin-data-* fallback on an earlier page', async () => {
+    const page1 = [
+      ...Array.from({ length: 99 }, (_, i) => ({ id: `g${i}`, files: { 'x.txt': {} } })),
+      { id: 'gist-fallback', files: { 'punchin-data-notes.json': {} } }, // full page → keep scanning
+    ]
+    const page2 = [{ id: 'gist-marker', files: { '- PunchIn Sync': {} } }]
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => page1 })
+      .mockResolvedValueOnce({ ok: true, json: async () => page2 })
+    const id = await findExistingPunchInGist('token')
+    expect(id).toBe('gist-marker')
+  })
+
+  it('falls back to a punchin-data-* gist only when no marker gist exists anywhere', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ id: 'gist-fallback', files: { 'punchin-data-notes.json': {} } }],
+    })
+    const id = await findExistingPunchInGist('token')
+    expect(id).toBe('gist-fallback')
+  })
+
+  it('paginates beyond the old 3-page cap to find a later marker gist', async () => {
+    const fullPage = (p) => ({
+      ok: true,
+      json: async () => Array.from({ length: 100 }, (_, i) => ({ id: `p${p}-g${i}`, files: { 'x.txt': {} } })),
+    })
+    fetchMock
+      .mockResolvedValueOnce(fullPage(1))
+      .mockResolvedValueOnce(fullPage(2))
+      .mockResolvedValueOnce(fullPage(3))
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 'gist-marker', files: { '- PunchIn Sync': {} } }] })
+    const id = await findExistingPunchInGist('token')
+    expect(id).toBe('gist-marker')
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
   it('throws with status code on non-OK response', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 403 })
     await expect(findExistingPunchInGist('token')).rejects.toThrow('GitHub 403')
