@@ -102,6 +102,19 @@ describe('evaluateReminders — long-running timer', () => {
     const after = evaluateReminders({ now, settings: base, activeEntries: [], state })
     expect(after.state['long:7']).toBeUndefined()
   })
+
+  it('does not re-fire when the clock moves backward within the same interval (#159)', () => {
+    const now = at(10)
+    const entries = [{ id: 7, jobId: 1, punchIn: minsAgo(now, 130) }] // 2 crossings @ 60min
+    const { fire, state } = evaluateReminders({ now, settings: base, activeEntries: entries })
+    expect(fire).toHaveLength(1)
+    expect(state['long:7']).toBe(2)
+    // Clock jumps back 90 min → elapsed shrinks to ~40 min → crossed drops to 0.
+    const earlier = new Date(now.getTime() - 90 * 60000)
+    const after = evaluateReminders({ now: earlier, settings: base, activeEntries: entries, state })
+    expect(after.fire).toEqual([]) // no re-fire; highest crossing is retained
+    expect(after.state['long:7']).toBe(2)
+  })
 })
 
 describe('evaluateReminders — time-of-day reminders', () => {

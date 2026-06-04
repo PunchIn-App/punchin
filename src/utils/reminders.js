@@ -37,7 +37,16 @@ export function evaluateReminders({ now, settings, activeEntries = [], jobs = []
     return { fire, state: next }
   }
 
+  // Local wall-clock minutes. On the spring-forward DST hour local time jumps
+  // (02:00 → 03:00), so a reminder targeted in the skipped hour fires at the next
+  // poll after the jump rather than at the intended wall moment — the `>=`
+  // comparison plus once-per-day keying keep that correct. Do NOT change `>=` to
+  // `==`, which would make a reminder whose exact minute is skipped by DST never
+  // fire (issue #162).
   const nowMin = now.getHours() * 60 + now.getMinutes()
+  // Time-of-day reminders de-dupe by local day key. A backward clock that crosses
+  // midnight could in principle let one re-fire for the prior day; an accepted
+  // edge for best-effort local reminders (issue #159).
   const today = dayKey(now)
   const weekday = now.getDay()
   const jobName = (id) => jobs.find(j => j.id === id)?.name || 'A job'
@@ -52,7 +61,10 @@ export function evaluateReminders({ now, settings, activeEntries = [], jobs = []
       const crossed = Math.floor(elapsed / thresholdMs)
       if (crossed >= 1) {
         const k = `long:${e.id}`
-        if (next[k] !== crossed) {
+        // Store the highest crossing seen and only fire when it increases. A
+        // backward clock/timezone change shrinks `crossed`; the old `!== crossed`
+        // would read that as a new value and re-fire for the same interval (#159).
+        if (crossed > (next[k] ?? 0)) {
           next[k] = crossed
           fire.push({
             key: k,
