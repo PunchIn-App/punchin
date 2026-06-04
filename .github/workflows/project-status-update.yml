@@ -1,11 +1,11 @@
-# Posts an automated status update to the PunchIn project (#3):
-#   - weekly (Monday) — a digest of the last 7 days across both repos
-#   - on each published release — a "shipped vX.Y.Z" update
+# Single source of truth for the PunchIn project (#3) status updates — covers
+# the WHOLE project (both repos) from one place:
+#   - weekly (Monday)                  — a digest of the last 7 days
+#   - on a punchin release              — a "shipped vX.Y.Z" update
+#   - on a punchin-email release        — same, via repository_dispatch relay
+#                                         (punchin-email/notify-status-update.yml)
 # Status flag is auto-derived: AT_RISK if any open P0 items, else ON_TRACK.
-#
 # Runs under ADD_TO_PROJECT_PAT (Projects + Issues read/write, Contents read).
-# The weekly schedule lives ONLY here (punchin); punchin-email runs the release
-# trigger only, so the weekly digest isn't posted twice.
 name: Project status update
 
 on:
@@ -13,6 +13,8 @@ on:
     - cron: "0 14 * * 1" # Mondays 14:00 UTC
   release:
     types: [published]
+  repository_dispatch:
+    types: [email-release] # relayed from a punchin-email release
   workflow_dispatch:
 
 permissions: {}
@@ -51,13 +53,19 @@ jobs:
             const openP0 = proj.user.projectV2.items.nodes
               .filter(i => i.p && i.p.name === 'P0' && i.content && i.content.state === 'OPEN').length;
 
-            const isRelease = context.eventName === 'release';
-            let version = '';
-            if (isRelease) version = context.payload.release.tag_name;
-            else { try { version = (await github.rest.repos.getLatestRelease({ owner, repo: context.repo.repo })).data.tag_name; } catch (e) {} }
+            // A release update comes either from this repo's own release event
+            // or relayed from a punchin-email release via repository_dispatch.
+            const relayed = context.eventName === 'repository_dispatch';
+            const isRelease = context.eventName === 'release' || relayed;
+            let relRepo = '', relTag = '';
+            if (context.eventName === 'release') { relRepo = context.repo.repo; relTag = context.payload.release.tag_name; }
+            else if (relayed) { relRepo = context.payload.client_payload.repo || 'punchin-email'; relTag = context.payload.client_payload.tag || ''; }
+
+            let version = relTag;
+            if (!isRelease) { try { version = (await github.rest.repos.getLatestRelease({ owner, repo: 'punchin' })).data.tag_name; } catch (e) {} }
 
             const headline = isRelease
-              ? `🚀 Shipped ${context.repo.repo} ${context.payload.release.tag_name}`
+              ? `🚀 Shipped ${relRepo} ${relTag}`
               : `Week of ${new Date().toISOString().slice(0, 10)}`;
             const status = openP0 > 0 ? 'AT_RISK' : 'ON_TRACK';
             const body = [
