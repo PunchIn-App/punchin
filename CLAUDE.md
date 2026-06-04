@@ -253,6 +253,8 @@ The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump �
 
 `.github/workflows/project-automation.yml` keeps the [PunchIn project board](https://github.com/orgs/PunchIn-App/projects/3) populated as issues/PRs move: on open it auto-adds the item and sets **Labels** (from the conventional-commit type), **Priority** (bug/enhancement → P1, else P2), **Size** (from PR diff), and **Start**/**Target** (+3 days) dates; on close it sets **Completion Date**. It deliberately leaves **Status** to the project's built-in workflows (Item added / Item closed / Pull request merged) so it never conflicts with them or the built-in Auto-close rule. **Milestones** are handled at release time (above), not here. Both `project-automation.yml` and `milestone-on-release.yml` live in each repo the board tracks (punchin + punchin-email). Everything runs under the **`ADD_TO_PROJECT_PAT`** secret — the default `GITHUB_TOKEN` is kept read-only (issue #104), so the PAT must grant **Projects: read/write · Issues: read/write · Contents: read** on both repos (Projects for the board fields, Issues for labels + milestones).
 
+`.github/workflows/project-status-update.yml` posts an automated **project status update** (the project's "Updates" panel): a weekly Monday digest plus a "shipped vX.Y.Z" update on each published release, summarizing activity across both repos. The status flag is auto-derived — **AT_RISK** if any open P0 items, else **ON_TRACK**. The weekly schedule lives only in punchin (punchin-email runs the release trigger only) so the digest isn't posted twice. Also runs under `ADD_TO_PROJECT_PAT`.
+
 #### CHANGELOG entry format
 
 Follow [Keep a Changelog](https://keepachangelog.com/) — add a new section at the very top of `docs/CHANGELOG.md`:
