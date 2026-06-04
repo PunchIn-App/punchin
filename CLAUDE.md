@@ -227,6 +227,8 @@ Every version bump must update all of the following in the **same commit or PR**
 | `SECURITY.md`        | Update the **Supported Versions** table — bump the supported version to `{X.Y.Z}.x` and mark all prior minor versions as `No` |
 | `docs/screenshots/` | Regenerate if any visible UI changed (see Documentation Maintenance below) |
 
+After the bump commit lands on `main`, also **create a GitHub release** (`gh release create vX.Y.Z …`) — it tags the version and surfaces it in the repo's Releases sidebar. This is a post-merge action (a tag points at a commit on `main`), not a file edit, so it's step 9 in the procedure below rather than a row in this table.
+
 The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump — update it only when intentionally upgrading the Cloudflare Workers runtime.
 
 #### Step-by-step release procedure
@@ -238,7 +240,12 @@ The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump �
 5. Update `**Version:**` in the `CLAUDE.md` Project Overview header
 6. If any visible UI changed, regenerate screenshots (see Documentation Maintenance below)
 7. Verify `npm run build` and `npm run test:run` both pass
-8. Commit everything in a single commit: `chore: bump to vX.Y.Z`
+8. Commit everything in a single commit: `chore: bump to vX.Y.Z` (or fold the bump into the feature PR)
+9. Once the version commit has landed on `main`, create a GitHub release so the version is tagged and shows in the repo's **Releases**:
+   ```bash
+   gh release create vX.Y.Z --target <commit-on-main> --title "vX.Y.Z" --latest --notes "<the new docs/CHANGELOG.md section>"
+   ```
+   The tag `vX.Y.Z` is the canonical marker for the release; `--notes` should mirror that version's `docs/CHANGELOG.md` section. Pass the **full** commit SHA (or a branch name) to `--target` — the API rejects abbreviated SHAs.
 
 #### CHANGELOG entry format
 
