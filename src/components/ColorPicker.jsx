@@ -37,12 +37,22 @@ export default function ColorPicker({ presets, value, onChange, size = 'md', lab
     const onOutside = e => {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
     }
-    const onEscape = e => { if (e.key === 'Escape') setOpen(false) }
+    const onEscape = e => {
+      if (e.key !== 'Escape') return
+      // ColorPicker renders inside other dialogs (e.g. the labor-type editor),
+      // whose own Escape handler is also on document. Catch Escape in the capture
+      // phase and stop it here so a single Escape only dismisses the popover, not
+      // the surrounding modal — a bubble-phase stopPropagation wouldn't beat a
+      // parent listener that registered first on the same node (issue #155).
+      e.stopPropagation()
+      e.preventDefault()
+      setOpen(false)
+    }
     document.addEventListener('mousedown', onOutside)
-    document.addEventListener('keydown', onEscape)
+    document.addEventListener('keydown', onEscape, true) // capture
     return () => {
       document.removeEventListener('mousedown', onOutside)
-      document.removeEventListener('keydown', onEscape)
+      document.removeEventListener('keydown', onEscape, true)
     }
   }, [open])
 

@@ -78,6 +78,25 @@ describe('ColorPicker — custom color button', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByTestId('hex-color-picker')).not.toBeInTheDocument()
   })
+
+  it('Escape closes only the popover, sparing a parent dialog\'s Escape handler (#155)', () => {
+    // Simulate a surrounding modal whose Escape handler is on document (bubble),
+    // registered before the popover opens.
+    const parentEscape = vi.fn()
+    const handler = e => { if (e.key === 'Escape') parentEscape() }
+    document.addEventListener('keydown', handler)
+    try {
+      render(<ColorPicker presets={PRESETS} value="#6366F1" onChange={vi.fn()} />)
+      fireEvent.click(screen.getByRole('button', { name: /^custom color$/i }))
+      const picker = screen.getByTestId('hex-color-picker')
+      // Escape originates from inside the popover (as it would in real use)
+      fireEvent.keyDown(picker, { key: 'Escape' })
+      expect(screen.queryByTestId('hex-color-picker')).not.toBeInTheDocument() // popover closed
+      expect(parentEscape).not.toHaveBeenCalled() // parent modal's handler did NOT fire
+    } finally {
+      document.removeEventListener('keydown', handler)
+    }
+  })
 })
 
 describe('ColorPicker — group label', () => {
