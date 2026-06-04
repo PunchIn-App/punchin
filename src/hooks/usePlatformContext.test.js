@@ -133,6 +133,18 @@ describe('usePlatformContext — iOS Safari detection', () => {
     const { result } = renderHook(() => usePlatformContext())
     expect(result.current.isIOSSafari).toBe(false)
   })
+
+  it('isIOSSafari=false inside the Facebook in-app browser (FBAN/FBAV) (#163)', () => {
+    setUA(IOS + 'Mobile/15E148 Safari/604.1 [FBAN/FBIOS;FBAV/450.0.0.0.0]')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIOSSafari).toBe(false)
+  })
+
+  it('isIOSSafari=false inside the Instagram in-app browser (#163)', () => {
+    setUA(IOS + 'Mobile/15E148 Instagram 300.0.0.0 (iPhone15,2; iOS 17_0)')
+    const { result } = renderHook(() => usePlatformContext())
+    expect(result.current.isIOSSafari).toBe(false)
+  })
 })
 
 describe('usePlatformContext — standalone detection', () => {

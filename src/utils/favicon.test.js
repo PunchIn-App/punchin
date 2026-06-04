@@ -57,6 +57,12 @@ describe('updateFavicon', () => {
     expect(link.rel).toBe('icon')
   })
 
+  it('declares a sizes attribute so the icon stays crisp on high-DPI (#164)', () => {
+    stubCanvas('data:image/png;base64,SZ')
+    updateFavicon('#1f6feb')
+    expect(document.getElementById('dynamic-favicon').getAttribute('sizes')).toBe('96x96')
+  })
+
   it('removes any pre-existing static icon link so the dynamic one wins', () => {
     const stale = realCreate('link')
     stale.rel = 'icon'

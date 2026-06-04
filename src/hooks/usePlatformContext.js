@@ -11,7 +11,8 @@ function detectOS() {
   // "Macintosh" UA with no iPad token. Real Macs have no touchscreen, so a
   // touch-capable "Macintosh" is an iPad running in desktop mode — without
   // this, a physical iPad would be misdetected as desktop web and miss the
-  // iOS install guidance entirely.
+  // iOS install guidance entirely. Caveat: a future touchscreen Mac would
+  // false-positive here; revisit if Apple ships one (issue #163).
   if (/Macintosh/i.test(ua) && (navigator.maxTouchPoints ?? 0) > 1) return 'ios'
   if (/android/i.test(ua) || platform === 'android') return 'android'
   return 'web'
@@ -37,10 +38,14 @@ function detectStandalone() {
 
 // On iOS, Add-to-Home-Screen that produces a real standalone PWA is Safari-only.
 // Third-party iOS browsers (Chrome/CriOS, Firefox/FxiOS, Edge/EdgiOS) are WebKit
-// under the hood but cannot install a true PWA — so we must distinguish them.
+// under the hood but cannot install a true PWA — and neither can in-app webviews
+// (Facebook/Instagram/Line/etc.), where the Share-sheet "Add to Home Screen"
+// guidance is wrong. Exclude both so we don't show install steps that can't work
+// (issue #163).
+const NON_SAFARI_IOS = /CriOS|FxiOS|EdgiOS|OPiOS|GSA|FBAN|FBAV|FBIOS|Instagram|Line\/|LinkedInApp|MicroMessenger|Snapchat|Twitter|musical_ly|TikTok/i
 function detectIOSSafari(os) {
   if (os !== 'ios') return false
-  return !/CriOS|FxiOS|EdgiOS|OPiOS|GSA/i.test(navigator.userAgent || '')
+  return !NON_SAFARI_IOS.test(navigator.userAgent || '')
 }
 
 export function usePlatformContext() {

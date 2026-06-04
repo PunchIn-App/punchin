@@ -53,7 +53,11 @@ export function drawFaviconDataUrl(hex, size = 64) {
 // replacing any static icon links on first run. No-op if canvas is unsupported.
 export function updateFavicon(hex) {
   try {
-    const url = drawFaviconDataUrl(hex)
+    // Render larger than a tab icon and declare the size, so when this single
+    // dynamic icon replaces the author's multi-resolution set the browser still
+    // has enough pixels to downscale crisply on high-DPI displays (issue #164).
+    const SIZE = 96
+    const url = drawFaviconDataUrl(hex, SIZE)
     if (!url) return
     let link = document.getElementById('dynamic-favicon')
     if (!link) {
@@ -64,6 +68,7 @@ export function updateFavicon(hex) {
       document.head.appendChild(link)
     }
     link.type = 'image/png'
+    link.setAttribute('sizes', `${SIZE}x${SIZE}`)
     link.href = url
   } catch {
     /* canvas unsupported — keep whatever static favicon is present */
