@@ -82,15 +82,19 @@ punchin/
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
-│   │   └── SettingsView.jsx    # Settings as an iOS-style drill-in (CategoryRow root list → Panel sub-pages; device Back / re-tapping the Settings tab returns to root): General (concurrent timers, week start, haptics), Appearance (theme/accent), Reminders (incl. per-reminder WeekdayPicker), Install, Data & Sync (Backup JSON/CSV · Sync GitHub Gist/Google Drive/OneDrive · Transfer · Danger Zone, grouped via PanelGroup), About (changelog, report bug, help-improve/feature request, License & legal, Support the App, check-for-updates). Exports buildBugReportUrl + buildFeatureRequestUrl
+│   │   ├── SettingsView.jsx    # Thin router for the iOS-style drill-in Settings (issue #144): CategoryRow root list → per-panel components under views/settings/; device Back / re-tapping the Settings tab returns to root. Owns the routing + the two signals the root badges also need (notifPerm, usePwaUpdate) and passes them down
+│   │   └── settings/           # Per-panel components (issue #144): components.jsx (Toggle/SettingsRow/ReminderRow/WeekdayPicker/CategoryRow/Panel/PanelGroup) + GeneralPanel/AppearancePanel/RemindersPanel/InstallPanel/DataSyncPanel/AboutPanel. Panels self-serve settings/platform/install via hooks rather than long prop lists (issue #148)
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook; merges live rows over DEFAULT_SETTINGS so consumers read a complete typed object (issue #134)
+│   │   ├── usePwaUpdate.js         # PWA "update available" coordination (issue #149): updateAvailable/updateStatus/checkForUpdates across window flag + SW reg.waiting + pwa:update-ready event
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web) + isIOSSafari (true only in iOS Safari, where Add to Home Screen works) + isIPad (treats a touch-capable "Macintosh" UA — iPadOS Safari's default desktop mode — as iOS, and distinguishes iPad from iPhone)
 │   │   ├── useInstallPrompt.js     # PWA install state: canInstall/isInstalled/isIOS/isIOSSafari + promptInstall(); shared by SettingsView and the install nudge
 │   │   ├── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
 │   │   └── useReminders.js        # Reminder scheduler (issue #54): watches settings + live timers, evaluates evaluateReminders on a 30s interval (and on tab focus), fires local notifications while reminders are enabled and permission granted. No backend / Web Push
 │   └── utils/
 │       ├── time.js             # Date/time helpers (format, range, sum)
+│       ├── backup.js           # exportBackup() (full JSON) + exportCsv() (completed entries) — data plumbing kept out of the settings view (issue #144)
+│       ├── issueUrl.js         # buildBugReportUrl + buildFeatureRequestUrl (GitHub new-issue links) + userAgent sniffing for the bug template (issue #146)
 │       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon)
 │       ├── notifications.js    # Browser Notification API wrappers: notificationsSupported, notificationPermission, requestNotificationPermission, showNotification (prefers the SW registration, falls back to the Notification constructor)
 │       ├── reminders.js        # Pure evaluateReminders({now, settings, activeEntries, jobs, state}) → {fire, state}; the testable reminder rules (long-running timer, idle, still-running, daily/weekly timesheet) + parseHHMM/dayKey helpers
@@ -156,6 +160,8 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
 | `src/views/SettingsView.test.jsx` | Drill-in root list + sub-pages, device-Back/Settings-tab-reselect returns to root, Data & Sync consolidation, toggles, theme, export/import, sync UI, danger zone, About rows (help-improve, License modal, Support link) |
 | `src/utils/issueUrl.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` (template/scope/URL) — browser/OS/device/install-type detection |
+| `src/utils/backup.test.js` | `exportBackup` JSON shape (version + 3 tables); `exportCsv` header + skips running entries |
+| `src/hooks/usePwaUpdate.test.js` | Initial state from window flag, `pwa:update-ready` event, on-mount `reg.waiting` re-surface (#57), apply-when-available, no-registration "latest" path |
 | `src/views/SettingsView.syncUnconfigured.test.jsx` | Sync section with empty client IDs: friendly "not set up" message, no env-var jargon, no provider buttons (issue #59) |
 | `src/views/SettingsView.haptics.test.jsx` | `hapticFeedback` toggle shown on iPhone/Android, hidden on iPad (no vibration motor) and web, toggles the setting (issue #65) |
 | `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles, per-reminder `WeekdayPicker` (renders, toggling a day, clearing the last day turns the reminder off + restores all days) |
