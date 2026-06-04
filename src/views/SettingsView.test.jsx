@@ -440,6 +440,37 @@ describe('SettingsView — Danger Zone', () => {
     })
   })
 
+  it('disconnects sync and clears app-local storage on factory reset, keeping pi.deviceId (#143)', async () => {
+    const store = new Map([
+      ['pi.reminderState', '{}'],
+      ['pi.opens', '5'],
+      ['pi.installNudgeDismissed', '1'],
+      ['pi.deviceId', 'device-xyz'],
+    ])
+    vi.stubGlobal('localStorage', {
+      getItem: k => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: k => store.delete(k),
+      clear: () => store.clear(),
+    })
+    try {
+      render(<SettingsView />)
+      expand('Data & Sync')
+      fireEvent.click(screen.getByText('Factory Reset'))
+      fireEvent.click(screen.getByRole('button', { name: /^continue$/i }))
+      fireEvent.click(screen.getByRole('button', { name: /yes, wipe everything/i }))
+      // disconnectSync runs first so the remote device file is deleted before creds are wiped
+      await waitFor(() => expect(mockDisconnectSync).toHaveBeenCalled())
+      await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalled())
+      expect(store.has('pi.reminderState')).toBe(false)
+      expect(store.has('pi.opens')).toBe(false)
+      expect(store.has('pi.installNudgeDismissed')).toBe(false)
+      expect(store.get('pi.deviceId')).toBe('device-xyz') // device identity preserved by design
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('re-seeds the default blue accent (#1f6feb), not amber, after factory reset (#69)', async () => {
     render(<SettingsView />)
     expand('Data & Sync')

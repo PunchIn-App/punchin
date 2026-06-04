@@ -548,6 +548,12 @@ export default function SettingsView() {
   }
 
   const factoryReset = async () => {
+    // Tear down sync first, while the credentials still exist: disconnectSync
+    // deletes this device's remote file (punchin-data-{deviceId}.json) before
+    // clearing creds. Without it a "wipe everything" leaves the file orphaned in
+    // the gist, and since pi.deviceId survives, reconnecting reuses the filename
+    // and merges the old data back in — defeating the erase (issue #143).
+    await disconnectSync()
     await db.transaction('rw', [db.entries, db.jobs, db.laborTypes, db.settings, db.deletions, db.secrets], async () => {
       await db.entries.clear()
       await db.jobs.clear()
@@ -557,6 +563,13 @@ export default function SettingsView() {
       await db.settings.clear()
       await db.settings.bulkPut(defaultSettingsRows()) // single source of truth (issue #131)
     })
+    // Clear app-local storage the DB wipe doesn't reach (issue #143). pi.deviceId
+    // is kept intentionally so re-enabling sync keeps this device's identity.
+    try {
+      localStorage.removeItem('pi.reminderState')
+      localStorage.removeItem('pi.opens')
+      localStorage.removeItem('pi.installNudgeDismissed')
+    } catch { /* storage unavailable (private mode) — nothing to clear */ }
     setResetStage(null)
   }
 
