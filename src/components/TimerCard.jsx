@@ -17,10 +17,21 @@ export default function TimerCard({ entry, job, laborType }) {
   const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
 
   useEffect(() => {
-    const iv = setInterval(() => {
-      setElapsed(Date.now() - new Date(entry.punchIn).getTime())
-    }, 1000)
-    return () => clearInterval(iv)
+    const tick = () => setElapsed(Date.now() - new Date(entry.punchIn).getTime())
+    let iv = null
+    const start = () => { if (iv === null) iv = setInterval(tick, 1000) }
+    const stop  = () => { if (iv !== null) { clearInterval(iv); iv = null } }
+    // Pause the per-second tick while the tab is backgrounded so N concurrent
+    // timer cards don't each keep a 1s interval (and animate-pulse/bounce) alive
+    // with nothing watching; re-sync and resume the instant it's visible again
+    // (issue #142).
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') stop()
+      else { tick(); start() }
+    }
+    if (document.visibilityState !== 'hidden') start()
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisibility) }
   }, [entry.punchIn])
 
   const punchOut = async () => {

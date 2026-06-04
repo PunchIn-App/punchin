@@ -1,5 +1,10 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import TimerCard from './TimerCard'
+
+function setVisibility(state) {
+  Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+  act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+}
 
 const mockEntriesUpdate = vi.fn().mockResolvedValue(1)
 
@@ -73,6 +78,36 @@ describe('TimerCard — rendering', () => {
   it('does not render notes section when notes is null', () => {
     render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
     expect(screen.queryByText('Quick fix session')).not.toBeInTheDocument()
+  })
+})
+
+describe('TimerCard — background pause (#142)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    setVisibility('visible') // restore for other tests
+  })
+
+  it('stops the 1s tick while the tab is hidden and re-syncs when visible again', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2024-01-15T10:00:00Z'))
+    const entry = { ...ENTRY, punchIn: new Date('2024-01-15T09:00:00Z') } // 1h ago
+    setVisibility('visible')
+    render(<TimerCard entry={entry} job={JOB} laborType={LABOR_TYPE} />)
+    const timer = screen.getByRole('timer')
+    expect(timer).toHaveTextContent('01:00:00')
+
+    // Ticks while visible
+    act(() => { vi.advanceTimersByTime(2000) })
+    expect(timer).toHaveTextContent('01:00:02')
+
+    // Hidden: interval is cleared, so background time does not update the clock
+    setVisibility('hidden')
+    act(() => { vi.advanceTimersByTime(10000) })
+    expect(timer).toHaveTextContent('01:00:02')
+
+    // Visible again: immediate re-sync to the true elapsed (12s total)
+    setVisibility('visible')
+    expect(timer).toHaveTextContent('01:00:12')
   })
 })
 
