@@ -17,6 +17,7 @@ import { runSync, disconnectSync } from '../sync/syncManager'
 import { buildGitHubOAuthUrl } from '../sync/providers/github'
 import { buildGoogleOAuthUrl } from '../sync/providers/google'
 import { buildOneDriveOAuthUrl } from '../sync/providers/onedrive'
+import { createOAuthState } from '../sync/oauthState'
 import { SYNC_CONFIG } from '../sync/config'
 
 const ACCENT_PRESETS = [
@@ -1108,7 +1109,7 @@ export default function SettingsView() {
               <div className="px-4 py-4 space-y-2">
                 {SYNC_CONFIG.github.clientId && (
                   <button
-                    onClick={() => { window.location.href = buildGitHubOAuthUrl(SYNC_CONFIG.github.clientId, SYNC_CONFIG.github.callbackBase) }}
+                    onClick={() => { window.location.href = buildGitHubOAuthUrl(SYNC_CONFIG.github.clientId, SYNC_CONFIG.github.callbackBase, createOAuthState()) }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
                   >
                     <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />
@@ -1120,7 +1121,7 @@ export default function SettingsView() {
                 )}
                 {SYNC_CONFIG.google.clientId && (
                   <button
-                    onClick={() => { window.location.href = buildGoogleOAuthUrl(SYNC_CONFIG.google.clientId) }}
+                    onClick={() => { window.location.href = buildGoogleOAuthUrl(SYNC_CONFIG.google.clientId, createOAuthState()) }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
                   >
                     <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />
@@ -1132,7 +1133,7 @@ export default function SettingsView() {
                 )}
                 {SYNC_CONFIG.onedrive.clientId && (
                   <button
-                    onClick={() => { window.location.href = buildOneDriveOAuthUrl(SYNC_CONFIG.onedrive.clientId) }}
+                    onClick={() => { window.location.href = buildOneDriveOAuthUrl(SYNC_CONFIG.onedrive.clientId, createOAuthState()) }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
                   >
                     <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />

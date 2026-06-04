@@ -30,6 +30,10 @@ describe('buildOneDriveOAuthUrl', () => {
     expect(url).toContain('state=onedrive')
   })
 
+  it('embeds the provider label and CSRF nonce in state when provided (issue #125)', () => {
+    expect(new URL(buildOneDriveOAuthUrl('id', 'nonce123')).searchParams.get('state')).toBe('onedrive:nonce123')
+  })
+
   it('includes a redirect_uri', () => {
     const url = buildOneDriveOAuthUrl('id')
     expect(url).toContain('redirect_uri=')

@@ -30,6 +30,10 @@ describe('buildGoogleOAuthUrl', () => {
     expect(url).toContain('state=google')
   })
 
+  it('embeds the provider label and CSRF nonce in state when provided (issue #125)', () => {
+    expect(new URL(buildGoogleOAuthUrl('id', 'nonce123')).searchParams.get('state')).toBe('google:nonce123')
+  })
+
   it('includes a redirect_uri', () => {
     const url = buildGoogleOAuthUrl('id')
     expect(url).toContain('redirect_uri=')

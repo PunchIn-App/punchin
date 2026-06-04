@@ -15,6 +15,7 @@ import { updateFavicon } from './utils/favicon'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
+import { consumeOAuthState } from './sync/oauthState'
 import { db } from './db'
 
 // localStorage keys for the first-run install nudge. Kept out of the Dexie
@@ -30,9 +31,10 @@ const NUDGE_MIN_OPENS = 2
 // message, so a crafted `#sync_error=...` can't present arbitrary or misleading
 // text in the Settings sync UI (issue #130).
 const SYNC_ERROR_MESSAGES = {
-  missing_code: 'Sign-in failed: no authorization code was returned.',
-  server_error: 'Sign-in failed: the sign-in service had an error.',
-  auth_failed:  'Sign-in failed: authorization was denied.',
+  missing_code:   'Sign-in failed: no authorization code was returned.',
+  server_error:   'Sign-in failed: the sign-in service had an error.',
+  auth_failed:    'Sign-in failed: authorization was denied.',
+  state_mismatch: 'Sign-in failed: the security check did not match. Please try connecting again.',
 }
 export function describeSyncError(code) {
   return SYNC_ERROR_MESSAGES[code] || 'Sign-in failed. Please try again.'
@@ -266,26 +268,35 @@ export default function App() {
       const token = params.get('sync_token')
       history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)
       setActiveView('settings')
-      fetchGitHubUser(token)
-        .then(user => { if (!cancelled) setPendingGitHubAuth({ token, username: user?.login ?? null }) })
+      // Verify the CSRF nonce the worker echoed back before trusting the token (issue #125).
+      if (consumeOAuthState(params.get('state'))) {
+        fetchGitHubUser(token)
+          .then(user => { if (!cancelled) setPendingGitHubAuth({ token, username: user?.login ?? null }) })
+      } else {
+        db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
+      }
 
-    // Google / OneDrive: token comes via implicit flow, provider passed as `state`
+    // Google / OneDrive: token comes via implicit flow; `state` is `provider:nonce`
     } else if (params.has('access_token') && params.has('state')) {
-      const provider = params.get('state')
-      if (provider !== 'google' && provider !== 'onedrive') return
-      const token = params.get('access_token')
-      const expiresIn = parseInt(params.get('expires_in') || '3600', 10) * 1000
-      db.settings.bulkPut([
-        { key: 'syncProvider', value: provider },
-        { key: 'syncToken', value: token },
-        { key: 'syncTokenExpiry', value: Date.now() + expiresIn },
-        { key: 'syncFileId', value: null },
-        { key: 'syncError', value: null },
-      ]).then(() => {
-        if (cancelled) return
+      const [provider, nonce] = (params.get('state') || '').split(':')
+      if (provider === 'google' || provider === 'onedrive') {
+        const token = params.get('access_token')
+        const expiresIn = parseInt(params.get('expires_in') || '3600', 10) * 1000
         history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)
         setActiveView('settings')
-      })
+        // Reject the callback unless the returned nonce matches the one we stored (issue #125).
+        if (consumeOAuthState(nonce)) {
+          db.settings.bulkPut([
+            { key: 'syncProvider', value: provider },
+            { key: 'syncToken', value: token },
+            { key: 'syncTokenExpiry', value: Date.now() + expiresIn },
+            { key: 'syncFileId', value: null },
+            { key: 'syncError', value: null },
+          ])
+        } else {
+          db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
+        }
+      }
     }
 
     return () => { cancelled = true }

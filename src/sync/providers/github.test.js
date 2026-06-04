@@ -36,6 +36,11 @@ describe('buildGitHubOAuthUrl', () => {
     expect(url).toContain('redirect_uri=')
     expect(url).toContain('example.com')
   })
+
+  it('includes the CSRF state when provided, and omits it otherwise (issue #125)', () => {
+    expect(new URL(buildGitHubOAuthUrl('id', 'https://example.com', 'nonce123')).searchParams.get('state')).toBe('nonce123')
+    expect(new URL(buildGitHubOAuthUrl('id', 'https://example.com')).searchParams.has('state')).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------

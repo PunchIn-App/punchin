@@ -46,6 +46,10 @@ export default {
 
     const code = url.searchParams.get('code')
     const appUrl = env.APP_URL || url.origin
+    // Echo GitHub's `state` back to the app so it can verify the CSRF nonce it
+    // minted before the redirect (issue #125).
+    const state = url.searchParams.get('state')
+    const stateParam = state ? `&state=${encodeURIComponent(state)}` : ''
 
     if (!code) {
       return Response.redirect(`${appUrl}/#sync_error=missing_code`)
@@ -66,7 +70,7 @@ export default {
         return Response.redirect(`${appUrl}/#sync_error=${encodeURIComponent(data.error_description || 'auth_failed')}`)
       }
       return Response.redirect(
-        `${appUrl}/#sync_token=${encodeURIComponent(data.access_token)}&sync_provider=github`
+        `${appUrl}/#sync_token=${encodeURIComponent(data.access_token)}&sync_provider=github${stateParam}`
       )
     } catch {
       return Response.redirect(`${appUrl}/#sync_error=server_error`)

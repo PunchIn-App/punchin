@@ -16,12 +16,13 @@ export function getDeviceFilename(deviceId) {
   return `${DATA_PREFIX}-${deviceId}.json`
 }
 
-export function buildGitHubOAuthUrl(clientId, callbackBase) {
+export function buildGitHubOAuthUrl(clientId, callbackBase, state) {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: `${callbackBase}/oauth/github/callback`,
     scope: 'gist',
   })
+  if (state) params.set('state', state) // CSRF nonce, echoed back via the worker (issue #125)
   return `https://github.com/login/oauth/authorize?${params}`
 }
 

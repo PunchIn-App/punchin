@@ -63,6 +63,7 @@ beforeEach(() => {
   document.documentElement.classList.remove('light')
   document.documentElement.style.removeProperty('--accent-rgb')
   window.location.hash = ''
+  sessionStorage.clear() // clear any leftover OAuth CSRF nonce between tests (issue #125)
   // Reset the global history state so back-button / OAuth tests can't leak state
   // into each other and become order-dependent.
   window.history.replaceState(null, '')
@@ -164,10 +165,14 @@ describe('App — back-button navigation (#65)', () => {
 })
 
 describe('App — OAuth callback handling', () => {
-  beforeEach(() => { mockFetchGitHubUser.mockResolvedValue({ login: 'octocat' }) })
+  const NONCE = 'test-nonce-abc'
+  beforeEach(() => {
+    mockFetchGitHubUser.mockResolvedValue({ login: 'octocat' })
+    sessionStorage.setItem('pi.oauthState', NONCE) // valid CSRF nonce for the happy-path tests (issue #125)
+  })
 
   it('navigates to Settings and shows account confirmation dialog after GitHub OAuth', async () => {
-    window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
+    window.location.hash = `#sync_token=ghtoken123&sync_provider=github&state=${NONCE}`
     render(<App />)
     await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
@@ -179,7 +184,7 @@ describe('App — OAuth callback handling', () => {
   })
 
   it('saves GitHub token and username when the user confirms the account', async () => {
-    window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
+    window.location.hash = `#sync_token=ghtoken123&sync_provider=github&state=${NONCE}`
     render(<App />)
     await waitFor(() => screen.getByRole('dialog'))
     await act(async () => { screen.getByRole('button', { name: 'Connect' }).click() })
@@ -194,7 +199,7 @@ describe('App — OAuth callback handling', () => {
 
   it('saves syncUsername as null when GitHub user fetch returns null', async () => {
     mockFetchGitHubUser.mockResolvedValueOnce(null)
-    window.location.hash = '#sync_token=tok&sync_provider=github'
+    window.location.hash = `#sync_token=tok&sync_provider=github&state=${NONCE}`
     render(<App />)
     await waitFor(() => screen.getByRole('dialog'))
     await act(async () => { screen.getByRole('button', { name: 'Connect' }).click() })
@@ -204,7 +209,7 @@ describe('App — OAuth callback handling', () => {
   })
 
   it('does not save anything when the user cancels the account confirmation', async () => {
-    window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
+    window.location.hash = `#sync_token=ghtoken123&sync_provider=github&state=${NONCE}`
     render(<App />)
     await waitFor(() => screen.getByRole('dialog'))
     await act(async () => { screen.getByRole('button', { name: 'Cancel' }).click() })
@@ -213,7 +218,7 @@ describe('App — OAuth callback handling', () => {
   })
 
   it('closes the confirmation on Escape without saving', async () => {
-    window.location.hash = '#sync_token=ghtoken123&sync_provider=github'
+    window.location.hash = `#sync_token=ghtoken123&sync_provider=github&state=${NONCE}`
     render(<App />)
     await screen.findByRole('dialog')
     // Flush effects so the dialog's document-level Escape listener is attached
@@ -225,7 +230,7 @@ describe('App — OAuth callback handling', () => {
   })
 
   it('stores Google token when hash has access_token + state=google', async () => {
-    window.location.hash = '#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google'
+    window.location.hash = `#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google:${NONCE}`
     render(<App />)
     await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
       expect.arrayContaining([
@@ -236,13 +241,13 @@ describe('App — OAuth callback handling', () => {
   })
 
   it('navigates to Settings after Google OAuth callback', async () => {
-    window.location.hash = '#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google'
+    window.location.hash = `#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google:${NONCE}`
     render(<App />)
     await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
   })
 
   it('stores OneDrive token when hash has access_token + state=onedrive', async () => {
-    window.location.hash = '#access_token=odtoken&expires_in=3600&state=onedrive'
+    window.location.hash = `#access_token=odtoken&expires_in=3600&state=onedrive:${NONCE}`
     render(<App />)
     await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
       expect.arrayContaining([
@@ -250,6 +255,25 @@ describe('App — OAuth callback handling', () => {
         { key: 'syncToken',    value: 'odtoken' },
       ])
     ))
+  })
+
+  it('rejects the GitHub callback when the CSRF state does not match (no token, no dialog)', async () => {
+    window.location.hash = `#sync_token=ghtoken123&sync_provider=github&state=WRONG-${NONCE}`
+    render(<App />)
+    await waitFor(() => expect(mockDbSettingsPut).toHaveBeenCalledWith(
+      { key: 'syncError', value: 'Sign-in failed: the security check did not match. Please try connecting again.' }
+    ))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
+  })
+
+  it('rejects a Google callback when the CSRF nonce does not match (no token saved)', async () => {
+    window.location.hash = `#access_token=googletoken&expires_in=3600&state=google:WRONG-${NONCE}`
+    render(<App />)
+    await waitFor(() => expect(mockDbSettingsPut).toHaveBeenCalledWith(
+      { key: 'syncError', value: 'Sign-in failed: the security check did not match. Please try connecting again.' }
+    ))
+    expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
   })
 
   it('stores a friendly message for a known sync_error code', async () => {

@@ -7,13 +7,15 @@ function httpError(label, status) {
   return new Error(status === 401 ? 'TOKEN_EXPIRED' : `${label} ${status}`)
 }
 
-export function buildGoogleOAuthUrl(clientId) {
+export function buildGoogleOAuthUrl(clientId, state) {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: window.location.origin + '/',
     response_type: 'token',
     scope: 'https://www.googleapis.com/auth/drive.appdata',
-    state: 'google',
+    // `state` carries the provider label (for callback routing) plus a CSRF
+    // nonce verified on return (issue #125): `google:<nonce>`.
+    state: state ? `google:${state}` : 'google',
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }

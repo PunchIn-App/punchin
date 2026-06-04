@@ -54,6 +54,7 @@ punchin/
 │   ├── App.jsx             # Root: tab state, theme application, accent → CSS var + dynamic favicon, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated)
 │   ├── sync/
 │   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
+│   │   ├── oauthState.js       # OAuth CSRF protection (issue #125): createOAuthState (mint+store a nonce in sessionStorage), consumeOAuthState (verify the returned nonce, fail closed). The nonce is embedded in the OAuth `state` and checked in App.jsx's callback handler
 │   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), importSnapshot (public merge for transfer links, issue #77), runSync (pull→merge→push), disconnectSync
 │   │   └── providers/
 │   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, fetchGitHubUser, findExistingPunchInGist, createGist (marker + device file), fetchAllDeviceData (reads all punchin-data-*.json + legacy file), pushDeviceData (writes marker + own device file), deleteDeviceFile (nulls file on disconnect), updateGist/fetchGist (legacy, kept for backward compat)
