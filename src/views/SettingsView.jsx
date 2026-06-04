@@ -6,6 +6,7 @@ import ColorPicker from '../components/ColorPicker'
 import DataTransfer from '../components/DataTransfer'
 import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Palette, Bug, MonitorDown, Cloud, CloudOff, LogOut, Check, Share, Plus, Compass, Vibrate, SlidersHorizontal, Database, Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck, Share2, Lightbulb, Scale, Heart } from 'lucide-react'
 import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../utils/notifications'
+import { buildBugReportUrl, buildFeatureRequestUrl } from '../utils/issueUrl'
 import { applyUpdate, hasWaitingUpdate } from '../utils/pwa'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { format } from 'date-fns'
@@ -185,66 +186,6 @@ export function isEntryDuplicate(backupEntry, existingEntries, newJobId, newLtId
       ? new Date(e.punchOut).getTime() === new Date(backupEntry.punchOut).getTime()
       : e.punchOut === backupEntry.punchOut)
   )
-}
-
-export function buildBugReportUrl(appVersion, isStandalone, os) {
-  const ua = navigator.userAgent
-
-  let browser = 'Unknown'
-  if (/Edg\/(\d+)/.test(ua))                   browser = `Edge ${ua.match(/Edg\/(\d+)/)[1]}`
-  else if (/CriOS\/(\d+)/.test(ua))             browser = `Chrome ${ua.match(/CriOS\/(\d+)/)[1]} (iOS)`
-  else if (/FxiOS\/(\d+)/.test(ua))             browser = `Firefox ${ua.match(/FxiOS\/(\d+)/)[1]} (iOS)`
-  else if (/Chrome\/(\d+)/.test(ua))            browser = `Chrome ${ua.match(/Chrome\/(\d+)/)[1]}`
-  else if (/Version\/(\d+).*Safari/.test(ua))   browser = `Safari ${ua.match(/Version\/(\d+)/)[1]}`
-  else if (/Firefox\/(\d+)/.test(ua))           browser = `Firefox ${ua.match(/Firefox\/(\d+)/)[1]}`
-
-  let osStr = 'Unknown'
-  if (os === 'ios') {
-    const m = ua.match(/OS (\d+[_\d]*)/)
-    osStr = m ? `iOS ${m[1].replace(/_/g, '.')}` : 'iOS'
-  } else if (os === 'android') {
-    const m = ua.match(/Android (\d+\.?\d*)/)
-    osStr = m ? `Android ${m[1]}` : 'Android'
-  } else {
-    const mac = ua.match(/Mac OS X (\d+[_\d]*)/)
-    const win = ua.match(/Windows NT (\d+\.\d+)/)
-    if (mac) osStr = `macOS ${mac[1].replace(/_/g, '.')}`
-    else if (win) {
-      const ntMap = { '10.0': 'Windows 10 / 11', '6.3': 'Windows 8.1', '6.2': 'Windows 8', '6.1': 'Windows 7' }
-      osStr = ntMap[win[1]] ?? `Windows NT ${win[1]}`
-    } else osStr = 'Linux / other'
-  }
-
-  let device = 'Unknown'
-  if (os === 'ios') {
-    device = /iPad/.test(ua) ? 'iPad' : 'iPhone'
-  } else if (os === 'android') {
-    const m = ua.match(/\(Linux; Android [^;]+; ([^)]+)\)/)
-    device = m ? m[1].trim() : 'Android device'
-  } else {
-    device = `Desktop (${screen.width}×${screen.height})`
-  }
-
-  const params = new URLSearchParams({
-    template: 'bug_report.yml',
-    version: appVersion,
-    'install-type': isStandalone ? 'PWA (installed to home screen)' : 'Browser tab',
-    browser,
-    os: osStr,
-    device,
-  })
-
-  return `https://github.com/PunchIn-App/punchin/issues/new?${params}`
-}
-
-// Opens the feature-request issue form (separate template from bug reports).
-// The version is dropped into the template's "scope" field for context.
-export function buildFeatureRequestUrl(appVersion) {
-  const params = new URLSearchParams({
-    template: 'feature_request.yml',
-    scope: `Suggested from PunchIn v${appVersion}`,
-  })
-  return `https://github.com/PunchIn-App/punchin/issues/new?${params}`
 }
 
 const PROVIDER_LABEL = { github: 'GitHub Gist', google: 'Google Drive', onedrive: 'OneDrive' }

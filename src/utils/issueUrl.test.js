@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { buildBugReportUrl, buildFeatureRequestUrl } from './SettingsView'
+import { buildBugReportUrl, buildFeatureRequestUrl } from './issueUrl'
 
 function setUA(ua) {
   Object.defineProperty(navigator, 'userAgent', { value: ua, writable: true, configurable: true })
