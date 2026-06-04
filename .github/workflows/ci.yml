@@ -22,9 +22,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        # npm ci installs exactly what package-lock.json pins and fails on
+        # package.json/lockfile drift, so CI is reproducible and a transitive
+        # in-range release can't silently change behaviour (issue #166).
+        run: npm ci
 
       - name: Build
         run: npm run build

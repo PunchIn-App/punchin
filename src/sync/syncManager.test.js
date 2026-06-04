@@ -458,6 +458,40 @@ describe('runSync — merge deduplication', () => {
     expect(jobs.filter(j => j.name === 'Client Project')).toHaveLength(1)
   })
 
+  it('dedups a labor type that differs only in case (#168)', async () => {
+    await seedSyncSettings()
+    await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false })
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, name: 'design', color: '#6366F1' }], // lowercase — must match 'Design'
+      jobs: [],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    expect(await db.laborTypes.toArray()).toHaveLength(1)
+  })
+
+  it('dedups a job that differs only in case (#168)', async () => {
+    await seedSyncSettings()
+    await db.jobs.add({ name: 'Client Project', isActive: true, laborRates: {} })
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [],
+      jobs: [{ id: 200, name: 'CLIENT PROJECT', laborTypeId: null, isActive: true }], // upper — must match
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    expect(await db.jobs.toArray()).toHaveLength(1)
+  })
+
   it('does not import a duplicate entry on a second sync', async () => {
     await seedSyncSettings()
     const ltId = await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false })
