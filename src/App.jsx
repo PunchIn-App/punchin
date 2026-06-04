@@ -257,7 +257,12 @@ export default function App() {
     if (search.get('code') && search.get('state')?.startsWith('onedrive:')) {
       const code = search.get('code')
       const [, nonce] = (search.get('state') || '').split(':')
-      history.replaceState({ piView: 'settings' }, '', window.location.pathname)
+      // Scrub the single-use code from the launch entry, then push a Settings
+      // entry so hardware Back returns home rather than exiting the app — a bare
+      // replaceState would leave hasPushedRef stale (issues #139, #141).
+      history.replaceState(history.state ?? { piView: DEFAULT_VIEW }, '', window.location.pathname)
+      history.pushState({ piView: 'settings' }, '', window.location.pathname)
+      hasPushedRef.current = true
       setActiveView('settings')
       if (consumeOAuthState(nonce)) {
         const verifier = consumePkceVerifier()
@@ -299,7 +304,12 @@ export default function App() {
     // showing an account chooser, so we ask the user to confirm it's right.
     } else if (params.has('sync_token') && params.get('sync_provider') === 'github') {
       const token = params.get('sync_token')
-      history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)
+      const cleanUrl = window.location.pathname + window.location.search
+      // Scrub the token from the launch entry, then push a Settings entry so
+      // hardware Back returns home rather than exiting the app (issues #139, #141).
+      history.replaceState(history.state ?? { piView: DEFAULT_VIEW }, '', cleanUrl)
+      history.pushState({ piView: 'settings' }, '', cleanUrl)
+      hasPushedRef.current = true
       setActiveView('settings')
       // Verify the CSRF nonce the worker echoed back before trusting the token (issue #125).
       if (consumeOAuthState(params.get('state'))) {
@@ -312,11 +322,18 @@ export default function App() {
     // Google: token comes via the implicit flow; `state` is `google:<nonce>`.
     // (OneDrive uses the Auth Code + PKCE query callback handled above, #128.)
     } else if (params.has('access_token') && params.has('state')) {
+      const cleanUrl = window.location.pathname + window.location.search
+      // Always scrub the token out of the URL first — before the provider check
+      // or any await — so an unrecognised state value or a rejected DB write
+      // can't leave the access_token sitting in the hash (issue #139).
+      history.replaceState(history.state ?? { piView: DEFAULT_VIEW }, '', cleanUrl)
       const [provider, nonce] = (params.get('state') || '').split(':')
       if (provider === 'google') {
         const token = params.get('access_token')
         const expiresIn = parseInt(params.get('expires_in') || '3600', 10) * 1000
-        history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)
+        // Push a Settings entry so hardware Back returns home, not exits (#141).
+        history.pushState({ piView: 'settings' }, '', cleanUrl)
+        hasPushedRef.current = true
         setActiveView('settings')
         // Reject the callback unless the returned nonce matches the one we stored (issue #125).
         if (consumeOAuthState(nonce)) {

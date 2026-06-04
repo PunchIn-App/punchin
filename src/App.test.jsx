@@ -326,6 +326,29 @@ describe('App — OAuth callback handling', () => {
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
     expect(mockDbSettingsPut).not.toHaveBeenCalled()
   })
+
+  it('scrubs the access_token from the URL even when the state is unrecognised (#139)', () => {
+    // Old code returned without replaceState for a non-google/onedrive state,
+    // leaving the token in the hash. It must be scrubbed unconditionally.
+    window.location.hash = '#access_token=leakme&state=unknown_provider'
+    render(<App />)
+    expect(window.location.hash).toBe('')
+    expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
+  })
+
+  it('pushes a Settings history entry after OAuth so Back returns home, not exit (#141)', async () => {
+    window.location.hash = `#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google:${NONCE}`
+    const lenBefore = history.length
+    render(<App />)
+    await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
+    // A Settings entry was pushed above the (still home-tagged) launch entry...
+    expect(history.state?.piView).toBe('settings')
+    expect(history.length).toBe(lenBefore + 1)
+    // ...so a hardware Back pops to the launch entry and shows the home view
+    // instead of the stale-hasPushedRef behaviour that exited the app.
+    act(() => window.dispatchEvent(new PopStateEvent('popstate', { state: { piView: 'timer' } })))
+    expect(screen.getByText('TimerView')).toBeInTheDocument()
+  })
 })
 
 describe('App — first-run install nudge', () => {
