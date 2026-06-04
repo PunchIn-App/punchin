@@ -68,7 +68,50 @@ export function isEntryInRange(entry, start, end) {
   return d >= start && d <= end
 }
 
+/**
+ * Whether an entry's worked interval [punchIn, punchOut|now] overlaps [start,
+ * end] at all — so it's counted for that window even if it began before it or
+ * ends after it. Unlike {@link isEntryInRange} (punchIn-only), this catches the
+ * morning half of an overnight shift and entries that span a period boundary
+ * (issue #136).
+ * @param {Entry} entry @param {Date} start @param {Date} end @returns {boolean}
+ */
+export function entryOverlapsRange(entry, start, end) {
+  const entryStart = new Date(entry.punchIn).getTime()
+  const entryEnd   = entry.punchOut ? new Date(entry.punchOut).getTime() : Date.now()
+  return entryStart <= end.getTime() && entryEnd >= start.getTime()
+}
+
+/**
+ * Milliseconds of an entry that actually fall inside [start, end], clipped to
+ * the window so a cross-midnight or cross-period entry contributes only its
+ * in-window portion instead of having its whole duration attributed to one day
+ * (issue #136). Running entries use `now` as the end. Returns 0 when there is no
+ * overlap.
+ * @param {Entry} entry @param {Date} start @param {Date} end @returns {number} milliseconds
+ */
+export function getEntryDurationInRange(entry, start, end) {
+  const entryStart = new Date(entry.punchIn).getTime()
+  const entryEnd   = entry.punchOut ? new Date(entry.punchOut).getTime() : Date.now()
+  const lo = Math.max(entryStart, start.getTime())
+  const hi = Math.min(entryEnd, end.getTime())
+  return Math.max(0, hi - lo)
+}
+
 /** @param {Entry[]} entries @returns {number} milliseconds */
 export function sumDurations(entries) {
   return entries.reduce((acc, e) => acc + getEntryDuration(e), 0)
+}
+
+/**
+ * Billable total for a window: completed entries only — running timers are
+ * excluded so on-screen totals agree with CSV/print/Analytics (issue #137) —
+ * each clipped to [start, end] so cross-period time isn't over-counted (#136).
+ * @param {Entry[]} entries @param {Date} start @param {Date} end @returns {number} milliseconds
+ */
+export function sumDurationsInRange(entries, start, end) {
+  return entries.reduce(
+    (acc, e) => (e.punchOut ? acc + getEntryDurationInRange(e, start, end) : acc),
+    0,
+  )
 }

@@ -8,7 +8,10 @@ import {
   getWeekRange,
   getWeekDays,
   isEntryInRange,
+  entryOverlapsRange,
+  getEntryDurationInRange,
   sumDurations,
+  sumDurationsInRange,
 } from './time'
 
 // ---------------------------------------------------------------------------
@@ -283,6 +286,86 @@ describe('isEntryInRange', () => {
 })
 
 // ---------------------------------------------------------------------------
+// entryOverlapsRange (issue #136)
+// ---------------------------------------------------------------------------
+describe('entryOverlapsRange', () => {
+  const start = new Date(2024, 0, 15, 0, 0, 0, 0)
+  const end   = new Date(2024, 0, 15, 23, 59, 59, 999)
+
+  it('includes an entry fully inside the range', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 10, 0) }
+    expect(entryOverlapsRange(e, start, end)).toBe(true)
+  })
+
+  it('includes an entry that started the previous day and ends inside (overnight morning half)', () => {
+    const e = { punchIn: new Date(2024, 0, 14, 23, 0), punchOut: new Date(2024, 0, 15, 2, 0) }
+    expect(entryOverlapsRange(e, start, end)).toBe(true)
+  })
+
+  it('includes an entry that starts inside and ends the next day', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 23, 0), punchOut: new Date(2024, 0, 16, 1, 0) }
+    expect(entryOverlapsRange(e, start, end)).toBe(true)
+  })
+
+  it('excludes an entry that ends before the range starts', () => {
+    const e = { punchIn: new Date(2024, 0, 14, 20, 0), punchOut: new Date(2024, 0, 14, 22, 0) }
+    expect(entryOverlapsRange(e, start, end)).toBe(false)
+  })
+
+  it('excludes an entry that starts after the range ends', () => {
+    const e = { punchIn: new Date(2024, 0, 16, 1, 0), punchOut: new Date(2024, 0, 16, 2, 0) }
+    expect(entryOverlapsRange(e, start, end)).toBe(false)
+  })
+
+  it('treats a running entry as ending now', () => {
+    const e = { punchIn: new Date(Date.now() - 1000), punchOut: null }
+    const wide = { start: new Date(Date.now() - 3600_000), end: new Date(Date.now() + 3600_000) }
+    expect(entryOverlapsRange(e, wide.start, wide.end)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getEntryDurationInRange (issue #136)
+// ---------------------------------------------------------------------------
+describe('getEntryDurationInRange', () => {
+  const dayStart = new Date(2024, 0, 15, 0, 0, 0, 0)
+  const dayEnd   = new Date(2024, 0, 15, 23, 59, 59, 999)
+
+  it('returns the full duration for an entry fully inside the range', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 10, 0) }
+    expect(getEntryDurationInRange(e, dayStart, dayEnd)).toBe(3_600_000)
+  })
+
+  it('clips to the end of the day for an entry that runs past midnight', () => {
+    // 23:00 → 01:00 next day: only the first hour (23:00–24:00) falls in this day
+    const e = { punchIn: new Date(2024, 0, 15, 23, 0), punchOut: new Date(2024, 0, 16, 1, 0) }
+    // 23:00:00.000 → 23:59:59.999 ≈ 1h minus 1ms
+    expect(getEntryDurationInRange(e, dayStart, dayEnd)).toBe(3_600_000 - 1)
+  })
+
+  it('clips to the start of the day for the morning half of an overnight entry', () => {
+    // Previous day 23:00 → 02:00: two hours (00:00–02:00) fall in this day
+    const e = { punchIn: new Date(2024, 0, 14, 23, 0), punchOut: new Date(2024, 0, 15, 2, 0) }
+    expect(getEntryDurationInRange(e, dayStart, dayEnd)).toBe(7_200_000)
+  })
+
+  it('returns 0 when the entry does not overlap the range', () => {
+    const e = { punchIn: new Date(2024, 0, 10, 9, 0), punchOut: new Date(2024, 0, 10, 10, 0) }
+    expect(getEntryDurationInRange(e, dayStart, dayEnd)).toBe(0)
+  })
+
+  it('sums per-day clips back to the full duration (no time lost or double-counted)', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 23, 0), punchOut: new Date(2024, 0, 16, 1, 0) } // 2h total
+    const day1 = getEntryDurationInRange(e, dayStart, dayEnd)
+    const day2Start = new Date(2024, 0, 16, 0, 0, 0, 0)
+    const day2End   = new Date(2024, 0, 16, 23, 59, 59, 999)
+    const day2 = getEntryDurationInRange(e, day2Start, day2End)
+    // 1ms is the gap between 23:59:59.999 and 00:00:00.000
+    expect(day1 + day2).toBe(7_200_000 - 1)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // sumDurations
 // ---------------------------------------------------------------------------
 describe('sumDurations', () => {
@@ -311,5 +394,40 @@ describe('sumDurations', () => {
       { punchIn: new Date(now - 1_000), punchOut: null },
     ]
     expect(sumDurations(entries)).toBeGreaterThan(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// sumDurationsInRange (issues #136 + #137)
+// ---------------------------------------------------------------------------
+describe('sumDurationsInRange', () => {
+  const start = new Date(2024, 0, 15, 0, 0, 0, 0)
+  const end   = new Date(2024, 0, 15, 23, 59, 59, 999)
+
+  it('returns 0 for an empty array', () => {
+    expect(sumDurationsInRange([], start, end)).toBe(0)
+  })
+
+  it('sums completed entries clipped to the window', () => {
+    const entries = [
+      { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 10, 0) },  // 1h
+      { punchIn: new Date(2024, 0, 15, 11, 0), punchOut: new Date(2024, 0, 15, 11, 30) }, // 30m
+    ]
+    expect(sumDurationsInRange(entries, start, end)).toBe(5_400_000)
+  })
+
+  it('excludes running entries (punchOut = null) so totals match exports (#137)', () => {
+    const entries = [
+      { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 10, 0) }, // 1h, counts
+      { punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null },                         // running, skipped
+    ]
+    expect(sumDurationsInRange(entries, start, end)).toBe(3_600_000)
+  })
+
+  it('clips a cross-midnight entry to only its in-window portion (#136)', () => {
+    const entries = [
+      { punchIn: new Date(2024, 0, 15, 23, 0), punchOut: new Date(2024, 0, 16, 1, 0) }, // 2h, 1h in-window
+    ]
+    expect(sumDurationsInRange(entries, start, end)).toBe(3_600_000 - 1)
   })
 })

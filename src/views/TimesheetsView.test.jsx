@@ -235,6 +235,34 @@ describe('TimesheetsView — DailySheet with entries', () => {
   })
 })
 
+// ─── Totals correctness: running timers + cross-day clipping (#136, #137) ──────
+
+describe('TimesheetsView — daily Total correctness', () => {
+  it('excludes a still-running timer from the daily Total (#137)', () => {
+    const completed = { ...AN_ENTRY } // 11:00 → 12:00, a completed hour
+    const running   = {
+      id: 9, jobId: 1, laborTypeId: 1,
+      punchIn: new Date(TODAY.getTime() - 5 * 3600000), // running for hours
+      punchOut: null, notes: null,
+    }
+    setupWithEntries([completed, running])
+    render(<TimesheetsView />)
+    // Total counts only the completed hour, not the running timer's elapsed time
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent(/^1h$/)
+  })
+
+  it('counts the in-day portion of an entry that began the night before (#136)', () => {
+    // Yesterday 23:00 → today 01:00: only the 00:00–01:00 hour belongs to today.
+    // The old punchIn-only filter dropped this entry from today entirely.
+    const yStart = new Date(TODAY); yStart.setDate(yStart.getDate() - 1); yStart.setHours(23, 0, 0, 0)
+    const tEnd   = new Date(TODAY); tEnd.setHours(1, 0, 0, 0)
+    const overnight = { id: 10, jobId: 1, laborTypeId: 1, punchIn: yStart, punchOut: tEnd, notes: null }
+    setupWithEntries([overnight])
+    render(<TimesheetsView />)
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent(/^1h$/)
+  })
+})
+
 // ─── Search filtering ─────────────────────────────────────────────────────────
 
 describe('TimesheetsView — search filters entries', () => {

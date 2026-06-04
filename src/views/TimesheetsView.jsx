@@ -5,20 +5,31 @@ import { format, addDays, subDays, addWeeks, subWeeks } from 'date-fns'
 import { db, deleteEntry } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import {
-  formatDurationHM, formatTime, getEntryDuration,
+  formatDurationHM, formatTime,
   getDayRange, getWeekRange, getWeekDays,
-  isEntryInRange, sumDurations,
+  entryOverlapsRange, getEntryDurationInRange, sumDurationsInRange,
 } from '../utils/time'
 import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
 import ConfirmModal from '../components/ConfirmModal'
 
+// Entries can start before a viewed day/week and run into it (an overnight
+// shift's morning half). The punchIn index can't express "overlaps [start,end]"
+// directly, so each reactive query looks back one day past the window start and
+// the entryOverlapsRange filter drops anything that doesn't actually touch it.
+// A day covers every realistic overnight shift; a forgotten multi-day timer
+// still surfaces in the Timer view with its "Overnight Run?" flag. (issue #136)
+const OVERNIGHT_LOOKBACK_MS = 24 * 60 * 60 * 1000
+
 function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { start, end } = getDayRange(date)
+  const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
   const entries = useLiveQuery(
-    // Indexed range query (issue #132): punchIn is a Date key, so Dexie can
-    // satisfy this from the `punchIn` index instead of scanning the whole table.
-    () => db.entries.where('punchIn').between(start, end, true, true).toArray(),
+    // Indexed range query (issue #132): punchIn is a Date key, so Dexie serves
+    // this from the `punchIn` index instead of scanning the whole table. The
+    // window reaches back a day (issue #136) to catch overnight entries that
+    // began before this day; entryOverlapsRange below drops the rest.
+    () => db.entries.where('punchIn').between(queryStart, end, true, true).toArray(),
     [start.getTime()]
   )
   const getJob = id => jobs?.find(j => j.id === id)
@@ -27,6 +38,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
   if (!entries) return null
 
   const filteredEntries = entries.filter(e => {
+    if (!entryOverlapsRange(e, start, end)) return false // drop look-back non-overlaps (#136)
     const job = getJob(e.jobId)
     const lt = getLT(e.laborTypeId)
 
@@ -50,7 +62,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
       {/* Summary bar */}
       <div className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
         <span className="text-sm text-appTextMuted">Total</span>
-        <span className="font-mono font-semibold text-appText text-lg">{formatDurationHM(sumDurations(filteredEntries))}</span>
+        <span className="font-mono font-semibold text-appText text-lg">{formatDurationHM(sumDurationsInRange(filteredEntries, start, end))}</span>
       </div>
 
       {filteredEntries.length === 0 ? (
@@ -62,7 +74,9 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
         filteredEntries.map(entry => {
           const job = getJob(entry.jobId)
           const lt  = getLT(entry.laborTypeId)
-          const dur = getEntryDuration(entry)
+          // Clip to the day so an overnight entry shows only the portion worked
+          // today, keeping the card durations summing to the day Total (#136).
+          const dur = getEntryDurationInRange(entry, start, end)
           return (
             <div key={entry.id} className="rounded-xl border border-appBorder bg-appCard p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
@@ -104,11 +118,13 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const wsMon = settings.weekStartsMonday // complete via DEFAULT_SETTINGS merge (issue #134)
   const { start, end } = getWeekRange(date, wsMon)
   const days = getWeekDays(date, wsMon)
+  const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
 
   const allEntries = useLiveQuery(
-    // Indexed range query (issue #132): punchIn is a Date key, so Dexie can
-    // satisfy this from the `punchIn` index instead of scanning the whole table.
-    () => db.entries.where('punchIn').between(start, end, true, true).toArray(),
+    // Indexed range query (issue #132) with a one-day look-back (issue #136) so
+    // an entry that began the night before the week still counts toward it;
+    // entryOverlapsRange below drops anything in the margin that doesn't touch it.
+    () => db.entries.where('punchIn').between(queryStart, end, true, true).toArray(),
     [start.getTime()]
   )
   const getJob = id => jobs?.find(j => j.id === id)
@@ -116,6 +132,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   if (!allEntries) return null
 
   const filteredEntries = allEntries.filter(e => {
+    if (!entryOverlapsRange(e, start, end)) return false // drop look-back non-overlaps (#136)
     const job = getJob(e.jobId)
     const lt = getLT(e.laborTypeId)
 
@@ -134,9 +151,10 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
     return true
   })
 
-  const total = sumDurations(filteredEntries)
+  const total = sumDurationsInRange(filteredEntries, start, end)
   const jobTotals = filteredEntries.reduce((acc, e) => {
-    acc[e.jobId] = (acc[e.jobId] || 0) + getEntryDuration(e)
+    if (!e.punchOut) return acc // running timers excluded from totals (#137)
+    acc[e.jobId] = (acc[e.jobId] || 0) + getEntryDurationInRange(e, start, end) // clip to week (#136)
     return acc
   }, {})
 
@@ -173,8 +191,11 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
       {days.map(day => {
         const ds = new Date(day); ds.setHours(0,0,0,0)
         const de = new Date(day); de.setHours(23,59,59,999)
-        const dayEntries = filteredEntries.filter(e => isEntryInRange(e, ds, de))
-        const dayTotal   = sumDurations(dayEntries)
+        // Overlap (not punchIn-only) so an overnight entry appears under both
+        // days it touches; totals clip each entry to the day it's shown under
+        // and skip running timers, so the rows sum to dayTotal (#136, #137).
+        const dayEntries = filteredEntries.filter(e => entryOverlapsRange(e, ds, de))
+        const dayTotal   = sumDurationsInRange(dayEntries, ds, de)
         const isToday    = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
         return (
@@ -203,7 +224,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="font-mono text-appTextDarker">{formatDurationHM(getEntryDuration(e))}</span>
+                        <span className="font-mono text-appTextDarker">{formatDurationHM(getEntryDurationInRange(e, ds, de))}</span>
                         <div className="flex items-center gap-1">
                           <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${getJob(e.jobId)?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
