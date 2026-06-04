@@ -35,30 +35,46 @@ async function mergeSnapshot(remote) {
   if (!remote?.version || !Array.isArray(remote.jobs)) return 0
 
   return db.transaction('rw', [db.laborTypes, db.jobs, db.entries], async () => {
+    // Identity is resolved per-record: a record that carries a `uuid` (written
+    // by current app versions) is matched to the local record with the same
+    // uuid — stable across renames and edits. Records without a uuid (legacy
+    // v1 snapshots from older app versions) fall back to the original
+    // name/value matching, so old and new snapshots both merge correctly.
     const ltMap = {}
     const existingLts = await db.laborTypes.toArray()
     for (const lt of remote.laborTypes ?? []) {
-      const match = existingLts.find(e => e.name.toLowerCase() === lt.name.toLowerCase())
+      const match =
+        (lt.uuid && existingLts.find(e => e.uuid === lt.uuid)) ||
+        existingLts.find(e => e.name.toLowerCase() === lt.name.toLowerCase())
       if (match) {
         ltMap[lt.id] = match.id
       } else {
-        ltMap[lt.id] = await db.laborTypes.add({ name: lt.name, color: lt.color })
+        const newId = await db.laborTypes.add({
+          name: lt.name, color: lt.color, uuid: lt.uuid, updatedAt: lt.updatedAt,
+        })
+        ltMap[lt.id] = newId
+        existingLts.push({ id: newId, name: lt.name, uuid: lt.uuid })
       }
     }
 
     const jobMap = {}
     const existingJobs = await db.jobs.toArray()
     for (const job of remote.jobs ?? []) {
-      const match = existingJobs.find(j => j.name.toLowerCase() === job.name.toLowerCase())
+      const match =
+        (job.uuid && existingJobs.find(j => j.uuid === job.uuid)) ||
+        existingJobs.find(j => j.name.toLowerCase() === job.name.toLowerCase())
       if (match) {
         jobMap[job.id] = match.id
       } else {
-        jobMap[job.id] = await db.jobs.add({
+        const newId = await db.jobs.add({
           name: job.name,
           clientName: job.clientName ?? null,
           laborTypeId: job.laborTypeId ? ltMap[job.laborTypeId] : null,
           isActive: job.isActive !== false,
+          uuid: job.uuid, updatedAt: job.updatedAt,
         })
+        jobMap[job.id] = newId
+        existingJobs.push({ id: newId, name: job.name, uuid: job.uuid })
       }
     }
 
@@ -68,22 +84,26 @@ async function mergeSnapshot(remote) {
       const newJobId = jobMap[entry.jobId]
       const newLtId = entry.laborTypeId ? ltMap[entry.laborTypeId] : null
       if (!newJobId) continue
-      const dup = existingEntries.some(e =>
-        e.jobId === newJobId &&
-        e.laborTypeId === newLtId &&
-        new Date(e.punchIn).getTime() === new Date(entry.punchIn).getTime() &&
-        (e.punchOut && entry.punchOut
-          ? new Date(e.punchOut).getTime() === new Date(entry.punchOut).getTime()
-          : e.punchOut === entry.punchOut)
-      )
+      const dup = entry.uuid
+        ? existingEntries.some(e => e.uuid === entry.uuid)
+        : existingEntries.some(e =>
+            e.jobId === newJobId &&
+            e.laborTypeId === newLtId &&
+            new Date(e.punchIn).getTime() === new Date(entry.punchIn).getTime() &&
+            (e.punchOut && entry.punchOut
+              ? new Date(e.punchOut).getTime() === new Date(entry.punchOut).getTime()
+              : e.punchOut === entry.punchOut)
+          )
       if (!dup) {
-        await db.entries.add({
+        const newId = await db.entries.add({
           jobId: newJobId,
           laborTypeId: newLtId,
           punchIn: new Date(entry.punchIn),
           punchOut: entry.punchOut ? new Date(entry.punchOut) : null,
           notes: entry.notes ?? null,
+          uuid: entry.uuid, updatedAt: entry.updatedAt,
         })
+        existingEntries.push({ id: newId, uuid: entry.uuid, jobId: newJobId, laborTypeId: newLtId, punchIn: new Date(entry.punchIn), punchOut: entry.punchOut ? new Date(entry.punchOut) : null })
         imported++
       }
     }

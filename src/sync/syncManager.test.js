@@ -545,3 +545,85 @@ describe('runSync — merge deduplication', () => {
     expect(entries).toHaveLength(0)
   })
 })
+
+// ---------------------------------------------------------------------------
+// runSync — merge: stable uuid identity (issue #123)
+// ---------------------------------------------------------------------------
+
+describe('runSync — merge by stable uuid identity', () => {
+  it('does not re-add an entry whose uuid already exists locally even if its fields changed', async () => {
+    // Reproduces the "edits duplicate across devices" half: under the old
+    // value-tuple dedup, an edited copy (different punchIn/punchOut) of the
+    // same entry would be imported as a second row. With uuid identity it is
+    // recognised as the same record and not duplicated.
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false })
+    const jobId = await db.jobs.add({ name: 'Client Project', isActive: true, laborRates: {} })
+    const localId = await db.entries.add({
+      jobId, laborTypeId: ltId,
+      punchIn: new Date('2025-01-01T09:00:00.000Z'),
+      punchOut: new Date('2025-01-01T10:00:00.000Z'),
+      notes: null,
+    })
+    const [lt, job, entry] = await Promise.all([
+      db.laborTypes.get(ltId), db.jobs.get(jobId), db.entries.get(localId),
+    ])
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Design', color: '#6366F1' }],
+      jobs: [{ id: 200, uuid: job.uuid, name: 'Client Project', laborTypeId: 100, isActive: true }],
+      entries: [{
+        uuid: entry.uuid, jobId: 200, laborTypeId: 100,
+        punchIn: '2025-01-01T11:30:00.000Z', // edited start
+        punchOut: '2025-01-01T12:15:00.000Z', // edited end
+        notes: 'edited elsewhere',
+      }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const entries = await db.entries.toArray()
+    expect(entries).toHaveLength(1) // matched by uuid → no duplicate
+  })
+
+  it('matches a labor type by uuid even when its name differs (rename no longer splits)', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false })
+    const { uuid } = await db.laborTypes.get(ltId)
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid, name: 'Visual Design', color: '#6366F1' }], // renamed remotely
+      jobs: [],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const lts = await db.laborTypes.toArray()
+    expect(lts).toHaveLength(1) // matched by uuid, not added as a second "Visual Design"
+  })
+
+  it('still imports a genuinely new uuid-bearing entry from a remote device', async () => {
+    await seedSyncSettings()
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 1, uuid: 'lt-uuid-1', name: 'Dev', color: '#F59E0B' }],
+      jobs: [{ id: 2, uuid: 'job-uuid-1', name: 'Remote Job', laborTypeId: 1, isActive: true }],
+      entries: [{
+        uuid: 'entry-uuid-1', jobId: 2, laborTypeId: 1,
+        punchIn: '2025-02-01T09:00:00.000Z', punchOut: '2025-02-01T10:00:00.000Z', notes: null,
+      }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const entries = await db.entries.toArray()
+    expect(entries).toHaveLength(1)
+    expect(entries[0].uuid).toBe('entry-uuid-1') // remote uuid preserved
+  })
+})

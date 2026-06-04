@@ -345,9 +345,11 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 | Table | Indexes | Purpose |
 |-------|---------|---------|
 | `settings` | `key` | KV store for app preferences |
-| `laborTypes` | `id, name` | Billable categories with color; soft-archived via `isArchived` |
-| `jobs` | `id, name, laborTypeId, isActive` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field |
-| `entries` | `id, jobId, laborTypeId, punchIn, punchOut` | Time records; optional `notes` (string) field |
+| `laborTypes` | `id, name, uuid` | Billable categories with color; soft-archived via `isArchived` |
+| `jobs` | `id, name, laborTypeId, isActive, uuid` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field |
+| `entries` | `id, jobId, laborTypeId, punchIn, punchOut, uuid` | Time records; optional `notes` (string) field |
+
+All three data tables also carry a `uuid` (stable cross-device identifier) and an `updatedAt` (ms epoch) field, stamped automatically by Dexie `creating`/`updating` hooks in `db.js`. `uuid` survives sync/transfer so cloud merge can identify the *same* record across devices (independent of the local-only auto-increment `id`); `updatedAt` is the basis for last-write-wins conflict resolution. The `creating` hook only fills in missing values, so a record merged in from another device keeps its remote `uuid`/`updatedAt`.
 
 ### Record Lifecycle
 
@@ -411,7 +413,7 @@ As of v0.3.0 the `populate` event in `db.js` seeds **only settings** — no defa
 
 ### Schema Changes
 
-When adding new tables or indexes, increment the version number in `db.js` and add an upgrade block. Dexie handles migrations automatically on version bump.
+When adding new tables or indexes, increment the version number in `db.js` and add an upgrade block. Dexie handles migrations automatically on version bump. (v3 added the `uuid` index + `updatedAt` field to `jobs`/`laborTypes`/`entries`, backfilling existing records in its `upgrade()` so older installs become merge-identifiable without data loss.)
 
 ---
 

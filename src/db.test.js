@@ -108,3 +108,44 @@ describe('db — basic CRUD', () => {
     expect(entry?.punchIn).toEqual(punchIn)
   })
 })
+
+describe('db — identity stamping (uuid / updatedAt hooks)', () => {
+  afterEach(async () => {
+    await db.jobs.clear()
+    await db.laborTypes.clear()
+    await db.entries.clear()
+  })
+
+  it.each([
+    ['jobs', { name: 'X', isActive: true, laborRates: {} }],
+    ['laborTypes', { name: 'Y', color: '#fff', isArchived: false }],
+    ['entries', { jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null }],
+  ])('stamps a uuid and updatedAt on a newly created %s record', async (table, record) => {
+    const id = await db[table].add(record)
+    const row = await db[table].get(id)
+    expect(typeof row.uuid).toBe('string')
+    expect(row.uuid.length).toBeGreaterThan(0)
+    expect(typeof row.updatedAt).toBe('number')
+  })
+
+  it('gives each record a distinct uuid', async () => {
+    const a = await db.jobs.add({ name: 'A', isActive: true, laborRates: {} })
+    const b = await db.jobs.add({ name: 'B', isActive: true, laborRates: {} })
+    const [ja, jb] = await Promise.all([db.jobs.get(a), db.jobs.get(b)])
+    expect(ja.uuid).not.toBe(jb.uuid)
+  })
+
+  it('preserves an explicitly-provided uuid/updatedAt (merge path keeps remote identity)', async () => {
+    const id = await db.jobs.add({ name: 'Remote', isActive: true, laborRates: {}, uuid: 'fixed-uuid', updatedAt: 123 })
+    const job = await db.jobs.get(id)
+    expect(job.uuid).toBe('fixed-uuid')
+    expect(job.updatedAt).toBe(123)
+  })
+
+  it('bumps updatedAt on update', async () => {
+    const id = await db.jobs.add({ name: 'X', isActive: true, laborRates: {}, updatedAt: 1 })
+    await db.jobs.update(id, { name: 'Y' })
+    const job = await db.jobs.get(id)
+    expect(job.updatedAt).toBeGreaterThan(1)
+  })
+})

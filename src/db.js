@@ -1,33 +1,59 @@
 import Dexie from 'dexie'
 
+// Stable cross-device record id. Prefers the native UUID generator; falls back
+// to a manual v4 UUID (crypto.getRandomValues is available in every supported
+// browser and in the test environment) so record creation never throws.
+export function genUuid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40
+  b[8] = (b[8] & 0x3f) | 0x80
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+
 /**
  * @typedef {'auto'|'dark'|'light'} Theme
  *
  * @typedef {{ key: string, value: boolean|string }} Setting
  *
+ * `uuid` is a stable, cross-device identifier stamped on creation (see the
+ * Dexie `creating` hook below). Unlike the auto-increment `id` (local-only), it
+ * survives sync/transfer and lets cloud merge identify the *same* record across
+ * devices. `updatedAt` (ms epoch) is bumped on every write and is the basis for
+ * last-write-wins conflict resolution.
+ *
  * @typedef {{
  *   id?: number,
+ *   uuid?: string,
  *   name: string,
  *   color: string,
  *   isArchived: boolean,
+ *   updatedAt?: number,
  * }} LaborType
  *
  * @typedef {{
  *   id?: number,
+ *   uuid?: string,
  *   name: string,
  *   laborTypeId: number,
  *   isActive: boolean,
  *   isDeleted?: boolean,
  *   laborRates?: Record<number, number>,
+ *   updatedAt?: number,
  * }} Job
  *
  * @typedef {{
  *   id?: number,
+ *   uuid?: string,
  *   jobId: number,
  *   laborTypeId: number,
  *   punchIn: Date,
  *   punchOut: Date|null,
- *   note?: string,
+ *   notes?: string,
+ *   updatedAt?: number,
  * }} Entry
  */
 
@@ -43,6 +69,42 @@ db.version(1).stores({
 db.version(2).stores({
   entries:     '++id, jobId, laborTypeId, punchIn, punchOut',
 })
+
+// v3 — add a stable cross-device `uuid` (indexed, non-unique: uniqueness is
+// guaranteed by genUuid(), and a plain index avoids any unique-constraint risk
+// during the backfill). The upgrade backfills `uuid` + `updatedAt` on every
+// existing record so older installs become merge-identifiable without data loss.
+db.version(3)
+  .stores({
+    laborTypes:  '++id, name, uuid',
+    jobs:        '++id, name, laborTypeId, isActive, uuid',
+    entries:     '++id, jobId, laborTypeId, punchIn, punchOut, uuid',
+  })
+  .upgrade(async (tx) => {
+    const stamp = Date.now()
+    for (const table of ['laborTypes', 'jobs', 'entries']) {
+      await tx.table(table).toCollection().modify((r) => {
+        if (r.uuid == null) r.uuid = genUuid()
+        if (r.updatedAt == null) r.updatedAt = stamp
+      })
+    }
+  })
+
+// Stamp identity metadata on every write, centrally — so the ~10 create/update
+// call sites across the app don't each have to remember to. `creating` only
+// fills in missing values, so a record merged from another device keeps its
+// remote `uuid`/`updatedAt`. `updating` bumps `updatedAt` unless the caller set
+// it explicitly (e.g. a future last-write-wins merge applying a remote value).
+for (const table of [db.laborTypes, db.jobs, db.entries]) {
+  table.hook('creating', (_primKey, obj) => {
+    if (obj.uuid == null) obj.uuid = genUuid()
+    if (obj.updatedAt == null) obj.updatedAt = Date.now()
+  })
+  table.hook('updating', (mods) => {
+    if (Object.prototype.hasOwnProperty.call(mods, 'updatedAt')) return undefined
+    return { updatedAt: Date.now() }
+  })
+}
 
 // Seed default settings on first run — no jobs or labor types pre-loaded
 db.on('populate', async () => {
