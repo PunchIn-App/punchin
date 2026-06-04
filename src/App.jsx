@@ -220,8 +220,11 @@ export default function App() {
     setPendingGitHubAuth(null)
   }, [])
 
-  // Handle OAuth callback tokens written into the URL hash by the provider
+  // Handle OAuth callback tokens written into the URL hash by the provider.
+  // Async resolutions are guarded by `cancelled` so a late fetch/decode can't
+  // setState after the effect is torn down (avoids a stale dialog re-appearing).
   useEffect(() => {
+    let cancelled = false
     const hash = window.location.hash
     if (!hash || hash === '#') return
     const params = new URLSearchParams(hash.slice(1))
@@ -231,31 +234,25 @@ export default function App() {
       const code = params.get('import')
       history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
       decodeSnapshot(code)
-        .then(snapshot => setImportPrompt({ snapshot, jobs: snapshot.jobs.length, entries: snapshot.entries.length }))
+        .then(snapshot => { if (!cancelled) setImportPrompt({ snapshot, jobs: snapshot.jobs.length, entries: snapshot.entries.length }) })
         .catch(() => { /* invalid/corrupt link — ignore silently */ })
-      return
-    }
 
-    if (params.has('sync_error')) {
+    } else if (params.has('sync_error')) {
       history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
       db.settings.put({ key: 'syncError', value: params.get('sync_error') })
-      return
-    }
 
     // GitHub: hold the token in memory and show a confirmation dialog before
     // saving — GitHub may silently use the already-signed-in account without
     // showing an account chooser, so we ask the user to confirm it's right.
-    if (params.has('sync_token') && params.get('sync_provider') === 'github') {
+    } else if (params.has('sync_token') && params.get('sync_provider') === 'github') {
       const token = params.get('sync_token')
       history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)
       setActiveView('settings')
       fetchGitHubUser(token)
-        .then(user => setPendingGitHubAuth({ token, username: user?.login ?? null }))
-      return
-    }
+        .then(user => { if (!cancelled) setPendingGitHubAuth({ token, username: user?.login ?? null }) })
 
     // Google / OneDrive: token comes via implicit flow, provider passed as `state`
-    if (params.has('access_token') && params.has('state')) {
+    } else if (params.has('access_token') && params.has('state')) {
       const provider = params.get('state')
       if (provider !== 'google' && provider !== 'onedrive') return
       const token = params.get('access_token')
@@ -267,10 +264,13 @@ export default function App() {
         { key: 'syncFileId', value: null },
         { key: 'syncError', value: null },
       ]).then(() => {
+        if (cancelled) return
         history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)
         setActiveView('settings')
       })
     }
+
+    return () => { cancelled = true }
   }, [setActiveView])
 
   // --- First-run install nudge -------------------------------------------

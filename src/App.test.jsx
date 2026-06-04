@@ -204,7 +204,7 @@ describe('App — OAuth callback handling', () => {
     await waitFor(() => screen.getByRole('dialog'))
     await act(async () => { screen.getByRole('button', { name: 'Cancel' }).click() })
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
   it('closes the confirmation on Escape without saving', async () => {
@@ -213,7 +213,7 @@ describe('App — OAuth callback handling', () => {
     await waitFor(() => screen.getByRole('dialog'))
     await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
   it('stores Google token when hash has access_token + state=google', async () => {
