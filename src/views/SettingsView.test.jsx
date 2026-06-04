@@ -1,11 +1,12 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import SettingsView from './SettingsView'
 
-// Settings are grouped into a single-open accordion (issue #60); a section's
-// content only renders once its header is expanded. This opens a section by
-// clicking its header button (matched on the exact title).
-const expand = (label) =>
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}$`, 'i') }))
+// Settings is an iOS-style drill-in (issue #60): the root list shows one row
+// per category, and tapping a row reveals that category's sub-page. Each row's
+// accessible name is its title followed by a subtitle, so match on the leading
+// title. Backup / Sync / Transfer / Danger Zone all live inside "Data & Sync".
+const expand = (title) =>
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${title}`, 'i') }))
 
 const mockUpdateSetting       = vi.fn()
 const mockDbJobsToArray       = vi.fn().mockResolvedValue([])
@@ -120,36 +121,63 @@ beforeEach(() => {
   global.alert = vi.fn()
 })
 
-describe('SettingsView — section rendering', () => {
-  it('renders General, Appearance, Data, Sync, and About section headers', () => {
+describe('SettingsView — root list & drill-in', () => {
+  it('renders General, Appearance, Reminders, Data & Sync, and About category rows', () => {
     render(<SettingsView />)
-    expect(screen.getByRole('button', { name: /^general$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^appearance$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^data$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^sync$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^about$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^general/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^appearance/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^reminders/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^data & sync/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^about/i })).toBeInTheDocument()
   })
 
-  it('sections are collapsed by default (single-open accordion)', () => {
+  it('shows only the root list by default (no panel content until a row is tapped)', () => {
     render(<SettingsView />)
-    // Content from collapsed sections is not rendered until expanded.
     expect(screen.queryByRole('switch', { name: /allow concurrent timers/i })).not.toBeInTheDocument()
     expect(screen.queryByText('Clear time entries')).not.toBeInTheDocument()
   })
 
-  it('opening one section closes the previously open one', () => {
+  it('drilling into a category replaces the root list with its sub-page', () => {
     render(<SettingsView />)
     expand('General')
+    // The category's content is now visible…
     expect(screen.getByRole('switch', { name: /allow concurrent timers/i })).toBeInTheDocument()
-    expand('Data')
-    // General collapsed when Data opened
-    expect(screen.queryByRole('switch', { name: /allow concurrent timers/i })).not.toBeInTheDocument()
-    expect(screen.getByText('Export data')).toBeInTheDocument()
+    // …and the other root rows are gone, replaced by a Back affordance.
+    expect(screen.queryByRole('button', { name: /^appearance/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^settings$/i })).toBeInTheDocument()
   })
 
-  it('Danger Zone section is collapsed by default', () => {
+  it('returns to the root list when Back is invoked (popstate)', () => {
     render(<SettingsView />)
-    expect(screen.queryByText('Clear time entries')).not.toBeInTheDocument()
+    expand('General')
+    fireEvent.popState(window, { state: null })
+    expect(screen.getByRole('button', { name: /^appearance/i })).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: /allow concurrent timers/i })).not.toBeInTheDocument()
+  })
+
+  it('consolidates Backup, Sync, Transfer, and Danger Zone under Data & Sync', () => {
+    render(<SettingsView />)
+    expand('Data & Sync')
+    expect(screen.getByText('Export data')).toBeInTheDocument()
+    expect(screen.getByText('Clear time entries')).toBeInTheDocument()
+  })
+
+  it('unwinds the open panel when the Settings tab is re-selected', () => {
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    render(<SettingsView />)
+    expand('General') // pushes a settingsPanel history entry
+    window.dispatchEvent(new CustomEvent('pi:reselect-tab', { detail: 'settings' }))
+    expect(backSpy).toHaveBeenCalled()
+    backSpy.mockRestore()
+  })
+
+  it('ignores reselect events for other tabs', () => {
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    render(<SettingsView />)
+    expand('General')
+    window.dispatchEvent(new CustomEvent('pi:reselect-tab', { detail: 'timer' }))
+    expect(backSpy).not.toHaveBeenCalled()
+    backSpy.mockRestore()
   })
 })
 
@@ -232,28 +260,28 @@ describe('SettingsView — Accent color', () => {
 describe('SettingsView — Data export', () => {
   it('calls db.jobs.toArray when Export data is clicked', async () => {
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Export data'))
     await waitFor(() => expect(mockDbJobsToArray).toHaveBeenCalled())
   })
 
   it('calls URL.createObjectURL when Export data is clicked', async () => {
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Export data'))
     await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled())
   })
 
   it('calls db.entries.toArray when Export CSV is clicked', async () => {
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Export CSV'))
     await waitFor(() => expect(mockDbEntriesToArray).toHaveBeenCalled())
   })
 
   it('calls URL.createObjectURL when Export CSV is clicked', async () => {
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Export CSV'))
     await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled())
   })
@@ -262,16 +290,18 @@ describe('SettingsView — Data export', () => {
 describe('SettingsView — Data import', () => {
   it('triggers the hidden file input when Import data is clicked', () => {
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     const input = document.querySelector('input[type="file"]')
     const clickSpy = vi.spyOn(input, 'click').mockImplementation(() => {})
-    fireEvent.click(screen.getByText('Import data'))
+    // Scope to the Backup group's import (the Transfer group also has an
+    // "Import data" action now that both live in the Data & Sync panel).
+    fireEvent.click(screen.getByRole('button', { name: /Restore jobs, types, and entries from backup JSON/i }))
     expect(clickSpy).toHaveBeenCalled()
   })
 
   it('shows alert for invalid JSON', async () => {
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     const input = document.querySelector('input[type="file"]')
     const file = new File(['not json'], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -283,7 +313,7 @@ describe('SettingsView — Data import', () => {
 
   it('shows alert for invalid backup file structure', async () => {
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     const input = document.querySelector('input[type="file"]')
     const file = new File([JSON.stringify({ version: 1 })], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -301,7 +331,7 @@ describe('SettingsView — Data import', () => {
       laborTypes: [],
     })
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     const input = document.querySelector('input[type="file"]')
     const file = new File([backup], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -318,13 +348,13 @@ describe('SettingsView — Data import', () => {
 describe('SettingsView — Danger Zone', () => {
   it('expands when the Danger Zone header is clicked', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     expect(screen.getByText('Clear time entries')).toBeInTheDocument()
   })
 
   it('shows ConfirmModal when Clear time entries is clicked', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Clear time entries'))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByText('Clear all time entries?')).toBeInTheDocument()
@@ -332,7 +362,7 @@ describe('SettingsView — Danger Zone', () => {
 
   it('calls db.entries.clear() when ConfirmModal is confirmed', async () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Clear time entries'))
     fireEvent.click(screen.getByRole('button', { name: /clear entries/i }))
     await waitFor(() => expect(mockDbEntriesClear).toHaveBeenCalled())
@@ -340,7 +370,7 @@ describe('SettingsView — Danger Zone', () => {
 
   it('closes ConfirmModal when Cancel is clicked', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Clear time entries'))
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -348,20 +378,20 @@ describe('SettingsView — Danger Zone', () => {
 
   it('shows Factory Reset button when Danger Zone is expanded', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     expect(screen.getByText('Factory Reset')).toBeInTheDocument()
   })
 
   it('advances to warn stage when Factory Reset is clicked', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
     expect(screen.getByText('Reset to factory defaults?')).toBeInTheDocument()
   })
 
   it('advances to final stage when Continue is clicked in warn stage', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }))
     expect(screen.getByText('There is no going back.')).toBeInTheDocument()
@@ -369,7 +399,7 @@ describe('SettingsView — Danger Zone', () => {
 
   it('returns to null stage when Cancel is clicked in warn stage', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(screen.queryByText('Reset to factory defaults?')).not.toBeInTheDocument()
@@ -378,7 +408,7 @@ describe('SettingsView — Danger Zone', () => {
 
   it('calls all db.clear methods when "Yes, wipe everything" is confirmed', async () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }))
     fireEvent.click(screen.getByRole('button', { name: /yes, wipe everything/i }))
@@ -393,7 +423,7 @@ describe('SettingsView — Danger Zone', () => {
 
   it('re-seeds the default blue accent (#1f6feb), not amber, after factory reset (#69)', async () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }))
     fireEvent.click(screen.getByRole('button', { name: /yes, wipe everything/i }))
@@ -405,7 +435,7 @@ describe('SettingsView — Danger Zone', () => {
 
   it('returns to null stage after factory reset completes', async () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }))
     fireEvent.click(screen.getByRole('button', { name: /yes, wipe everything/i }))
@@ -447,6 +477,34 @@ describe('SettingsView — About', () => {
     render(<SettingsView />)
     expand('About')
     expect(screen.getByText('Check for updates')).toBeInTheDocument()
+  })
+
+  it('opens a feature-request issue from "Help improve PunchIn"', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {})
+    render(<SettingsView />)
+    expand('About')
+    fireEvent.click(screen.getByText('Help improve PunchIn'))
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringContaining('template=feature_request.yml'),
+      '_blank',
+      'noopener,noreferrer',
+    )
+    openSpy.mockRestore()
+  })
+
+  it('opens the LicenseModal from "License & legal"', () => {
+    render(<SettingsView />)
+    expand('About')
+    fireEvent.click(screen.getByText('License & legal'))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getAllByText('License & legal').length).toBeGreaterThan(1)
+  })
+
+  it('renders a "Support the App" link to Buy Me a Coffee', () => {
+    render(<SettingsView />)
+    expand('About')
+    const link = screen.getByRole('link', { name: /support the app/i })
+    expect(link).toHaveAttribute('href', 'https://www.buymeacoffee.com/PunchIn-App')
   })
 
   it('shows "Already up to date" after clicking Check for updates (no service worker)', async () => {
@@ -533,7 +591,7 @@ describe('SettingsView — Data import: edge cases', () => {
       laborTypes: [{ id: 5, name: 'Design', color: '#6366F1' }],
     })
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     const input = document.querySelector('input[type="file"]')
     const file = new File([backup], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -563,7 +621,7 @@ describe('SettingsView — Data import: edge cases', () => {
       laborTypes: [],
     })
     render(<SettingsView />)
-    expand('Data')
+    expand('Data & Sync')
     const input = document.querySelector('input[type="file"]')
     const file = new File([backup], 'backup.json', { type: 'application/json' })
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
@@ -582,7 +640,7 @@ describe('SettingsView — Data import: edge cases', () => {
 describe('SettingsView — Danger Zone: cancel at final stage', () => {
   it('returns to Factory Reset button when Cancel is clicked in the final stage', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByText(/danger zone/i))
+    expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }))
     // Confirm we are now in the final stage
@@ -597,14 +655,15 @@ describe('SettingsView — Danger Zone: cancel at final stage', () => {
 })
 
 describe('SettingsView — Sync section', () => {
-  it('renders Sync section header', () => {
+  it('renders the Sync group inside the Data & Sync page', () => {
     render(<SettingsView />)
-    expect(screen.getByRole('button', { name: /^sync$/i })).toBeInTheDocument()
+    expand('Data & Sync')
+    expect(screen.getByText('Sync across devices')).toBeInTheDocument()
   })
 
   it('shows disconnected state with provider buttons when client IDs are configured', () => {
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     expect(screen.getByText('Sync across devices')).toBeInTheDocument()
     expect(screen.getByText('GitHub Gist')).toBeInTheDocument()
     expect(screen.getByText('Google Drive')).toBeInTheDocument()
@@ -617,7 +676,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     expect(await screen.findByRole('button', { name: /Sync Now/i })).toBeInTheDocument()
     expect(screen.getByText('GitHub Gist')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Disconnect/i })).toBeInTheDocument()
@@ -629,7 +688,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     expect(await screen.findByText('Connected')).toBeInTheDocument()
   })
 
@@ -639,7 +698,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     // Wait on a connected-only sentinel so the async live-query settle is
     // observed before asserting the provider label (which also appears as a
     // connect button in the disconnected state).
@@ -654,7 +713,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: Date.now() - 30000 },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     await screen.findByRole('button', { name: /Sync Now/i })
     expect(screen.getByText('OneDrive')).toBeInTheDocument()
     expect(screen.getByText(/Just now/)).toBeInTheDocument()
@@ -666,7 +725,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'syncTokenExpiry', value: Date.now() - 1000 },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     expect(await screen.findByText(/Token expired/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sync Now/i })).toBeDisabled()
   })
@@ -678,7 +737,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     expect(await screen.findByText('GitHub 401')).toBeInTheDocument()
   })
 
@@ -688,7 +747,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     fireEvent.click(await screen.findByRole('button', { name: /Sync Now/i }))
     await waitFor(() => expect(mockRunSync).toHaveBeenCalled())
   })
@@ -699,7 +758,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     fireEvent.click(await screen.findByRole('button', { name: /Disconnect/i }))
     // A confirmation dialog appears (replaces the old window.confirm)
     const dialog = await screen.findByRole('dialog')
@@ -714,7 +773,7 @@ describe('SettingsView — Sync section', () => {
       { key: 'lastSyncedAt', value: null },
     ])
     render(<SettingsView />)
-    expand('Sync')
+    expand('Data & Sync')
     fireEvent.click(await screen.findByRole('button', { name: /Disconnect/i }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /Cancel/i }))

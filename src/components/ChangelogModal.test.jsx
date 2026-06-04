@@ -66,6 +66,13 @@ describe('ChangelogModal — interactions', () => {
     fireEvent.click(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it('closes on hardware/gesture Back (popstate)', () => {
+    const onClose = vi.fn()
+    render(<ChangelogModal onClose={onClose} />)
+    fireEvent.popState(window)
+    expect(onClose).toHaveBeenCalled()
+  })
 })
 
 describe('ChangelogModal — focus trap', () => {

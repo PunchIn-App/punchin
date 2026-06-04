@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluateReminders, parseHHMM, dayKey } from './reminders'
+import { evaluateReminders, parseHHMM, dayKey, dayAllowed } from './reminders'
 
 const at = (h, m = 0) => {
   const d = new Date(2026, 5, 3, h, m, 0) // Wed, 3 Jun 2026
@@ -140,5 +140,43 @@ describe('evaluateReminders — time-of-day reminders', () => {
 
     const otherDay = { ...settings, remindTimesheetWeeklyDay: 5 }
     expect(evaluateReminders({ now: at(16, 30), settings: otherDay }).fire).toEqual([])
+  })
+})
+
+describe('dayAllowed', () => {
+  it('returns true when days is not an array (every day)', () => {
+    expect(dayAllowed(3, undefined)).toBe(true)
+    expect(dayAllowed(0, null)).toBe(true)
+  })
+  it('respects an explicit allowed-days list', () => {
+    expect(dayAllowed(3, [1, 2, 3, 4, 5])).toBe(true)
+    expect(dayAllowed(0, [1, 2, 3, 4, 5])).toBe(false)
+  })
+  it('treats an empty list as never', () => {
+    expect(dayAllowed(3, [])).toBe(false)
+  })
+})
+
+describe('evaluateReminders — day-of-week gating', () => {
+  // at() is a Wednesday (day 3).
+  it('skips the idle reminder when today is not an allowed day', () => {
+    const settings = { remindersEnabled: true, remindLongRunning: false, remindIdle: true, remindIdleTime: '09:00', remindIdleDays: [1, 2, 4, 5] }
+    expect(evaluateReminders({ now: at(10), settings, activeEntries: [] }).fire).toEqual([])
+  })
+  it('fires the idle reminder when today is an allowed day', () => {
+    const settings = { remindersEnabled: true, remindLongRunning: false, remindIdle: true, remindIdleTime: '09:00', remindIdleDays: [3] }
+    expect(evaluateReminders({ now: at(10), settings, activeEntries: [] }).fire.map(f => f.key)).toContain('idle')
+  })
+  it('skips the still-running reminder outside its allowed days', () => {
+    const settings = { remindersEnabled: true, remindLongRunning: false, remindStillRunning: true, remindStillRunningTime: '17:00', remindStillRunningDays: [0, 6] }
+    expect(evaluateReminders({ now: at(17, 30), settings, activeEntries: [{ id: 1, jobId: 1, punchIn: at(16) }] }).fire).toEqual([])
+  })
+  it('skips the daily timesheet reminder outside its allowed days', () => {
+    const settings = { remindersEnabled: true, remindLongRunning: false, remindTimesheetDaily: true, remindTimesheetDailyTime: '17:00', remindTimesheetDailyDays: [1, 2, 4, 5] }
+    expect(evaluateReminders({ now: at(17, 5), settings }).fire).toEqual([])
+  })
+  it('still fires when days arrays are absent (back-compat)', () => {
+    const settings = { remindersEnabled: true, remindLongRunning: false, remindIdle: true, remindIdleTime: '09:00' }
+    expect(evaluateReminders({ now: at(10), settings, activeEntries: [] }).fire.map(f => f.key)).toContain('idle')
   })
 })

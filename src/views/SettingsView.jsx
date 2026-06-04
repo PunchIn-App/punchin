@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import ConfirmModal from '../components/ConfirmModal'
 import ChangelogModal from '../components/ChangelogModal'
+import LicenseModal from '../components/LicenseModal'
 import ColorPicker from '../components/ColorPicker'
 import DataTransfer from '../components/DataTransfer'
-import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, Palette, Bug, MonitorDown, Cloud, CloudOff, LogOut, Check, Share, Plus, Compass, Vibrate, SlidersHorizontal, Database, Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck, Share2 } from 'lucide-react'
+import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Palette, Bug, MonitorDown, Cloud, CloudOff, LogOut, Check, Share, Plus, Compass, Vibrate, SlidersHorizontal, Database, Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck, Share2, Lightbulb, Scale, Heart } from 'lucide-react'
 import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../utils/notifications'
 import { applyUpdate, hasWaitingUpdate } from '../utils/pwa'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -78,33 +79,97 @@ function ReminderRow({ icon: Icon, title, subtitle, enabled, onToggle, children 
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 
 const reminderInputClass = 'bg-appBg border border-appBorder text-appText rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-appAccent/50'
 
-// Collapsible settings group. Only one section is open at a time (single-open
-// accordion) — the parent owns the open state and closes siblings when one
-// opens. Keeps the long settings list decluttered (issue #60).
-function AccordionSection({ title, icon: Icon, danger, badge, open, onToggle, children }) {
-  const borderColor = danger ? 'border-red-500/30' : 'border-appBorder'
-  const titleColor = danger ? 'text-red-400' : 'text-appText'
-  const iconColor = danger ? 'text-red-400/80' : 'text-appTextMuted'
+// Seven toggle chips (Sun–Sat) letting a time-of-day reminder fire only on the
+// chosen weekdays. `value` is an array of weekday numbers (0=Sun … 6=Sat);
+// undefined is treated as every day so pre-existing reminders are unaffected.
+function WeekdayPicker({ value, onChange, label }) {
+  const days = Array.isArray(value) ? value : ALL_DAYS
+  const toggle = (d) => {
+    const next = days.includes(d) ? days.filter(x => x !== d) : [...days, d].sort((a, b) => a - b)
+    onChange(next)
+  }
+  return (
+    <div role="group" aria-label={label} className="flex items-center gap-1">
+      {WEEKDAY_INITIALS.map((initial, d) => {
+        const on = days.includes(d)
+        return (
+          <button
+            key={d}
+            type="button"
+            onClick={() => toggle(d)}
+            aria-pressed={on}
+            aria-label={WEEKDAYS[d]}
+            className={`w-7 h-7 rounded-full text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-appAccent/50
+              ${on ? 'bg-appAccent text-[#0F1117]' : 'bg-appBg text-appText border border-appBorder hover:bg-appInput'}`}
+          >
+            {initial}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// A tappable category row on the Settings root list. Drilling in shows that
+// category's own sub-page (iOS-style master → detail), replacing the former
+// single-open accordion so nothing collapses underfoot (issue #60).
+function CategoryRow({ icon: Icon, title, subtitle, badge, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left first:rounded-t-xl last:rounded-b-xl"
+    >
+      <span className="flex items-center gap-3 min-w-0">
+        {Icon && <Icon className="w-5 h-5 flex-shrink-0 text-appTextMuted" aria-hidden="true" />}
+        <span className="min-w-0">
+          <span className="flex items-center gap-2">
+            <span className="text-sm font-medium text-appText">{title}</span>
+            {badge && <span className="w-2 h-2 rounded-full bg-appAccent flex-shrink-0" aria-hidden="true" />}
+          </span>
+          {subtitle && <span className="block text-xs text-appTextMuted mt-0.5">{subtitle}</span>}
+        </span>
+      </span>
+      <ChevronRight className="w-4 h-4 flex-shrink-0 text-appTextMuted" aria-hidden="true" />
+    </button>
+  )
+}
+
+// A drilled-in sub-page: an iOS-style back affordance ("‹ Settings") plus the
+// category title, then the section's content. The Back button unwinds the
+// pushed history entry so the hardware/gesture Back gesture composes with it.
+function Panel({ title, onBack, children }) {
   return (
     <section>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl border ${borderColor} bg-appCard hover:bg-appInput transition-colors text-left`}
-      >
-        <span className="flex items-center gap-3 min-w-0">
-          {Icon && <Icon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} aria-hidden="true" />}
-          <span className={`text-sm font-medium ${titleColor}`}>{title}</span>
-          {badge && <span className="w-2 h-2 rounded-full bg-appAccent flex-shrink-0" aria-hidden="true" />}
-        </span>
-        <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${iconColor} ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
-      </button>
-      {open && <div className="mt-2">{children}</div>}
+      <div className="flex items-center gap-2 mb-1">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-0.5 -ml-1.5 pr-2 py-1 rounded-lg text-appAccent text-sm font-medium hover:bg-appInput transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+          Settings
+        </button>
+      </div>
+      <h2 className="text-xl font-display font-semibold text-appText mb-3 px-1">{title}</h2>
+      <div className="space-y-3">{children}</div>
     </section>
+  )
+}
+
+// A labelled group within a sub-page (used inside Data &amp; Sync to keep
+// Backup / Sync / Transfer / Danger Zone visually distinct).
+function PanelGroup({ title, danger, children }) {
+  return (
+    <div>
+      <h3 className={`text-xs font-semibold uppercase tracking-wide px-1 mb-2 ${danger ? 'text-red-400' : 'text-appTextMuted'}`}>{title}</h3>
+      {children}
+    </div>
   )
 }
 
@@ -170,6 +235,16 @@ export function buildBugReportUrl(appVersion, isStandalone, os) {
   return `https://github.com/PunchIn-App/punchin/issues/new?${params}`
 }
 
+// Opens the feature-request issue form (separate template from bug reports).
+// The version is dropped into the template's "scope" field for context.
+export function buildFeatureRequestUrl(appVersion) {
+  const params = new URLSearchParams({
+    template: 'feature_request.yml',
+    scope: `Suggested from PunchIn v${appVersion}`,
+  })
+  return `https://github.com/PunchIn-App/punchin/issues/new?${params}`
+}
+
 const PROVIDER_LABEL = { github: 'GitHub Gist', google: 'Google Drive', onedrive: 'OneDrive' }
 
 function formatLastSync(ts) {
@@ -186,15 +261,16 @@ export default function SettingsView() {
   const { isStandalone, os, isIPad } = usePlatformContext()
   const fileInputRef = useRef(null)
   const [resetStage, setResetStage] = useState(null) // null | 'warn' | 'final'
-  // Single-open accordion: which section is expanded (null = all collapsed).
-  // Open straight to About when an update is already waiting so the user can
-  // act on it without hunting (the header also shows a dot — see badge below).
-  const [openSection, setOpenSection] = useState(() =>
+  // iOS-style drill-in: which category sub-page is open (null = root list).
+  // Deep-link straight to About when an update is already waiting so the user
+  // can act on it without hunting (the row also shows a dot — see badge below).
+  const [activePanel, setActivePanel] = useState(() =>
     (typeof window !== 'undefined' && window.__pwaUpdateAvailable) ? 'about' : null
   )
   const [updateStatus, setUpdateStatus] = useState(null) // null | 'checking' | 'latest'
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showChangelog, setShowChangelog] = useState(false)
+  const [showLicense, setShowLicense] = useState(false)
   const [updateAvailable, setUpdateAvailable] = useState(() => !!window.__pwaUpdateAvailable)
   const [iosHelpOpen, setIosHelpOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -202,13 +278,47 @@ export default function SettingsView() {
   const [notifPerm, setNotifPerm] = useState(() => notificationPermission())
   const { canInstall, isInstalled, isIOS, isIOSSafari, os: installOs, promptInstall } = useInstallPrompt()
 
-  const toggleSection = (id) => setOpenSection(cur => (cur === id ? null : id))
+  // Open a category sub-page. Push a history entry (mirroring the modal pattern)
+  // so the hardware/gesture Back closes the panel instead of switching tabs;
+  // App.jsx's popstate handler ignores states without `piView`, so this composes.
+  const openPanel = (id) => {
+    history.pushState({ settingsPanel: id }, '')
+    setActivePanel(id)
+  }
+  const closePanel = () => {
+    if (history.state?.settingsPanel) history.back()
+    else setActivePanel(null)
+  }
 
-  // Reset the multi-stage factory-reset flow whenever the Danger Zone collapses,
-  // so re-opening it always starts from the neutral state.
   useEffect(() => {
-    if (openSection !== 'danger') setResetStage(null)
-  }, [openSection])
+    const onPop = (e) => setActivePanel(e.state?.settingsPanel ?? null)
+    window.addEventListener('popstate', onPop)
+    // If we deep-linked straight into a panel (update waiting), push a matching
+    // entry once on mount so Back returns to the root list, not another tab.
+    if (typeof window !== 'undefined' && window.__pwaUpdateAvailable && history.state?.settingsPanel !== 'about') {
+      history.pushState({ settingsPanel: 'about' }, '')
+    }
+    return () => window.removeEventListener('popstate', onPop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Re-tapping the Settings tab in the bottom nav returns to the root list,
+  // matching the hardware Back gesture (App.jsx dispatches this on re-select).
+  useEffect(() => {
+    const onReselect = (e) => {
+      if (e.detail !== 'settings') return
+      if (history.state?.settingsPanel) history.back()
+      else setActivePanel(null)
+    }
+    window.addEventListener('pi:reselect-tab', onReselect)
+    return () => window.removeEventListener('pi:reselect-tab', onReselect)
+  }, [])
+
+  // Reset the multi-stage factory-reset flow whenever we leave the Data & Sync
+  // page (which now hosts the Danger Zone), so re-opening always starts neutral.
+  useEffect(() => {
+    if (activePanel !== 'data') setResetStage(null)
+  }, [activePanel])
 
   const syncSettings = useLiveQuery(async () => {
     const rows = await db.settings.toArray()
@@ -452,10 +562,13 @@ export default function SettingsView() {
         { key: 'remindLongRunningMinutes',  value: 60      },
         { key: 'remindIdle',                value: false   },
         { key: 'remindIdleTime',            value: '09:00' },
+        { key: 'remindIdleDays',            value: [0,1,2,3,4,5,6] },
         { key: 'remindStillRunning',        value: false   },
         { key: 'remindStillRunningTime',    value: '17:00' },
+        { key: 'remindStillRunningDays',    value: [0,1,2,3,4,5,6] },
         { key: 'remindTimesheetDaily',      value: false   },
         { key: 'remindTimesheetDailyTime',  value: '17:00' },
+        { key: 'remindTimesheetDailyDays',  value: [0,1,2,3,4,5,6] },
         { key: 'remindTimesheetWeekly',     value: false   },
         { key: 'remindTimesheetWeeklyDay',  value: 5       },
         { key: 'remindTimesheetWeeklyTime', value: '16:00' },
@@ -501,6 +614,18 @@ export default function SettingsView() {
     await updateSetting('remindersEnabled', perm === 'granted')
   }
 
+  // Writing a reminder's chosen weekdays. Clearing the last day reads as "I
+  // don't want this reminder" — so instead of saving an empty (never-fires) set,
+  // switch the reminder off and restore all days for a clean re-enable later.
+  const setReminderDays = (enabledKey, daysKey, days) => {
+    if (days.length === 0) {
+      updateSetting(enabledKey, false)
+      updateSetting(daysKey, ALL_DAYS)
+    } else {
+      updateSetting(daysKey, days)
+    }
+  }
+
   const notifSupported = notificationsSupported()
   const remindersOn = !!settings.remindersEnabled && notifPerm === 'granted'
 
@@ -514,14 +639,23 @@ export default function SettingsView() {
   return (
     <div className="h-full scrollable px-4 pt-4 pb-24 space-y-3 lg:max-w-2xl lg:mx-auto lg:w-full">
 
-      {/* General — concurrent timers, week start, and (on phones) haptics live
-          together so they aren't lonely one-item categories (issue #60) */}
-      <AccordionSection
-        title="General"
-        icon={SlidersHorizontal}
-        open={openSection === 'general'}
-        onToggle={() => toggleSection('general')}
-      >
+      {/* Root list — tap a category to drill into its sub-page (issue #60) */}
+      {activePanel === null && (
+        <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
+          <CategoryRow icon={SlidersHorizontal} title="General" subtitle="Timers, week start, haptics" onClick={() => openPanel('general')} />
+          <CategoryRow icon={Palette} title="Appearance" subtitle="Theme and accent color" onClick={() => openPanel('appearance')} />
+          <CategoryRow icon={Bell} title="Reminders" subtitle="Local notification nudges" badge={remindersOn} onClick={() => openPanel('reminders')} />
+          {(isInstalled || canInstall || isIOS) && (
+            <CategoryRow icon={MonitorDown} title="Install" subtitle="Add PunchIn to your device" onClick={() => openPanel('install')} />
+          )}
+          <CategoryRow icon={Database} title="Data & Sync" subtitle="Backup, sync, transfer, reset" onClick={() => openPanel('data')} />
+          <CategoryRow icon={Info} title="About" subtitle={`v${__APP_VERSION__}`} badge={updateAvailable} onClick={() => openPanel('about')} />
+        </div>
+      )}
+
+      {/* General — concurrent timers, week start, and (on phones) haptics */}
+      {activePanel === 'general' && (
+        <Panel title="General" onBack={closePanel}>
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <SettingsRow
             icon={Layers}
@@ -562,15 +696,12 @@ export default function SettingsView() {
             />
           )}
         </div>
-      </AccordionSection>
+        </Panel>
+      )}
 
       {/* Appearance */}
-      <AccordionSection
-        title="Appearance"
-        icon={Palette}
-        open={openSection === 'appearance'}
-        onToggle={() => toggleSection('appearance')}
-      >
+      {activePanel === 'appearance' && (
+        <Panel title="Appearance" onBack={closePanel}>
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <SettingsRow
             icon={Monitor}
@@ -615,17 +746,13 @@ export default function SettingsView() {
             />
           </div>
         </div>
-      </AccordionSection>
+        </Panel>
+      )}
 
       {/* Reminders — local notifications (no backend); only deliver while the
           app is open or installed (issue #54) */}
-      <AccordionSection
-        title="Reminders"
-        icon={Bell}
-        badge={remindersOn}
-        open={openSection === 'reminders'}
-        onToggle={() => toggleSection('reminders')}
-      >
+      {activePanel === 'reminders' && (
+        <Panel title="Reminders" onBack={closePanel}>
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           {!notifSupported ? (
             <div className="px-4 py-4">
@@ -700,6 +827,11 @@ export default function SettingsView() {
                         className={reminderInputClass}
                       />
                     </label>
+                    <WeekdayPicker
+                      value={settings.remindIdleDays}
+                      onChange={days => setReminderDays('remindIdle', 'remindIdleDays', days)}
+                      label="Days for the no-timer reminder"
+                    />
                   </ReminderRow>
 
                   <ReminderRow
@@ -719,6 +851,11 @@ export default function SettingsView() {
                         className={reminderInputClass}
                       />
                     </label>
+                    <WeekdayPicker
+                      value={settings.remindStillRunningDays}
+                      onChange={days => setReminderDays('remindStillRunning', 'remindStillRunningDays', days)}
+                      label="Days for the still-running reminder"
+                    />
                   </ReminderRow>
 
                   <ReminderRow
@@ -738,6 +875,11 @@ export default function SettingsView() {
                         className={reminderInputClass}
                       />
                     </label>
+                    <WeekdayPicker
+                      value={settings.remindTimesheetDailyDays}
+                      onChange={days => setReminderDays('remindTimesheetDaily', 'remindTimesheetDailyDays', days)}
+                      label="Days for the daily timesheet reminder"
+                    />
                   </ReminderRow>
 
                   <ReminderRow
@@ -774,16 +916,13 @@ export default function SettingsView() {
             </>
           )}
         </div>
-      </AccordionSection>
+        </Panel>
+      )}
 
-      {/* Install — behaviour adapts to the platform's install capabilities */}
-      {(isInstalled || canInstall || isIOS) && (
-        <AccordionSection
-          title="Install"
-          icon={MonitorDown}
-          open={openSection === 'install'}
-          onToggle={() => toggleSection('install')}
-        >
+      {/* Install — behaviour adapts to the platform's install capabilities;
+          only reachable when the root list offered the row */}
+      {activePanel === 'install' && (
+        <Panel title="Install" onBack={closePanel}>
           <div className="rounded-xl border border-appBorder bg-appCard overflow-hidden">
             {isInstalled ? (
               <SettingsRow
@@ -857,16 +996,14 @@ export default function SettingsView() {
               </>
             )}
           </div>
-        </AccordionSection>
+        </Panel>
       )}
 
-      {/* Data */}
-      <AccordionSection
-        title="Data"
-        icon={Database}
-        open={openSection === 'data'}
-        onToggle={() => toggleSection('data')}
-      >
+      {/* Data & Sync — Backup, Sync, Transfer, and Danger Zone consolidated into
+          one page since they all govern where your data lives (issue #60) */}
+      {activePanel === 'data' && (
+        <Panel title="Data & Sync" onBack={closePanel}>
+        <PanelGroup title="Backup">
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <button onClick={exportData}
             className="w-full flex items-center gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left border-b border-appBorderLight">
@@ -901,15 +1038,10 @@ export default function SettingsView() {
             className="hidden"
           />
         </div>
-      </AccordionSection>
+        </PanelGroup>
 
-      {/* Sync */}
-      <AccordionSection
-        title="Sync"
-        icon={Cloud}
-        open={openSection === 'sync'}
-        onToggle={() => toggleSection('sync')}
-      >
+        {/* Sync */}
+        <PanelGroup title="Sync">
         <div className="rounded-xl border border-appBorder bg-appCard overflow-hidden">
           {syncSettings?.syncProvider ? (
             <>
@@ -1021,26 +1153,15 @@ export default function SettingsView() {
             </>
           )}
         </div>
-      </AccordionSection>
+        </PanelGroup>
 
-      {/* Transfer — account-free device-to-device data move via link + QR (issue #77) */}
-      <AccordionSection
-        title="Transfer"
-        icon={Share2}
-        open={openSection === 'transfer'}
-        onToggle={() => toggleSection('transfer')}
-      >
+        {/* Transfer — account-free device-to-device move via link + QR (issue #77) */}
+        <PanelGroup title="Transfer">
         <DataTransfer />
-      </AccordionSection>
+        </PanelGroup>
 
-      {/* Danger Zone */}
-      <AccordionSection
-        title="Danger Zone"
-        icon={AlertTriangle}
-        danger
-        open={openSection === 'danger'}
-        onToggle={() => toggleSection('danger')}
-      >
+        {/* Danger Zone */}
+        <PanelGroup title="Danger Zone" danger>
         <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
           {/* Clear entries */}
           <button onClick={() => setShowClearConfirm(true)}
@@ -1112,16 +1233,13 @@ export default function SettingsView() {
             </div>
           )}
         </div>
-      </AccordionSection>
+        </PanelGroup>
+        </Panel>
+      )}
 
       {/* About */}
-      <AccordionSection
-        title="About"
-        icon={Info}
-        badge={updateAvailable}
-        open={openSection === 'about'}
-        onToggle={() => toggleSection('about')}
-      >
+      {activePanel === 'about' && (
+        <Panel title="About" onBack={closePanel}>
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
           <a
             href="https://github.com/PunchIn-App/punchin"
@@ -1162,6 +1280,30 @@ export default function SettingsView() {
             <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
           </button>
           <button
+            onClick={() => window.open(buildFeatureRequestUrl(__APP_VERSION__), '_blank', 'noopener,noreferrer')}
+            className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
+            <div className="flex items-center gap-3 min-w-0">
+              <Lightbulb className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-sm text-appText font-medium">Help improve PunchIn</p>
+                <p className="text-xs text-appTextMuted mt-0.5">Suggest a feature — opens a GitHub feature request</p>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+          </button>
+          <button
+            onClick={() => setShowLicense(true)}
+            className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
+            <div className="flex items-center gap-3 min-w-0">
+              <Scale className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-sm text-appText font-medium">License &amp; legal</p>
+                <p className="text-xs text-appTextMuted mt-0.5">App license and third-party attributions</p>
+              </div>
+            </div>
+            <ChevronDown className="w-4 h-4 text-appTextMuted flex-shrink-0 -rotate-90" aria-hidden="true" />
+          </button>
+          <button
             onClick={checkForUpdates}
             disabled={updateStatus === 'checking'}
             className={`w-full flex items-center gap-3 px-4 py-4 transition-colors text-left rounded-b-xl disabled:opacity-60
@@ -1183,7 +1325,22 @@ export default function SettingsView() {
             </div>
           </button>
         </div>
-      </AccordionSection>
+
+        {/* Support — links out to Buy Me a Coffee (no third-party script: a plain
+            link keeps the app self-contained and tracker-free). Styled with the
+            user's accent so it follows their theme. */}
+        <a
+          href="https://www.buymeacoffee.com/PunchIn-App"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-appAccent text-[#0F1117] font-display font-bold text-sm hover:brightness-110 active:brightness-90 transition-all focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:outline-none"
+        >
+          <Heart className="w-4 h-4" aria-hidden="true" />
+          Support the App
+          <ExternalLink className="w-3.5 h-3.5 opacity-80" aria-hidden="true" />
+        </a>
+        </Panel>
+      )}
 
       {showClearConfirm && (
         <ConfirmModal
@@ -1206,6 +1363,7 @@ export default function SettingsView() {
       )}
 
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+      {showLicense && <LicenseModal onClose={() => setShowLicense(false)} />}
     </div>
   )
 }

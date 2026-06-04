@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.15.2
+**Version:** 0.16.0
 
 ---
 
@@ -70,7 +70,8 @@ punchin/
 │   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
 │   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
 │   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
-│   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets
+│   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets; centered reading-modal — closes on device Back (pushes {modal:true} history entry)
+│   │   ├── LicenseModal.jsx     # Centered reading-modal showing the app license (LICENSE ?raw, BUSL-1.1) and third-party attributions (docs/THIRD-PARTY-LICENSES.md ?raw, rendered via a small built-in markdown renderer); two-way section switch via aria-pressed buttons; closes on device Back
 │   │   ├── DataTransfer.jsx     # Account-free device-to-device transfer (issue #77): "Create share link" snapshots the DB → compressed #import= link + QR (qrcode-generator); "Import from a link" pastes a link/code and merges via importSnapshot
 │   │   └── InstallPromptModal.jsx # First-run install bottom sheet; mode = 'native' (Chrome/Edge one-tap), 'ios-safari' (Share→Add-to-Home-Screen), or 'ios-other' (open-in-Safari guidance for Chrome/Firefox on iOS)
 │   ├── views/
@@ -78,7 +79,7 @@ punchin/
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
-│   │   └── SettingsView.jsx    # Settings as a single-open accordion (AccordionSection): General (concurrent timers, week start, haptics), Appearance (theme/accent), Install, Data (JSON/CSV backup), Sync (GitHub Gist / Google Drive / OneDrive), Danger Zone, About (changelog, bug report, check-for-updates)
+│   │   └── SettingsView.jsx    # Settings as an iOS-style drill-in (CategoryRow root list → Panel sub-pages; device Back / re-tapping the Settings tab returns to root): General (concurrent timers, week start, haptics), Appearance (theme/accent), Reminders (incl. per-reminder WeekdayPicker), Install, Data & Sync (Backup JSON/CSV · Sync GitHub Gist/Google Drive/OneDrive · Transfer · Danger Zone, grouped via PanelGroup), About (changelog, report bug, help-improve/feature request, License & legal, Support the App, check-for-updates). Exports buildBugReportUrl + buildFeatureRequestUrl
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web) + isIOSSafari (true only in iOS Safari, where Add to Home Screen works) + isIPad (treats a touch-capable "Macintosh" UA — iPadOS Safari's default desktop mode — as iOS, and distinguishes iPad from iPhone)
@@ -126,16 +127,17 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/utils/pwa.test.js` | `getInstallPrompt`, `notifyUpdateAvailable`, `setPwaUpdateFn`, `applyUpdate`, `initPwaInstallPrompt`, `hasWaitingUpdate` (reg.waiting detection) |
 | `src/utils/favicon.test.js` | `drawFaviconDataUrl` (accent color, null-context fallback), `updateFavicon` (link creation, static-link replacement, idempotent updates) |
 | `src/utils/notifications.test.js` | `notificationsSupported`, `notificationPermission`, `requestNotificationPermission`, `showNotification` (permission gate, SW-registration path, constructor fallback) |
-| `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules) |
+| `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `dayAllowed`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules, day-of-week gating + back-compat when day arrays absent) |
 | `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |
 | `src/utils/deviceId.test.js` | `getDeviceId` — generates 8-char hex, persists across calls, falls back to `'default'` when localStorage is unavailable |
-| `src/db.test.js` | Schema validation, default settings seed, basic CRUD for jobs/labor types/entries |
+| `src/db.test.js` | Schema validation, default settings seed (20 keys incl. the per-reminder weekday defaults = all 7 days), basic CRUD for jobs/labor types/entries |
 | `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), `isIOSSafari` (Safari vs CriOS/FxiOS/EdgiOS), `isIPad` incl. desktop-mode iPad (touch-capable "Macintosh" → iOS) vs real Mac, standalone mode detection |
 | `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
 | `src/hooks/useReminders.test.js` | fires a notification when an enabled reminder condition is met; no-ops when reminders disabled or permission not granted |
 | `src/hooks/useInstallPrompt.test.js` | `canInstall`/`isInstalled` state from `pwa:install-ready`/`pwa:installed`; `promptInstall` accept/dismiss outcomes |
-| `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap |
+| `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap, device-Back (popstate) dismiss |
+| `src/components/LicenseModal.test.jsx` | Dialog a11y, default app-license (BUSL) tab, switch to third-party (aria-pressed), close button/Escape/backdrop, device-Back (popstate) dismiss |
 | `src/components/InstallPromptModal.test.jsx` | All three modes (native / ios-safari / ios-other), dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
 | `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
 | `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management |
@@ -149,12 +151,12 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/components/TimerCard.test.jsx` | Job/labor-type display, stop timer, open/close EditEntryModal |
 | `src/views/AnalyticsView.test.jsx` | Loading state, period toggle, summary cards, empty state, charts |
 | `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
-| `src/views/SettingsView.test.jsx` | All settings sections, toggles, theme, export/import, sync UI, danger zone |
-| `src/views/SettingsView.bugReport.test.js` | `buildBugReportUrl` browser/OS/device/install-type detection |
+| `src/views/SettingsView.test.jsx` | Drill-in root list + sub-pages, device-Back/Settings-tab-reselect returns to root, Data & Sync consolidation, toggles, theme, export/import, sync UI, danger zone, About rows (help-improve, License modal, Support link) |
+| `src/views/SettingsView.bugReport.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` (template/scope/URL) — browser/OS/device/install-type detection |
 | `src/views/SettingsView.syncUnconfigured.test.jsx` | Sync section with empty client IDs: friendly "not set up" message, no env-var jargon, no provider buttons (issue #59) |
 | `src/views/SettingsView.dedup.test.js` | `isEntryDuplicate` (backup import dedup logic) |
 | `src/views/SettingsView.haptics.test.jsx` | `hapticFeedback` toggle shown on iPhone/Android, hidden on iPad (no vibration motor) and web, toggles the setting (issue #65) |
-| `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles |
+| `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles, per-reminder `WeekdayPicker` (renders, toggling a day, clearing the last day turns the reminder off + restores all days) |
 | `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
 | `src/views/TimesheetsView.test.jsx` | Daily/weekly tabs, period nav, search/filter, CSV/print, edit/delete |
 | `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks (incl. GitHub username fetch + Settings navigation, issue #83), first-run install nudge gating (mobile-only, ios-other mode, desktop suppression), back-button history navigation (seed/push/popstate, issue #65), transfer-link import prompt (confirm/cancel/corrupt, issue #77) |
@@ -370,10 +372,13 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `remindLongRunningMinutes` | number | `60` — long-running timer threshold (minutes) |
 | `remindIdle` | boolean | `false` — alert if no timer is running by `remindIdleTime` |
 | `remindIdleTime` | string (`"HH:MM"`) | `"09:00"` |
+| `remindIdleDays` | number[] (0=Sun … 6=Sat) | `[0,1,2,3,4,5,6]` — weekdays the idle reminder may fire (clearing all days turns the reminder off) |
 | `remindStillRunning` | boolean | `false` — alert if a timer is still running at `remindStillRunningTime` |
 | `remindStillRunningTime` | string (`"HH:MM"`) | `"17:00"` |
+| `remindStillRunningDays` | number[] (0=Sun … 6=Sat) | `[0,1,2,3,4,5,6]` — weekdays the still-running reminder may fire |
 | `remindTimesheetDaily` | boolean | `false` — daily timesheet reminder |
 | `remindTimesheetDailyTime` | string (`"HH:MM"`) | `"17:00"` |
+| `remindTimesheetDailyDays` | number[] (0=Sun … 6=Sat) | `[0,1,2,3,4,5,6]` — weekdays the daily timesheet reminder may fire |
 | `remindTimesheetWeekly` | boolean | `false` — weekly timesheet reminder |
 | `remindTimesheetWeeklyDay` | number (0=Sun … 6=Sat) | `5` (Friday) |
 | `remindTimesheetWeeklyTime` | string (`"HH:MM"`) | `"16:00"` |
@@ -509,13 +514,17 @@ On mobile, modals are bottom sheets whose style branches by platform. On desktop
 | Android standalone | `bg-black/70 backdrop-blur-sm` | `rounded-t-[28px]` (MD3) | 48 dp drag handle, `popstate` back-button dismiss, `vibrate(40)` haptic |
 | Web / browser tab | `bg-black/70 backdrop-blur-sm` | `rounded-2xl` | None |
 
-Use `usePlatformContext()` to get `{ isStandalone, os }` and branch accordingly. Follow `StartTimerModal.jsx` as the reference pattern; apply the same treatment to any new modal.
+Use `usePlatformContext()` to get `{ isStandalone, os }` and branch accordingly. Follow `StartTimerModal.jsx` as the reference pattern for **form / action** modals; apply the same treatment to any new one.
+
+**Centered reading-modal variant.** Long-form content dialogs — `ChangelogModal`, `LicenseModal` — are the exception: they are always centered (`max-w-lg`, `max-h-[80vh]` with internal scroll) rather than platform bottom-sheets. They still require the full a11y contract (`role="dialog"`, `aria-modal`, `aria-labelledby`, focus trap, Escape) **and** must close on the device Back gesture by pushing a `{ modal: true }` history entry on open and dismissing on `popstate` (unwinding the entry on close). Use these two as the reference when adding another content/reading modal.
 
 ### Navigation
 
 Navigation is **tab-based state** in `App.jsx`, not URL routing. The active tab is a string (`"timer"`, `"jobs"`, `"timesheets"`, `"analytics"`, `"settings"`). Do not introduce a router without explicit agreement.
 
 `App.jsx` integrates the **History API** so the device Back button/gesture moves between tabs instead of leaving the installed app: each tab change pushes a `history` entry tagged `{ piView }`, and a `popstate` listener restores the view. This is deliberately lightweight (no router). Modals push their own `{ modal: true }` history entry on top, so closing a modal with Back composes cleanly with tab history.
+
+`SettingsView` adds a second, in-view layer of the same scheme: it is an **iOS-style drill-in** (a root list of `CategoryRow`s → `Panel` sub-pages) rather than URL routing. Opening a sub-page pushes a `{ settingsPanel }` entry; the in-page Back affordance and the device Back both `popstate` back to the root list. App.jsx's handler ignores states without `piView`, so this composes. Re-tapping the already-active **Settings** tab dispatches a `pi:reselect-tab` window event that `SettingsView` listens for to unwind to its root list (matching device Back).
 
 ### Time Utilities
 

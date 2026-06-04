@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.16.0] — 2026-06-04
+
+### Added
+- Reminders — the "no timer running", "timer still running", and "daily timesheet" reminders can now be limited to specific days of the week; clearing every day simply turns that reminder off.
+- Settings — "Help improve PunchIn" opens a pre-filled GitHub feature request, alongside the existing bug report.
+- Settings — "License & legal" shows the app license (BUSL-1.1) and third-party attributions in-app.
+- Settings — a "Support the App" button links out to Buy Me a Coffee, styled in your chosen accent color.
+
+### Changed
+- Settings — reorganized into an iOS-style drill-in: a list of categories you tap into, instead of one long accordion. Backup, Sync, Transfer, and Danger Zone now live together under a single "Data & Sync" page.
+- Settings — the device Back gesture and re-tapping the Settings tab both return to the top-level Settings list.
+- About — the Changelog and License dialogs now close on the device Back gesture.
+
+### Fixed
+- Appearance — the brand accent now falls back to the default blue (not the old amber) on first paint, before your saved color loads.
+
 ## [0.15.2] — 2026-06-03
 
 ### Changed

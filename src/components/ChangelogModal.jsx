@@ -39,6 +39,20 @@ const TITLE_ID = 'changelog-modal-title'
 export default function ChangelogModal({ onClose }) {
   const dialogRef = useRef(null)
 
+  // Hardware/gesture Back closes the modal instead of navigating away. Push a
+  // history entry on open and unwind it on close so it composes with the app's
+  // tab/panel history (states without `piView`/`settingsPanel` are ignored
+  // there). Mirrors the bottom-sheet modals' back-dismiss behaviour.
+  useEffect(() => {
+    history.pushState({ modal: true }, '')
+    const onPop = () => onClose()
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      if (history.state?.modal) history.back()
+    }
+  }, [onClose])
+
   useEffect(() => {
     const el = dialogRef.current
     if (!el) return

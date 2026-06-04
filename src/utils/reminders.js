@@ -21,6 +21,14 @@ export function dayKey(d) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
 }
 
+// Whether a reminder may fire on the given weekday (0=Sun … 6=Sat). `days` is an
+// optional array of allowed weekday numbers; a missing/non-array value means
+// "every day" so reminders configured before this option keep firing as before.
+export function dayAllowed(weekday, days) {
+  if (!Array.isArray(days)) return true
+  return days.includes(weekday)
+}
+
 export function evaluateReminders({ now, settings, activeEntries = [], jobs = [], state = {} }) {
   const fire = []
   const next = { ...state }
@@ -31,6 +39,7 @@ export function evaluateReminders({ now, settings, activeEntries = [], jobs = []
 
   const nowMin = now.getHours() * 60 + now.getMinutes()
   const today = dayKey(now)
+  const weekday = now.getDay()
   const jobName = (id) => jobs.find(j => j.id === id)?.name || 'A job'
 
   // 1. Long-running timer — fires once per threshold interval an active timer
@@ -62,8 +71,8 @@ export function evaluateReminders({ now, settings, activeEntries = [], jobs = []
     if (k.startsWith('long:') && !activeKeys.has(k)) delete next[k]
   }
 
-  // 2. No timer running by a chosen time of day.
-  if (settings.remindIdle) {
+  // 2. No timer running by a chosen time of day (on the allowed weekdays).
+  if (settings.remindIdle && dayAllowed(weekday, settings.remindIdleDays)) {
     const target = parseHHMM(settings.remindIdleTime)
     if (target != null && nowMin >= target && activeEntries.length === 0 && next.idle !== today) {
       next.idle = today
@@ -75,8 +84,8 @@ export function evaluateReminders({ now, settings, activeEntries = [], jobs = []
     }
   }
 
-  // 3. Timer still running at a chosen time of day.
-  if (settings.remindStillRunning) {
+  // 3. Timer still running at a chosen time of day (on the allowed weekdays).
+  if (settings.remindStillRunning && dayAllowed(weekday, settings.remindStillRunningDays)) {
     const target = parseHHMM(settings.remindStillRunningTime)
     if (target != null && nowMin >= target && activeEntries.length > 0 && next.still !== today) {
       next.still = today
@@ -89,8 +98,8 @@ export function evaluateReminders({ now, settings, activeEntries = [], jobs = []
     }
   }
 
-  // 4. Daily timesheet reminder.
-  if (settings.remindTimesheetDaily) {
+  // 4. Daily timesheet reminder (on the allowed weekdays).
+  if (settings.remindTimesheetDaily && dayAllowed(weekday, settings.remindTimesheetDailyDays)) {
     const target = parseHHMM(settings.remindTimesheetDailyTime)
     if (target != null && nowMin >= target && next.tsDaily !== today) {
       next.tsDaily = today

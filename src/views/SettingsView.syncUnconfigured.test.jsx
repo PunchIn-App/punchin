@@ -1,10 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import SettingsView from './SettingsView'
 
-// Sync now lives inside a collapsible accordion section (issue #60); expand it
-// before asserting on its contents.
+// Sync now lives inside the "Data & Sync" drill-in page (issue #60); open that
+// page before asserting on its contents.
 const expandSync = () =>
-  fireEvent.click(screen.getByRole('button', { name: /^sync$/i }))
+  fireEvent.click(screen.getByRole('button', { name: /^data & sync/i }))
 
 // Mirrors a production build with NO VITE_*_CLIENT_ID set — every provider
 // clientId is empty, so the Sync section must fall back to the friendly

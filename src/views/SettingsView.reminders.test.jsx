@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import SettingsView from './SettingsView'
 
 // Reminders settings section (issue #54). The Notification API is wrapped by
@@ -39,8 +39,9 @@ vi.mock('../sync/providers/github',   () => ({ buildGitHubOAuthUrl:   () => '' }
 vi.mock('../sync/providers/google',   () => ({ buildGoogleOAuthUrl:   () => '' }))
 vi.mock('../sync/providers/onedrive', () => ({ buildOneDriveOAuthUrl: () => '' }))
 
+// Reminders now lives in its own drill-in page (issue #60); open it first.
 const expandReminders = () =>
-  fireEvent.click(screen.getByRole('button', { name: /^reminders$/i }))
+  fireEvent.click(screen.getByRole('button', { name: /^reminders/i }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -111,5 +112,35 @@ describe('SettingsView — Reminders section (#54)', () => {
     expandReminders()
     fireEvent.click(screen.getByRole('switch', { name: /long-running timer/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('remindLongRunning', false)
+  })
+
+  it('shows a weekday picker for an enabled time-of-day reminder', () => {
+    n.perm = 'granted'
+    mockSettings = { remindersEnabled: true, remindLongRunning: false, remindIdle: true, remindIdleTime: '09:00', remindIdleDays: [0, 1, 2, 3, 4, 5, 6] }
+    render(<SettingsView />)
+    expandReminders()
+    expect(screen.getByRole('group', { name: /days for the no-timer reminder/i })).toBeInTheDocument()
+  })
+
+  it('toggles a weekday off, writing the remaining days to settings', () => {
+    n.perm = 'granted'
+    mockSettings = { remindersEnabled: true, remindLongRunning: false, remindIdle: true, remindIdleTime: '09:00', remindIdleDays: [0, 1, 2, 3, 4, 5, 6] }
+    render(<SettingsView />)
+    expandReminders()
+    const group = screen.getByRole('group', { name: /days for the no-timer reminder/i })
+    // Sunday is weekday 0 — removing it leaves Mon–Sat.
+    fireEvent.click(within(group).getByRole('button', { name: /^sunday$/i }))
+    expect(mockUpdateSetting).toHaveBeenCalledWith('remindIdleDays', [1, 2, 3, 4, 5, 6])
+  })
+
+  it('turns the reminder off (and restores all days) when the last day is cleared', () => {
+    n.perm = 'granted'
+    mockSettings = { remindersEnabled: true, remindLongRunning: false, remindIdle: true, remindIdleTime: '09:00', remindIdleDays: [0] }
+    render(<SettingsView />)
+    expandReminders()
+    const group = screen.getByRole('group', { name: /days for the no-timer reminder/i })
+    fireEvent.click(within(group).getByRole('button', { name: /^sunday$/i })) // removes the only remaining day
+    expect(mockUpdateSetting).toHaveBeenCalledWith('remindIdle', false)
+    expect(mockUpdateSetting).toHaveBeenCalledWith('remindIdleDays', [0, 1, 2, 3, 4, 5, 6])
   })
 })

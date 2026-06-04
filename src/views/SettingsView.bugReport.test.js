@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { buildBugReportUrl } from './SettingsView'
+import { buildBugReportUrl, buildFeatureRequestUrl } from './SettingsView'
 
 function setUA(ua) {
   Object.defineProperty(navigator, 'userAgent', { value: ua, writable: true, configurable: true })
@@ -167,5 +167,21 @@ describe('buildBugReportUrl — install type and metadata', () => {
     setUA('Mozilla/5.0')
     const url = buildBugReportUrl('1.0.0', false, 'web')
     expect(url).toMatch(/^https:\/\/github\.com\/PunchIn-App\/punchin\/issues\/new/)
+  })
+})
+
+// ── feature request ───────────────────────────────────────────────────────────
+
+describe('buildFeatureRequestUrl', () => {
+  it('targets the feature_request.yml template', () => {
+    expect(params(buildFeatureRequestUrl('1.2.3')).get('template')).toBe('feature_request.yml')
+  })
+
+  it('includes the app version in the scope field', () => {
+    expect(params(buildFeatureRequestUrl('1.2.3')).get('scope')).toBe('Suggested from PunchIn v1.2.3')
+  })
+
+  it('points to the punchin GitHub issues URL', () => {
+    expect(buildFeatureRequestUrl('1.2.3')).toMatch(/^https:\/\/github\.com\/PunchIn-App\/punchin\/issues\/new/)
   })
 })

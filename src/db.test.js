@@ -24,9 +24,16 @@ describe('db — schema', () => {
 })
 
 describe('db — populate seed', () => {
-  it('seeds exactly 17 default settings', async () => {
+  it('seeds exactly 20 default settings', async () => {
     const all = await db.settings.toArray()
-    expect(all).toHaveLength(17)
+    expect(all).toHaveLength(20)
+  })
+
+  it('seeds the per-reminder weekday defaults as all 7 days', async () => {
+    const all = await db.settings.toArray()
+    for (const key of ['remindIdleDays', 'remindStillRunningDays', 'remindTimesheetDailyDays']) {
+      expect(all.find(s => s.key === key)?.value).toEqual([0, 1, 2, 3, 4, 5, 6])
+    }
   })
 
   it('seeds allowConcurrentTimers = false', async () => {

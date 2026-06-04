@@ -116,7 +116,13 @@ export default function App() {
   // top of these and pop themselves, which composes cleanly with this scheme.
   const hasPushedRef = useRef(false)
   const navigate = useCallback((view) => {
-    if (view === activeViewRef.current) return
+    if (view === activeViewRef.current) {
+      // Re-tapping the already-active tab lets a view reset its own internal
+      // sub-state — Settings uses this to pop back to its root list from a
+      // drilled-in sub-page (matching the hardware Back behaviour).
+      window.dispatchEvent(new CustomEvent('pi:reselect-tab', { detail: view }))
+      return
+    }
     if (view === DEFAULT_VIEW) {
       // Returning home: unwind our single pushed entry so Back from home exits
       // the app. popstate restores the default view for us.

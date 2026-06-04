@@ -46,10 +46,10 @@ beforeEach(() => {
   mockIsIPad = false
 })
 
-// Haptic feedback now lives inside the collapsible "General" group (issue #60),
-// so expand it before asserting the toggle's presence/absence.
+// Haptic feedback now lives inside the "General" drill-in page (issue #60), so
+// open it before asserting the toggle's presence/absence.
 const expandGeneral = () =>
-  fireEvent.click(screen.getByRole('button', { name: /^general$/i }))
+  fireEvent.click(screen.getByRole('button', { name: /^general/i }))
 
 describe('SettingsView — haptic feedback toggle (#65)', () => {
   it('shows the Haptic feedback toggle on a phone', () => {
