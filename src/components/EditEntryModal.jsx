@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useId } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db'
+import { db, deleteEntry } from '../db'
 import ConfirmModal from './ConfirmModal'
 
 // Helper helpers for date/time controls — exported for unit testing
@@ -155,7 +155,7 @@ export default function EditEntryModal({ entry, onClose }) {
   const handleDelete = async () => {
     if (!entry?.id) return
     try {
-      await db.entries.delete(entry.id)
+      await deleteEntry(entry.id)
       onClose()
     } catch (err) {
       console.error(err)

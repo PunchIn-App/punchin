@@ -90,6 +90,15 @@ db.version(3)
     }
   })
 
+// v4 — `deletions` tombstone table. Entries are hard-deleted from `entries`
+// (so every view/analytics/export query is unaffected), but the deleted
+// record's `uuid` is recorded here with a `deletedAt` timestamp. Cloud merge
+// reads these so a delete on one device propagates to the others instead of the
+// entry resurrecting from a peer's snapshot.
+db.version(4).stores({
+  deletions: 'uuid, deletedAt',
+})
+
 // Stamp identity metadata on every write, centrally — so the ~10 create/update
 // call sites across the app don't each have to remember to. `creating` only
 // fills in missing values, so a record merged from another device keeps its
@@ -103,6 +112,21 @@ for (const table of [db.laborTypes, db.jobs, db.entries]) {
   table.hook('updating', (mods) => {
     if (Object.prototype.hasOwnProperty.call(mods, 'updatedAt')) return undefined
     return { updatedAt: Date.now() }
+  })
+}
+
+// Delete a time entry and record a tombstone (keyed by its stable uuid) so the
+// deletion propagates through cloud sync instead of the entry reappearing from
+// another device's snapshot. Atomic: the entry and its tombstone are written in
+// one transaction.
+export async function deleteEntry(id) {
+  return db.transaction('rw', [db.entries, db.deletions], async () => {
+    const entry = await db.entries.get(id)
+    if (!entry) return
+    if (entry.uuid) {
+      await db.deletions.put({ uuid: entry.uuid, deletedAt: Date.now() })
+    }
+    await db.entries.delete(id)
   })
 }
 

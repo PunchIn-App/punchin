@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronLeft, ChevronRight, Calendar, Pencil, Trash2, Plus, Search, FileDown, Receipt, Printer } from 'lucide-react'
 import { format, addDays, subDays, addWeeks, subWeeks } from 'date-fns'
-import { db } from '../db'
+import { db, deleteEntry } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import {
   formatDurationHM, formatTime, getEntryDuration,
@@ -267,7 +267,7 @@ export default function TimesheetsView() {
 
   const confirmDelete = async () => {
     if (confirmDeleteId) {
-      await db.entries.delete(confirmDeleteId)
+      await deleteEntry(confirmDeleteId)
     }
     setConfirmDeleteId(null)
   }

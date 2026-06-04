@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { db } from './db'
+import { db, deleteEntry } from './db'
 
 afterAll(async () => {
   await db.close()
@@ -147,5 +147,27 @@ describe('db — identity stamping (uuid / updatedAt hooks)', () => {
     await db.jobs.update(id, { name: 'Y' })
     const job = await db.jobs.get(id)
     expect(job.updatedAt).toBeGreaterThan(1)
+  })
+})
+
+describe('db — deleteEntry tombstones (issue #118)', () => {
+  afterEach(async () => {
+    await db.entries.clear()
+    await db.deletions.clear()
+  })
+
+  it('hard-deletes the entry and records a tombstone keyed by its uuid', async () => {
+    const id = await db.entries.add({ jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null })
+    const { uuid } = await db.entries.get(id)
+    await deleteEntry(id)
+    expect(await db.entries.get(id)).toBeUndefined()
+    const tomb = await db.deletions.get(uuid)
+    expect(tomb?.uuid).toBe(uuid)
+    expect(typeof tomb.deletedAt).toBe('number')
+  })
+
+  it('is a no-op for a missing entry (no tombstone written)', async () => {
+    await expect(deleteEntry(99999)).resolves.toBeUndefined()
+    expect(await db.deletions.toArray()).toHaveLength(0)
   })
 })

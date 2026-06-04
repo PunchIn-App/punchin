@@ -5,6 +5,7 @@ import EditEntryModal from './EditEntryModal'
 const mockEntriesUpdate = vi.fn().mockResolvedValue(1)
 const mockEntriesAdd    = vi.fn().mockResolvedValue(1)
 const mockEntriesDelete = vi.fn().mockResolvedValue(undefined)
+const mockDeleteEntry   = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({
@@ -17,6 +18,7 @@ vi.mock('../db', () => ({
       get delete() { return mockEntriesDelete },
     },
   },
+  get deleteEntry() { return mockDeleteEntry },
 }))
 
 const COMPLETED_ENTRY = {
@@ -250,7 +252,7 @@ describe('EditEntryModal — delete flow', () => {
     )
   })
 
-  it('confirming delete calls db.entries.delete(10) and onClose', async () => {
+  it('confirming delete calls deleteEntry(10) and onClose', async () => {
     const onClose = vi.fn()
     render(<EditEntryModal entry={COMPLETED_ENTRY} onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: /delete entry/i }))
@@ -258,7 +260,7 @@ describe('EditEntryModal — delete flow', () => {
       expect(screen.getByText('Delete this time entry?')).toBeInTheDocument()
     )
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
-    await waitFor(() => expect(mockEntriesDelete).toHaveBeenCalledWith(10))
+    await waitFor(() => expect(mockDeleteEntry).toHaveBeenCalledWith(10))
     expect(onClose).toHaveBeenCalled()
   })
 

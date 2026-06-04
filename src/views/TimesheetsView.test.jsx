@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import TimesheetsView from './TimesheetsView'
 
 const mockEntriesDelete = vi.fn().mockResolvedValue(undefined)
+const mockDeleteEntry   = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({
@@ -12,6 +13,7 @@ vi.mock('../db', () => ({
       get delete() { return mockEntriesDelete },
     },
   },
+  get deleteEntry() { return mockDeleteEntry },
 }))
 vi.mock('../hooks/useSettings', () => ({
   useSettings: () => ({ settings: { weekStartsMonday: true }, updateSetting: vi.fn() }),
@@ -268,12 +270,12 @@ describe('TimesheetsView — delete entry flow', () => {
     expect(screen.getByText('Delete this time entry?')).toBeInTheDocument()
   })
 
-  it('calls db.entries.delete when deletion is confirmed', async () => {
+  it('calls deleteEntry when deletion is confirmed', async () => {
     setupWithEntries()
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('button', { name: /delete entry for acme corp/i }))
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
-    await waitFor(() => expect(mockEntriesDelete).toHaveBeenCalledWith(1))
+    await waitFor(() => expect(mockDeleteEntry).toHaveBeenCalledWith(1))
   })
 
   it('closes the ConfirmModal after deletion is confirmed', async () => {

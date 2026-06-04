@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { db } from '../db'
+import { db, deleteEntry } from '../db'
 import { exportSnapshot, runSync, disconnectSync } from './syncManager'
 import * as github from './providers/github'
 import * as google from './providers/google'
@@ -49,6 +49,7 @@ beforeEach(async () => {
   await db.jobs.clear()
   await db.laborTypes.clear()
   await db.entries.clear()
+  await db.deletions.clear()
   for (const key of ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt', 'syncUsername']) {
     await db.settings.delete(key)
   }
@@ -625,5 +626,77 @@ describe('runSync — merge by stable uuid identity', () => {
     const entries = await db.entries.toArray()
     expect(entries).toHaveLength(1)
     expect(entries[0].uuid).toBe('entry-uuid-1') // remote uuid preserved
+  })
+})
+
+// ---------------------------------------------------------------------------
+// runSync — merge: delete tombstones (issue #118)
+// ---------------------------------------------------------------------------
+
+describe('runSync — merge with delete tombstones', () => {
+  async function seedOneEntry(updatedAt) {
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false })
+    const jobId = await db.jobs.add({ name: 'Client Project', isActive: true, laborRates: {} })
+    const extra = updatedAt != null ? { updatedAt } : {}
+    const id = await db.entries.add({
+      jobId, laborTypeId: ltId,
+      punchIn: new Date('2025-01-01T09:00:00.000Z'),
+      punchOut: new Date('2025-01-01T10:00:00.000Z'),
+      notes: null, ...extra,
+    })
+    const [lt, job, entry] = await Promise.all([
+      db.laborTypes.get(ltId), db.jobs.get(jobId), db.entries.get(id),
+    ])
+    return { id, lt, job, entry }
+  }
+
+  it('does not resurrect an entry that was deleted locally (peer snapshot still has it)', async () => {
+    await seedSyncSettings()
+    const { id, lt, job, entry } = await seedOneEntry()
+    await deleteEntry(id) // local delete → tombstone
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Design', color: '#6366F1' }],
+      jobs: [{ id: 200, uuid: job.uuid, name: 'Client Project', laborTypeId: 100, isActive: true }],
+      entries: [{ uuid: entry.uuid, jobId: 200, laborTypeId: 100, punchIn: '2025-01-01T09:00:00.000Z', punchOut: '2025-01-01T10:00:00.000Z', notes: null }],
+      deletions: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    expect(await db.entries.toArray()).toHaveLength(0) // tombstone suppresses the re-import
+  })
+
+  it('applies a remote tombstone, deleting the matching local entry and keeping the tombstone', async () => {
+    await seedSyncSettings()
+    const { entry } = await seedOneEntry(1000)
+
+    const remoteSnapshot = {
+      version: 1, laborTypes: [], jobs: [], entries: [],
+      deletions: [{ uuid: entry.uuid, deletedAt: 2000 }], // deleted after the entry's updatedAt
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    expect(await db.entries.toArray()).toHaveLength(0)
+    expect(await db.deletions.get(entry.uuid)).toBeTruthy() // persisted so it keeps propagating
+  })
+
+  it('keeps a local entry edited after the remote tombstone (a newer edit undeletes)', async () => {
+    await seedSyncSettings()
+    const { entry } = await seedOneEntry(5000)
+
+    const remoteSnapshot = {
+      version: 1, laborTypes: [], jobs: [], entries: [],
+      deletions: [{ uuid: entry.uuid, deletedAt: 3000 }], // deleted BEFORE the local edit
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    expect(await db.entries.toArray()).toHaveLength(1) // newer local edit wins
   })
 })
