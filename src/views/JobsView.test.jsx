@@ -27,8 +27,8 @@ vi.mock('../components/ColorPicker', () => ({
 }))
 
 const JOBS = [
-  { id: 1, name: 'Acme Corp',  isActive: true,  isDeleted: false, laborTypeId: null, laborRates: {} },
-  { id: 2, name: 'Old Client', isActive: false, isDeleted: false, laborTypeId: null, laborRates: {} },
+  { id: 1, name: 'Acme Corp',  isActive: true,  laborTypeId: null, laborRates: {} },
+  { id: 2, name: 'Old Client', isActive: false, laborTypeId: null, laborRates: {} },
 ]
 const LABOR_TYPES = [
   { id: 1, name: 'Design', color: '#6366F1', isArchived: false },

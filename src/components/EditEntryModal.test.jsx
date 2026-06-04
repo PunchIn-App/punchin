@@ -39,7 +39,7 @@ const ACTIVE_ENTRY = {
   notes: null,
 }
 
-const JOBS = [{ id: 1, name: 'Acme Corp', isActive: true, isDeleted: false, laborTypeId: null }]
+const JOBS = [{ id: 1, name: 'Acme Corp', isActive: true, laborTypeId: null }]
 const LABOR_TYPES = [{ id: 1, name: 'Design', isArchived: false }]
 
 function setupMocks() {

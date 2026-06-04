@@ -41,7 +41,7 @@ vi.mock('../hooks/useSettings', () => ({
 // Fixtures
 // --------------------------------------------------------------------------
 
-const JOBS  = [{ id: 1, name: 'Job A', isActive: true, isDeleted: false, laborTypeId: 1 }]
+const JOBS  = [{ id: 1, name: 'Job A', isActive: true, laborTypeId: 1 }]
 const TYPES = [{ id: 1, name: 'Design', isArchived: false }]
 
 // useLiveQuery is called twice per render (jobs, then laborTypes).
@@ -93,7 +93,7 @@ describe('StartTimerModal — validation', () => {
 
   it('shows an error when job is selected but no labor type', async () => {
     // Job has no default laborTypeId, so the useEffect won't auto-fill it
-    const jobsNoDefault = [{ id: 1, name: 'Job A', isActive: true, isDeleted: false, laborTypeId: null }]
+    const jobsNoDefault = [{ id: 1, name: 'Job A', isActive: true, laborTypeId: null }]
     let n = 0
     useLiveQuery.mockImplementation(() => (++n % 2 === 1 ? jobsNoDefault : []))
 

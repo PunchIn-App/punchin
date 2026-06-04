@@ -209,7 +209,7 @@ All state lives in a local IndexedDB database named `PunchInDB`, managed by Dexi
 | Table | Purpose |
 |---|---|
 | `entries` | Time entries — `punchOut: null` means the timer is still running |
-| `jobs` | Client projects; soft-archived via `isActive` / `isDeleted` |
+| `jobs` | Client projects; soft-archived via `isActive` |
 | `laborTypes` | Billable categories with hex color; soft-archived via `isArchived` |
 | `settings` | Key-value app preferences |
 

@@ -217,7 +217,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 
   const inputCls = 'bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-appAccent/60 transition-colors'
 
-  const activeJobs = jobs?.filter(j => j.isActive !== false && j.isDeleted !== true) ?? []
+  const activeJobs = jobs?.filter(j => j.isActive !== false) ?? []
 
   return (
     <div

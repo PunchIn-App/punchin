@@ -34,7 +34,7 @@ export default function EditEntryModal({ entry, onClose }) {
   const isActiveTimer = isEditMode && !entry.punchOut
 
   // Database lists
-  const jobs       = useLiveQuery(() => db.jobs.filter(j => (j.isActive !== false && j.isDeleted !== true) || j.id === entry?.jobId).toArray(), [entry])
+  const jobs       = useLiveQuery(() => db.jobs.filter(j => j.isActive !== false || j.id === entry?.jobId).toArray(), [entry])
   const laborTypes = useLiveQuery(() =>
     db.laborTypes.orderBy('name').filter(lt => !lt.isArchived || lt.id === entry?.laborTypeId).toArray(),
   [entry])

@@ -170,7 +170,7 @@ export default function JobsView() {
 
   const jobs       = useLiveQuery(async () => {
     const all = await db.jobs.toArray()
-    return all.filter(j => j.isDeleted !== true).sort((a, b) => a.name.localeCompare(b.name))
+    return [...all].sort((a, b) => a.name.localeCompare(b.name))
   }, [])
   const laborTypes = useLiveQuery(() => db.laborTypes.orderBy('name').toArray(), [])
 

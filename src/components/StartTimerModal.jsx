@@ -116,7 +116,7 @@ export default function StartTimerModal({ onClose }) {
   const hapticsOn = isStandalone && settings.hapticFeedback !== false
   const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
 
-  const jobs       = useLiveQuery(() => db.jobs.filter(j => j.isActive !== false && j.isDeleted !== true).toArray(), [])
+  const jobs       = useLiveQuery(() => db.jobs.filter(j => j.isActive !== false).toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.orderBy('name').filter(lt => !lt.isArchived).toArray(), [])
 
   const stableClose   = useCallback(onClose, [onClose])

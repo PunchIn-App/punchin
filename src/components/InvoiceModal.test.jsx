@@ -17,7 +17,7 @@ vi.mock('../hooks/useSettings', () => ({
 }))
 
 // A job with a rate of $100/hr for labor type 1
-const JOBS = [{ id: 1, name: 'Acme Corp', clientName: 'Acme', isActive: true, isDeleted: false, laborRates: { 1: 100 } }]
+const JOBS = [{ id: 1, name: 'Acme Corp', clientName: 'Acme', isActive: true, laborRates: { 1: 100 } }]
 const LABOR_TYPES = [{ id: 1, name: 'Design', color: '#6366F1', isArchived: false }]
 // One completed entry: 1 hour
 const ENTRIES = [{
@@ -101,7 +101,7 @@ describe('InvoiceModal — line items calculation', () => {
   })
 
   it('shows "—" for amount when job has no rate set for that labor type', async () => {
-    const jobNoRates = [{ id: 1, name: 'No Rates Job', isActive: true, isDeleted: false, laborRates: {} }]
+    const jobNoRates = [{ id: 1, name: 'No Rates Job', isActive: true, laborRates: {} }]
     renderModal({ jobs: jobNoRates })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
     // "1.00" appears twice (line-item hours + total hours); "—" for rate and amount
@@ -127,7 +127,7 @@ describe('InvoiceModal — line items calculation', () => {
   })
 
   it('shows "no rates set" hint when job has no labor rates', async () => {
-    const jobNoRates = [{ id: 1, name: 'Plain Job', isActive: true, isDeleted: false, laborRates: {} }]
+    const jobNoRates = [{ id: 1, name: 'Plain Job', isActive: true, laborRates: {} }]
     useLiveQuery.mockImplementation(() => [])
     renderModal({ jobs: jobNoRates })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })

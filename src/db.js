@@ -40,7 +40,6 @@ export function genUuid() {
  *   name: string,
  *   laborTypeId: number,
  *   isActive: boolean,
- *   isDeleted?: boolean,
  *   laborRates?: Record<number, number>,
  *   updatedAt?: number,
  * }} Job

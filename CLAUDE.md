@@ -369,11 +369,10 @@ Both `jobs` and `laborTypes` use soft-deletion — records are never hard-delete
 | Table | Field | Meaning |
 |-------|-------|---------|
 | `jobs` | `isActive: false` | Archived — moved to collapsed "Archived" folder below active jobs; restorable; hidden from punch-in dropdowns |
-| `jobs` | `isDeleted: true` | Schema field exists but is **not exposed in the UI** — reserved for future use or data migration |
 | `jobs` | `laborRates: { [laborTypeId]: number }` | Per-labor-type hourly rates ($/hr) used by the invoice generator. Stored as a plain JSON object on the job record — no extra table or schema migration required. Missing keys mean "no rate set". |
 | `laborTypes` | `isArchived: true` | Archived — moved to collapsed "Archived" folder below active types; restorable; hidden from all labor-type dropdowns |
 
-Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archived/deleted records. `EditEntryModal` still includes a record's own archived labor type so existing entries can be saved without data loss.
+Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archived records. `EditEntryModal` still includes a record's own archived labor type so existing entries can be saved without data loss.
 
 #### Archive UX (v0.3.0+, unchanged in v0.5.0)
 - Active jobs show in the main list with **Edit** and **Archive** buttons only — there is no Delete button in the UI.
