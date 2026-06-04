@@ -250,11 +250,19 @@ describe('App — OAuth callback handling', () => {
     ))
   })
 
-  it('stores sync error when hash has sync_error', async () => {
+  it('stores a friendly message for a known sync_error code', async () => {
     window.location.hash = '#sync_error=auth_failed'
     render(<App />)
     await waitFor(() => expect(mockDbSettingsPut).toHaveBeenCalledWith(
-      { key: 'syncError', value: 'auth_failed' }
+      { key: 'syncError', value: 'Sign-in failed: authorization was denied.' }
+    ))
+  })
+
+  it('maps an unknown/crafted sync_error code to a generic message (no reflected text)', async () => {
+    window.location.hash = '#sync_error=' + encodeURIComponent('<b>Totally legit</b> — call 1-800-SCAM')
+    render(<App />)
+    await waitFor(() => expect(mockDbSettingsPut).toHaveBeenCalledWith(
+      { key: 'syncError', value: 'Sign-in failed. Please try again.' }
     ))
   })
 

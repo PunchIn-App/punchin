@@ -25,6 +25,19 @@ const OPEN_COUNT_KEY        = 'pi.opens'
 // after they've seen some value, which converts far better than a cold first paint.
 const NUDGE_MIN_OPENS = 2
 
+// Map OAuth callback error codes (which arrive in an attacker-influenceable URL
+// fragment) to friendly, fixed messages. Unknown values fall back to a generic
+// message, so a crafted `#sync_error=...` can't present arbitrary or misleading
+// text in the Settings sync UI (issue #130).
+const SYNC_ERROR_MESSAGES = {
+  missing_code: 'Sign-in failed: no authorization code was returned.',
+  server_error: 'Sign-in failed: the sign-in service had an error.',
+  auth_failed:  'Sign-in failed: authorization was denied.',
+}
+export function describeSyncError(code) {
+  return SYNC_ERROR_MESSAGES[code] || 'Sign-in failed. Please try again.'
+}
+
 function hexToRgb(hex) {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
@@ -239,7 +252,7 @@ export default function App() {
 
     } else if (params.has('sync_error')) {
       history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
-      db.settings.put({ key: 'syncError', value: params.get('sync_error') })
+      db.settings.put({ key: 'syncError', value: describeSyncError(params.get('sync_error')) })
 
     // GitHub: hold the token in memory and show a confirmation dialog before
     // saving — GitHub may silently use the already-signed-in account without
