@@ -178,6 +178,21 @@ async function mergeSnapshot(remote) {
   })
 }
 
+// Tag a sync network step so a failure says which side broke (issue #122).
+// `download` failures leave local data untouched; `upload` failures mean the
+// remote was merged into the local db but this device's changes didn't reach
+// the cloud — they upload on the next sync. Both are safe to retry because
+// mergeSnapshot is idempotent (records match by stable uuid, so re-running never
+// duplicates). The TOKEN_EXPIRED signal is preserved so the UI can prompt re-auth.
+async function syncStep(phase, work) {
+  try {
+    return await work()
+  } catch (err) {
+    if (err?.message === 'TOKEN_EXPIRED') throw err
+    throw new Error(`Sync ${phase} failed: ${err.message}`)
+  }
+}
+
 export async function runSync() {
   const s = await getSettings()
   if (!s.syncProvider || !s.syncToken) throw new Error('Not connected')
@@ -193,33 +208,33 @@ export async function runSync() {
     const deviceId = getDeviceId()
 
     if (!fileId) {
-      fileId = await findExistingPunchInGist(s.syncToken)
+      fileId = await syncStep('download', () => findExistingPunchInGist(s.syncToken))
       if (fileId) await db.settings.put({ key: 'syncFileId', value: fileId })
     }
 
     if (fileId) {
-      const snapshots = await fetchAllDeviceData(s.syncToken, fileId)
+      const snapshots = await syncStep('download', () => fetchAllDeviceData(s.syncToken, fileId))
       for (const snapshot of snapshots) await mergeSnapshot(snapshot)
     }
 
     const snapshot = await exportSnapshot()
 
     if (fileId) {
-      await pushDeviceData(s.syncToken, fileId, deviceId, snapshot)
+      await syncStep('upload', () => pushDeviceData(s.syncToken, fileId, deviceId, snapshot))
     } else {
-      fileId = await createGist(s.syncToken, deviceId, snapshot)
+      fileId = await syncStep('upload', () => createGist(s.syncToken, deviceId, snapshot))
       await db.settings.put({ key: 'syncFileId', value: fileId })
     }
   } else if (s.syncProvider === 'google') {
-    const remote = await pullFromDrive(s.syncToken)
+    const remote = await syncStep('download', () => pullFromDrive(s.syncToken))
     if (remote) await mergeSnapshot(remote)
     const snapshot = await exportSnapshot()
-    await pushToDrive(s.syncToken, snapshot)
+    await syncStep('upload', () => pushToDrive(s.syncToken, snapshot))
   } else if (s.syncProvider === 'onedrive') {
-    const remote = await pullFromOneDrive(s.syncToken)
+    const remote = await syncStep('download', () => pullFromOneDrive(s.syncToken))
     if (remote) await mergeSnapshot(remote)
     const snapshot = await exportSnapshot()
-    await pushToOneDrive(s.syncToken, snapshot)
+    await syncStep('upload', () => pushToOneDrive(s.syncToken, snapshot))
   }
 
   const now = Date.now()

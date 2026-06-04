@@ -858,3 +858,42 @@ describe('runSync — token expiry handling', () => {
     expect(stored?.value ?? null).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// runSync — failure isolation + retry safety (issue #122)
+// ---------------------------------------------------------------------------
+
+describe('runSync — failure isolation and retry safety', () => {
+  it('tags a download (pull) failure and leaves lastSyncedAt unchanged', async () => {
+    await seedSyncSettings({ syncProvider: 'google', syncFileId: null })
+    google.pullFromDrive.mockRejectedValueOnce(new Error('Drive 500'))
+    await expect(runSync()).rejects.toThrow(/Sync download failed/)
+    expect(google.pushToDrive).not.toHaveBeenCalled() // never reached push
+    expect((await db.settings.get('lastSyncedAt'))?.value ?? null).toBeNull()
+  })
+
+  it('tags an upload (push) failure and leaves lastSyncedAt unchanged', async () => {
+    await seedSyncSettings({ syncProvider: 'google', syncFileId: null })
+    google.pullFromDrive.mockResolvedValueOnce(null)
+    google.pushToDrive.mockRejectedValueOnce(new Error('Drive 500'))
+    await expect(runSync()).rejects.toThrow(/Sync upload failed/)
+    expect((await db.settings.get('lastSyncedAt'))?.value ?? null).toBeNull()
+  })
+
+  it('is idempotent: merging the same uuid-bearing remote snapshot twice adds it once', async () => {
+    await seedSyncSettings()
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 1, uuid: 'lt-x', name: 'Dev', color: '#F59E0B' }],
+      jobs: [{ id: 2, uuid: 'job-x', name: 'Remote Job', laborTypeId: 1, isActive: true }],
+      entries: [{ uuid: 'entry-x', jobId: 2, laborTypeId: 1, punchIn: '2025-02-01T09:00:00.000Z', punchOut: '2025-02-01T10:00:00.000Z', notes: null }],
+    }
+    github.fetchAllDeviceData.mockResolvedValue([remoteSnapshot]) // returned on every pull
+    github.pushDeviceData.mockResolvedValue(undefined)
+    await runSync()
+    await runSync() // simulates a retry after a transient failure
+    expect(await db.entries.toArray()).toHaveLength(1)
+    expect(await db.jobs.toArray()).toHaveLength(1)
+    expect(await db.laborTypes.toArray()).toHaveLength(1)
+  })
+})
