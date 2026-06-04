@@ -33,6 +33,15 @@ vi.mock('../hooks/useSettings', () => ({
 }))
 
 vi.mock('../db', () => ({
+  // Representative default rows (the full 27-key list is validated in
+  // db.test.js); factoryReset forwards these straight to settings.bulkPut.
+  defaultSettingsRows: () => [
+    { key: 'allowConcurrentTimers', value: false },
+    { key: 'weekStartsMonday', value: true },
+    { key: 'theme', value: 'auto' },
+    { key: 'accentColor', value: '#1f6feb' },
+    { key: 'syncProvider', value: null },
+  ],
   db: {
     jobs: {
       get toArray() { return mockDbJobsToArray },

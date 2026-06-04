@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { db, deleteEntry } from './db'
+import { db, deleteEntry, DEFAULT_SETTINGS } from './db'
 
 afterAll(async () => {
   await db.close()
@@ -24,9 +24,22 @@ describe('db — schema', () => {
 })
 
 describe('db — populate seed', () => {
-  it('seeds exactly 20 default settings', async () => {
+  it('seeds exactly the DEFAULT_SETTINGS keys (27, incl. the sync keys) on fresh install', async () => {
     const all = await db.settings.toArray()
-    expect(all).toHaveLength(20)
+    expect(all).toHaveLength(Object.keys(DEFAULT_SETTINGS).length)
+    expect(all).toHaveLength(27)
+    // Single source of truth (issue #131): the seeded rows match DEFAULT_SETTINGS exactly.
+    const seeded = Object.fromEntries(all.map(({ key, value }) => [key, value]))
+    expect(seeded).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('seeds the sync keys as null on fresh install (matches factory reset, issue #131)', async () => {
+    const all = await db.settings.toArray()
+    for (const key of ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt', 'syncError', 'syncUsername']) {
+      const row = all.find(s => s.key === key)
+      expect(row).toBeDefined()
+      expect(row.value).toBeNull()
+    }
   })
 
   it('seeds the per-reminder weekday defaults as all 7 days', async () => {

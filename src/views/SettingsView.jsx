@@ -9,7 +9,7 @@ import { notificationsSupported, notificationPermission, requestNotificationPerm
 import { applyUpdate, hasWaitingUpdate } from '../utils/pwa'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { format } from 'date-fns'
-import { db } from '../db'
+import { db, defaultSettingsRows } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -555,35 +555,7 @@ export default function SettingsView() {
       await db.deletions.clear()
       await db.secrets.clear() // wipe the encrypted sync token + key (issue #126)
       await db.settings.clear()
-      await db.settings.bulkPut([
-        { key: 'allowConcurrentTimers', value: false },
-        { key: 'weekStartsMonday',      value: true  },
-        { key: 'theme',                 value: 'auto' },
-        { key: 'accentColor',           value: '#1f6feb' },
-        { key: 'hapticFeedback',        value: true  },
-        { key: 'remindersEnabled',          value: false   },
-        { key: 'remindLongRunning',         value: true    },
-        { key: 'remindLongRunningMinutes',  value: 60      },
-        { key: 'remindIdle',                value: false   },
-        { key: 'remindIdleTime',            value: '09:00' },
-        { key: 'remindIdleDays',            value: [0,1,2,3,4,5,6] },
-        { key: 'remindStillRunning',        value: false   },
-        { key: 'remindStillRunningTime',    value: '17:00' },
-        { key: 'remindStillRunningDays',    value: [0,1,2,3,4,5,6] },
-        { key: 'remindTimesheetDaily',      value: false   },
-        { key: 'remindTimesheetDailyTime',  value: '17:00' },
-        { key: 'remindTimesheetDailyDays',  value: [0,1,2,3,4,5,6] },
-        { key: 'remindTimesheetWeekly',     value: false   },
-        { key: 'remindTimesheetWeeklyDay',  value: 5       },
-        { key: 'remindTimesheetWeeklyTime', value: '16:00' },
-        { key: 'syncProvider',          value: null },
-        { key: 'syncToken',             value: null },
-        { key: 'syncTokenExpiry',       value: null },
-        { key: 'syncFileId',            value: null },
-        { key: 'lastSyncedAt',          value: null },
-        { key: 'syncError',             value: null },
-        { key: 'syncUsername',          value: null },
-      ])
+      await db.settings.bulkPut(defaultSettingsRows()) // single source of truth (issue #131)
     })
     setResetStage(null)
   }

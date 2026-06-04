@@ -37,7 +37,7 @@ function toLocalDateString(d) {
 export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab, onClose }) {
   const { isStandalone, os } = usePlatformContext()
   const { settings } = useSettings()
-  const wsMon = settings?.weekStartsMonday !== false
+  const wsMon = settings.weekStartsMonday // complete via DEFAULT_SETTINGS merge (issue #134)
 
   const uid      = useId()
   const titleId  = `${uid}-title`

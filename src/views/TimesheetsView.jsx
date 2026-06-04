@@ -101,7 +101,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
 
 function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { settings } = useSettings()
-  const wsMon = settings?.weekStartsMonday !== false
+  const wsMon = settings.weekStartsMonday // complete via DEFAULT_SETTINGS merge (issue #134)
   const { start, end } = getWeekRange(date, wsMon)
   const days = getWeekDays(date, wsMon)
 
@@ -229,7 +229,7 @@ export default function TimesheetsView() {
   const [tab, setTab]         = useState('daily')
   const [currentDate, setDate] = useState(new Date())
   const { settings }          = useSettings()
-  const wsMon                  = settings?.weekStartsMonday !== false
+  const wsMon                  = settings.weekStartsMonday // DEFAULT_SETTINGS merge (issue #134)
 
   // Modals state
   const [editingEntry, setEditingEntry]   = useState(null)

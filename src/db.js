@@ -139,32 +139,53 @@ export async function deleteEntry(id) {
   })
 }
 
+// Single source of truth for default settings (issues #131/#134). Seeded on a
+// fresh install (populate) and restored by factoryReset, and merged under the
+// live rows by useSettings so every consumer reads a complete, typed object.
+// The sync keys are seeded as null on fresh install too, so a fresh install
+// matches a factory reset (no undefined-vs-null branching in consumers).
+export const DEFAULT_SETTINGS = {
+  allowConcurrentTimers: false,
+  weekStartsMonday: true,
+  theme: 'auto',
+  accentColor: '#1f6feb',
+  hapticFeedback: true,
+  // Reminder notifications (issue #54) — all off by default; the master toggle
+  // requests notification permission when first enabled.
+  remindersEnabled: false,
+  remindLongRunning: true,
+  remindLongRunningMinutes: 60,
+  remindIdle: false,
+  remindIdleTime: '09:00',
+  remindIdleDays: [0, 1, 2, 3, 4, 5, 6],
+  remindStillRunning: false,
+  remindStillRunningTime: '17:00',
+  remindStillRunningDays: [0, 1, 2, 3, 4, 5, 6],
+  remindTimesheetDaily: false,
+  remindTimesheetDailyTime: '17:00',
+  remindTimesheetDailyDays: [0, 1, 2, 3, 4, 5, 6],
+  remindTimesheetWeekly: false,
+  remindTimesheetWeeklyDay: 5,
+  remindTimesheetWeeklyTime: '16:00',
+  // Sync (issue #131) — seeded as null on fresh install too. The token itself
+  // is stored encrypted in the `secrets` table (issue #126); the `syncToken`
+  // settings key is a legacy/null placeholder kept for back-compat.
+  syncProvider: null,
+  syncToken: null,
+  syncTokenExpiry: null,
+  syncFileId: null,
+  lastSyncedAt: null,
+  syncError: null,
+  syncUsername: null,
+}
+
+/** DEFAULT_SETTINGS as Dexie KV rows for bulkPut (populate + factoryReset). */
+export const defaultSettingsRows = () =>
+  Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({ key, value }))
+
 // Seed default settings on first run — no jobs or labor types pre-loaded
 db.on('populate', async () => {
-  await db.settings.bulkPut([
-    { key: 'allowConcurrentTimers', value: false },
-    { key: 'weekStartsMonday',      value: true  },
-    { key: 'theme',                 value: 'auto' },
-    { key: 'accentColor',           value: '#1f6feb' },
-    { key: 'hapticFeedback',        value: true  },
-    // Reminder notifications (issue #54) — all off by default; the master
-    // toggle requests notification permission when first enabled.
-    { key: 'remindersEnabled',          value: false   },
-    { key: 'remindLongRunning',         value: true    },
-    { key: 'remindLongRunningMinutes',  value: 60      },
-    { key: 'remindIdle',                value: false   },
-    { key: 'remindIdleTime',            value: '09:00' },
-    { key: 'remindIdleDays',            value: [0,1,2,3,4,5,6] },
-    { key: 'remindStillRunning',        value: false   },
-    { key: 'remindStillRunningTime',    value: '17:00' },
-    { key: 'remindStillRunningDays',    value: [0,1,2,3,4,5,6] },
-    { key: 'remindTimesheetDaily',      value: false   },
-    { key: 'remindTimesheetDailyTime',  value: '17:00' },
-    { key: 'remindTimesheetDailyDays',  value: [0,1,2,3,4,5,6] },
-    { key: 'remindTimesheetWeekly',     value: false   },
-    { key: 'remindTimesheetWeeklyDay',  value: 5       },
-    { key: 'remindTimesheetWeeklyTime', value: '16:00' },
-  ])
+  await db.settings.bulkPut(defaultSettingsRows())
 })
 
 export default db

@@ -63,7 +63,7 @@ punchin/
 │   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope — stays implicit; see the #128 comment for why), pushToDrive, pullFromDrive
 │   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (Auth Code + PKCE, AppFolder scope, issue #128) + exchangeOneDriveCode (client-side token exchange, token never in URL), pushToOneDrive, pullFromOneDrive
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
-│   ├── db.js               # Dexie schema, seed data, migrations
+│   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131)
 │   ├── components/
 │   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell; shows update badge on Settings icon
 │   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
@@ -84,7 +84,7 @@ punchin/
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
 │   │   └── SettingsView.jsx    # Settings as an iOS-style drill-in (CategoryRow root list → Panel sub-pages; device Back / re-tapping the Settings tab returns to root): General (concurrent timers, week start, haptics), Appearance (theme/accent), Reminders (incl. per-reminder WeekdayPicker), Install, Data & Sync (Backup JSON/CSV · Sync GitHub Gist/Google Drive/OneDrive · Transfer · Danger Zone, grouped via PanelGroup), About (changelog, report bug, help-improve/feature request, License & legal, Support the App, check-for-updates). Exports buildBugReportUrl + buildFeatureRequestUrl
 │   ├── hooks/
-│   │   ├── useSettings.js          # Reactive Dexie KV settings hook
+│   │   ├── useSettings.js          # Reactive Dexie KV settings hook; merges live rows over DEFAULT_SETTINGS so consumers read a complete typed object (issue #134)
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web) + isIOSSafari (true only in iOS Safari, where Add to Home Screen works) + isIPad (treats a touch-capable "Macintosh" UA — iPadOS Safari's default desktop mode — as iOS, and distinguishes iPad from iPhone)
 │   │   ├── useInstallPrompt.js     # PWA install state: canInstall/isInstalled/isIOS/isIOSSafari + promptInstall(); shared by SettingsView and the install nudge
 │   │   ├── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
@@ -133,7 +133,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `dayAllowed`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules, day-of-week gating + back-compat when day arrays absent) |
 | `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |
 | `src/utils/deviceId.test.js` | `getDeviceId` — generates 8-char hex, persists across calls, falls back to `'default'` when localStorage is unavailable |
-| `src/db.test.js` | Schema validation, default settings seed (20 keys incl. the per-reminder weekday defaults = all 7 days), basic CRUD for jobs/labor types/entries |
+| `src/db.test.js` | Schema validation, default settings seed (27 keys incl. the sync keys seeded as null and the per-reminder weekday defaults = all 7 days; matches `DEFAULT_SETTINGS`), indexed `punchIn` range queries (`between`/`aboveOrEqual`, issue #132), `deleteEntry` tombstones, basic CRUD for jobs/labor types/entries |
 | `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), `isIOSSafari` (Safari vs CriOS/FxiOS/EdgiOS), `isIPad` incl. desktop-mode iPad (touch-capable "Macintosh" → iOS) vs real Mac, standalone mode detection |
 | `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
@@ -416,6 +416,8 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 
 As of v0.3.0 the `populate` event in `db.js` seeds **only settings** — no default jobs or labor types are created. New users see empty lists and are prompted to add their own. The factory reset in Settings restores this same zero state.
 
+Both the `populate` seed and `factoryReset` consume the single exported **`DEFAULT_SETTINGS`** object in `db.js` (via `defaultSettingsRows()`), so they can never drift (issue #131). A fresh install seeds **all** keys including the sync keys (as `null`), matching a factory reset exactly. `useSettings` merges the live rows over `DEFAULT_SETTINGS`, so consumers always read a complete, typed settings object and don't need per-call `|| default` / `!== false` fallbacks (issue #134).
+
 ### Schema Changes
 
 When adding new tables or indexes, increment the version number in `db.js` and add an upgrade block. Dexie handles migrations automatically on version bump. (v3 added the `uuid` index + `updatedAt` field to `jobs`/`laborTypes`/`entries`, backfilling existing records in its `upgrade()` so older installs become merge-identifiable without data loss.)
@@ -643,7 +645,7 @@ The script (`scripts/screenshots.mjs`):
 ## Adding Features — Checklist
 
 1. **New data type?** Add table/indexes in `db.js`, bump version, add seed data if needed
-2. **New setting?** Add key to `db.js` initializer, document it in the settings table above, and add it to the `factoryReset` function in `SettingsView.jsx` so it resets correctly. Destructive data actions belong in the collapsible **Danger Zone** section, not in the main Data section.
+2. **New setting?** Add the key + default to the single `DEFAULT_SETTINGS` object in `db.js` (both `populate` and `factoryReset` consume it via `defaultSettingsRows()`, so there's one source of truth — no separate edit to `SettingsView.jsx` needed) and document it in the Settings Keys table above. Because `useSettings` merges over `DEFAULT_SETTINGS`, consumers can read `settings.yourKey` directly without a fallback. Destructive data actions belong in the collapsible **Danger Zone** section, not in the main Data section.
 3. **New view?** Add to `App.jsx` tab switch and `Layout.jsx` nav bar (keep it to 5 nav items max for mobile)
 4. **Editing time?** Always go through `utils/time.js` helpers; never use raw `Date` arithmetic inline
 5. **Charts?** Follow `AnalyticsView.jsx` — use Recharts, reference CSS variables for colors (`var(--text-secondary)` etc.). Wrap each chart in `<figure role="img" aria-label="…">` with a `<table className="sr-only">` fallback.
