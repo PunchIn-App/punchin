@@ -172,6 +172,8 @@ describe('App — OAuth callback handling', () => {
     await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
     expect(screen.getByText(/Connect as @octocat/)).toBeInTheDocument()
+    // discloses the broad gist scope so the grant is informed (issue #127)
+    expect(screen.getByText(/grants access to your GitHub gists/i)).toBeInTheDocument()
     // token must NOT be saved to DB until user confirms
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
   })

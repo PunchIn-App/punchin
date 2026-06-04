@@ -87,6 +87,11 @@ function GitHubAccountConfirm({ username, onConfirm, onDismiss }) {
               : 'Your data will sync to a private gist in this GitHub account.'
             }{' '}If this isn&apos;t the right account, tap Cancel, sign out of GitHub in your browser, then try connecting again.
           </p>
+          <p className="text-xs text-appTextMuted mt-2">
+            Connecting grants access to your GitHub gists. GitHub&apos;s gist permission covers{' '}
+            <span className="text-appText">all</span> your gists, not just PunchIn&apos;s — you can revoke it
+            anytime in your GitHub account settings.
+          </p>
         </div>
         <div className="flex gap-2">
           <button
