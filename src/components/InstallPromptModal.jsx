@@ -1,74 +1,10 @@
-import { useEffect, useRef, useCallback, useId } from 'react'
+import { useCallback, useId } from 'react'
 import { X, MonitorDown, Share, Plus, Compass } from 'lucide-react'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 import { useSettings } from '../hooks/useSettings'
-
-// ---------------------------------------------------------------------------
-// Swipe-down-to-dismiss (iOS bottom sheet) — mirrors StartTimerModal.
-// ---------------------------------------------------------------------------
-function useSwipeDismiss(onClose, hapticTrigger) {
-  const ref = useRef(null)
-  const startY = useRef(null)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const DISMISS_THRESHOLD = 80
-    const onTouchStart = e => { startY.current = e.touches[0].clientY }
-    const onTouchEnd = e => {
-      if (startY.current === null) return
-      const delta = e.changedTouches[0].clientY - startY.current
-      startY.current = null
-      if (delta > DISMISS_THRESHOLD) { hapticTrigger(); onClose() }
-    }
-    el.addEventListener('touchstart', onTouchStart, { passive: true })
-    el.addEventListener('touchend', onTouchEnd, { passive: true })
-    return () => {
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchend', onTouchEnd)
-    }
-  }, [onClose, hapticTrigger])
-
-  return ref
-}
-
-// ---------------------------------------------------------------------------
-// Android hardware back-button dismiss — mirrors StartTimerModal.
-// ---------------------------------------------------------------------------
-function useAndroidBackDismiss(onClose, hapticTrigger) {
-  useEffect(() => {
-    history.pushState({ modal: true }, '')
-    const handler = () => { hapticTrigger(); onClose() }
-    window.addEventListener('popstate', handler)
-    return () => {
-      window.removeEventListener('popstate', handler)
-      if (history.state?.modal) history.back()
-    }
-  }, [onClose, hapticTrigger])
-}
-
-function useSheetStyles(isStandalone, os) {
-  if (isStandalone && os === 'ios') {
-    return {
-      scrim:  'fixed inset-0 bg-black/40 backdrop-blur-md flex items-end sm:items-center justify-center z-50 p-4',
-      sheet:  'w-full max-w-md bg-appCard rounded-2xl border border-appBorder overflow-hidden shadow-xl',
-      handle: <div aria-hidden="true" className="flex justify-center pt-2.5 pb-1"><div className="w-9 h-[5px] rounded-full bg-white/30" /></div>,
-    }
-  }
-  if (isStandalone && os === 'android') {
-    return {
-      scrim:  'fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4',
-      sheet:  'w-full max-w-md bg-appCard rounded-t-[28px] border border-appBorder overflow-hidden shadow-xl',
-      handle: <div aria-hidden="true" className="flex justify-center items-center h-12"><div className="w-8 h-1 rounded-full bg-white/30" /></div>,
-    }
-  }
-  return {
-    scrim:  'fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4',
-    sheet:  'w-full max-w-md bg-appCard rounded-2xl border border-appBorder overflow-hidden shadow-xl',
-    handle: null,
-  }
-}
+import { useFocusTrap } from '../hooks/useFocusTrap'
+import { useSwipeDismiss, useAndroidBackDismiss, useSheetStyles } from '../hooks/useBottomSheet'
 
 // First-run install nudge. Three modes (chosen by the caller):
 //   - 'native'    (Chrome/Edge): primary button replays the captured native
@@ -105,29 +41,8 @@ export default function InstallPromptModal({ mode = 'native', onInstall, onClose
 
   const { scrim, sheet, handle } = useSheetStyles(isStandalone, os)
 
-  // Focus first focusable element and trap focus within the dialog.
-  useEffect(() => {
-    const el = swipeRef.current
-    if (!el) return
-    const focusable = () => Array.from(el.querySelectorAll(
-      'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    ))
-    focusable()[0]?.focus()
-
-    const handleKey = (e) => {
-      if (e.key === 'Escape') { stableClose(); return }
-      if (e.key !== 'Tab') return
-      const els = focusable()
-      if (!els.length) return
-      if (e.shiftKey && document.activeElement === els[0]) {
-        e.preventDefault(); els[els.length - 1].focus()
-      } else if (!e.shiftKey && document.activeElement === els[els.length - 1]) {
-        e.preventDefault(); els[0].focus()
-      }
-    }
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [stableClose])
+  // Focus trap, Escape, and focus restoration (issues #151/#152/#154)
+  useFocusTrap(swipeRef, stableClose)
 
   return (
     <div className={scrim} onClick={onClose}>

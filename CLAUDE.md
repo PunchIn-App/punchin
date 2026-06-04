@@ -89,6 +89,8 @@ punchin/
 │   │   ├── usePwaUpdate.js         # PWA "update available" coordination (issue #149): updateAvailable/updateStatus/checkForUpdates across window flag + SW reg.waiting + pwa:update-ready event
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web) + isIOSSafari (true only in iOS Safari, where Add to Home Screen works) + isIPad (treats a touch-capable "Macintosh" UA — iPadOS Safari's default desktop mode — as iOS, and distinguishes iPad from iPhone)
 │   │   ├── useInstallPrompt.js     # PWA install state: canInstall/isInstalled/isIOS/isIOSSafari + promptInstall(); shared by SettingsView and the install nudge
+│   │   ├── useFocusTrap.js         # Shared modal a11y (issue #151): initial focus ([data-autofocus]/first/opts), container-scoped Tab trap (#154), focus restoration on close (#152), Escape→onClose. Consumed by every modal
+│   │   ├── useBottomSheet.jsx      # Shared bottom-sheet plumbing (issue #151): useSwipeDismiss / useAndroidBackDismiss / useSheetStyles for StartTimerModal + InstallPromptModal
 │   │   ├── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
 │   │   └── useReminders.js        # Reminder scheduler (issue #54): watches settings + live timers, evaluates evaluateReminders on a 30s interval (and on tab focus), fires local notifications while reminders are enabled and permission granted. No backend / Web Push
 │   └── utils/
@@ -147,7 +149,8 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/components/LicenseModal.test.jsx` | Dialog a11y, default app-license (BUSL) tab, switch to third-party (aria-pressed), close button/Escape/backdrop, device-Back (popstate) dismiss |
 | `src/components/InstallPromptModal.test.jsx` | All three modes (native / ios-safari / ios-other), dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
 | `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
-| `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management |
+| `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management, unique title id per instance (#156) |
+| `src/hooks/useFocusTrap.test.jsx` | Initial focus (first / `[data-autofocus]` / `opts.initialFocus`), Escape→onClose, focus restoration on unmount (#152), focus pulled back into the dialog on Tab (#154) |
 | `src/components/DataTransfer.test.jsx` | Share-link + QR generation, "Includes N jobs/entries" summary, import junk rejection, end-to-end import of a real encoded link with count (issue #77) |
 | `src/components/EditEntryModal.test.jsx` | Add/edit/active-timer modes, validation, save/delete flows, keyboard |
 | `src/components/EditEntryModal.helpers.test.js` | `formatDateToYYYYMMDD`, `formatTimeToHHMM`, `combineDateAndTime` |
@@ -554,7 +557,13 @@ On mobile, modals are bottom sheets whose style branches by platform. On desktop
 
 Use `usePlatformContext()` to get `{ isStandalone, os }` and branch accordingly. Follow `StartTimerModal.jsx` as the reference pattern for **form / action** modals; apply the same treatment to any new one.
 
-**Centered reading-modal variant.** Long-form content dialogs — `ChangelogModal`, `LicenseModal` — are the exception: they are always centered (`max-w-lg`, `max-h-[80vh]` with internal scroll) rather than platform bottom-sheets. They still require the full a11y contract (`role="dialog"`, `aria-modal`, `aria-labelledby`, focus trap, Escape) **and** must close on the device Back gesture by pushing a `{ modal: true }` history entry on open and dismissing on `popstate` (unwinding the entry on close). Use these two as the reference when adding another content/reading modal.
+**Shared modal hooks (issue #151).** Don't re-implement the focus trap or sheet plumbing inline — every modal consumes:
+- `useFocusTrap(dialogRef, onClose, opts?)` (`src/hooks/useFocusTrap.js`) — the full a11y contract in one place: initial focus (`[data-autofocus]` → first focusable, or `opts.initialFocus(el, focusables)` e.g. `(el) => el` for a scrollable reading dialog), a container-scoped Tab trap, focus **restoration** to the triggering element on close, and Escape→`onClose`.
+- `useSwipeDismiss` / `useAndroidBackDismiss` / `useSheetStyles` (`src/hooks/useBottomSheet.jsx`) — the iOS swipe-down, Android back-button dismiss, and platform scrim/sheet/handle styles for bottom-sheet modals.
+
+Title ids use `useId()` (never a hardcoded string) so two of the same modal can coexist.
+
+**Centered reading-modal variant.** Long-form content dialogs — `ChangelogModal`, `LicenseModal` — are the exception: they are always centered (`max-w-lg`, `max-h-[80vh]` with internal scroll) rather than platform bottom-sheets. They still require the full a11y contract (`role="dialog"`, `aria-modal`, `aria-labelledby`, focus trap via `useFocusTrap(ref, onClose, { initialFocus: (el) => el })`, Escape) **and** must close on the device Back gesture by pushing a `{ modal: true }` history entry on open and dismissing on `popstate` (unwinding the entry on close). Use these two as the reference when adding another content/reading modal.
 
 ### Navigation
 

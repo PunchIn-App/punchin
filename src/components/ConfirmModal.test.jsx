@@ -45,6 +45,21 @@ describe('ConfirmModal — rendering', () => {
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(dialog).toHaveAttribute('aria-labelledby')
   })
+
+  it('gives each instance a unique title id so two can coexist (#156)', () => {
+    render(
+      <div>
+        <ConfirmModal title="A?" onConfirm={vi.fn()} onCancel={vi.fn()} />
+        <ConfirmModal title="B?" onConfirm={vi.fn()} onCancel={vi.fn()} />
+      </div>
+    )
+    const [a, b] = screen.getAllByRole('dialog')
+    const idA = a.getAttribute('aria-labelledby')
+    const idB = b.getAttribute('aria-labelledby')
+    expect(idA).toBeTruthy()
+    expect(idB).toBeTruthy()
+    expect(idA).not.toBe(idB) // no hardcoded duplicate id
+  })
 })
 
 describe('ConfirmModal — interactions', () => {

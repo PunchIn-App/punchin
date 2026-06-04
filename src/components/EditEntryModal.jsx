@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useId } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteEntry } from '../db'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import ConfirmModal from './ConfirmModal'
 
 // Helper helpers for date/time controls — exported for unit testing
@@ -63,30 +64,8 @@ export default function EditEntryModal({ entry, onClose }) {
 
   const dialogRef  = useRef(null)
 
-  // Focus trap and Escape handler
-  useEffect(() => {
-    const el = dialogRef.current
-    if (!el) return
-    const focusable = () => Array.from(el.querySelectorAll(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    ))
-    const first = focusable()[0]
-    if (first) first.focus()
-
-    const handleKey = (e) => {
-      if (e.key === 'Escape') { onClose(); return }
-      if (e.key !== 'Tab') return
-      const els = focusable()
-      if (!els.length) return
-      if (e.shiftKey && document.activeElement === els[0]) {
-        e.preventDefault(); els[els.length - 1].focus()
-      } else if (!e.shiftKey && document.activeElement === els[els.length - 1]) {
-        e.preventDefault(); els[0].focus()
-      }
-    }
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  // Focus trap, Escape, and focus restoration (issues #151/#152/#154)
+  useFocusTrap(dialogRef, onClose)
 
   // Pre-fill on edit mode
   useEffect(() => {

@@ -1,102 +1,13 @@
-import { useState, useEffect, useRef, useCallback, useId } from 'react'
+import { useState, useEffect, useCallback, useId } from 'react'
 import { X } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
+import { useFocusTrap } from '../hooks/useFocusTrap'
+import { useSwipeDismiss, useAndroidBackDismiss, useSheetStyles } from '../hooks/useBottomSheet'
 
-// ---------------------------------------------------------------------------
-// Swipe-down-to-dismiss hook (iOS bottom sheet)
-// Fires hapticTrigger exactly when the threshold is crossed, giving the user
-// physical confirmation before the sheet animates away.
-// ---------------------------------------------------------------------------
-function useSwipeDismiss(onClose, hapticTrigger) {
-  const ref = useRef(null)
-  const startY = useRef(null)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-
-    const DISMISS_THRESHOLD = 80
-
-    const onTouchStart = e => { startY.current = e.touches[0].clientY }
-    const onTouchEnd = e => {
-      if (startY.current === null) return
-      const delta = e.changedTouches[0].clientY - startY.current
-      startY.current = null
-      if (delta > DISMISS_THRESHOLD) {
-        hapticTrigger()
-        onClose()
-      }
-    }
-
-    el.addEventListener('touchstart', onTouchStart, { passive: true })
-    el.addEventListener('touchend', onTouchEnd, { passive: true })
-    return () => {
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchend', onTouchEnd)
-    }
-  }, [onClose, hapticTrigger])
-
-  return ref
-}
-
-// ---------------------------------------------------------------------------
-// Android hardware back-button hook
-// Fires hapticTrigger when the popstate event is caught so the user feels
-// the dismiss even if the sheet closes before they lift their thumb.
-// ---------------------------------------------------------------------------
-function useAndroidBackDismiss(onClose, hapticTrigger) {
-  useEffect(() => {
-    history.pushState({ modal: true }, '')
-    const handler = () => {
-      hapticTrigger()
-      onClose()
-    }
-    window.addEventListener('popstate', handler)
-    return () => {
-      window.removeEventListener('popstate', handler)
-      if (history.state?.modal) history.back()
-    }
-  }, [onClose, hapticTrigger])
-}
-
-// ---------------------------------------------------------------------------
-// Platform-aware sheet style helpers
-// ---------------------------------------------------------------------------
-function useSheetStyles(isStandalone, os) {
-  if (isStandalone && os === 'ios') {
-    return {
-      scrim:  'fixed inset-0 bg-black/40 backdrop-blur-md flex items-end sm:items-center justify-center z-50 p-4',
-      sheet:  'w-full max-w-md bg-appCard rounded-2xl border border-appBorder overflow-hidden shadow-xl',
-      handle: <div aria-hidden="true" className="flex justify-center pt-2.5 pb-1">
-                <div className="w-9 h-[5px] rounded-full bg-white/30" />
-              </div>,
-    }
-  }
-
-  if (isStandalone && os === 'android') {
-    return {
-      scrim:  'fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4',
-      sheet:  'w-full max-w-md bg-appCard rounded-t-[28px] border border-appBorder overflow-hidden shadow-xl',
-      handle: <div aria-hidden="true" className="flex justify-center items-center h-12">
-                <div className="w-8 h-1 rounded-full bg-white/30" />
-              </div>,
-    }
-  }
-
-  return {
-    scrim:  'fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4',
-    sheet:  'w-full max-w-md bg-appCard rounded-2xl border border-appBorder overflow-hidden shadow-xl',
-    handle: null,
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 export default function StartTimerModal({ onClose }) {
   const [jobId, setJobId]             = useState('')
   const [laborTypeId, setLaborTypeId] = useState('')
@@ -134,30 +45,8 @@ export default function StartTimerModal({ onClose }) {
 
   const { scrim, sheet, handle } = useSheetStyles(isStandalone, os)
 
-  // Focus first focusable element and trap focus within the dialog
-  useEffect(() => {
-    const el = swipeRef.current
-    if (!el) return
-    const focusable = () => Array.from(el.querySelectorAll(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    ))
-    const first = focusable()[0]
-    if (first) first.focus()
-
-    const handleKey = (e) => {
-      if (e.key === 'Escape') { stableClose(); return }
-      if (e.key !== 'Tab') return
-      const els = focusable()
-      if (!els.length) return
-      if (e.shiftKey && document.activeElement === els[0]) {
-        e.preventDefault(); els[els.length - 1].focus()
-      } else if (!e.shiftKey && document.activeElement === els[els.length - 1]) {
-        e.preventDefault(); els[0].focus()
-      }
-    }
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [stableClose])
+  // Focus trap, Escape, and focus restoration (issues #151/#152/#154)
+  useFocusTrap(swipeRef, stableClose)
 
   useEffect(() => {
     if (!jobId || !jobs) return

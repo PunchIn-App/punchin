@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, useRef, useId } from 'react'
+import { useState, useMemo, useRef, useId } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { X, Download, Printer } from 'lucide-react'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfDay, endOfDay, subWeeks, subMonths,
@@ -191,30 +192,8 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     setTimeout(() => { w.print() }, 250)
   }
 
-  // Focus trap and Escape handler
-  useEffect(() => {
-    const el = dialogRef.current
-    if (!el) return
-    const focusable = () => Array.from(el.querySelectorAll(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    ))
-    const first = focusable()[0]
-    if (first) first.focus()
-
-    const handleKey = (e) => {
-      if (e.key === 'Escape') { onClose(); return }
-      if (e.key !== 'Tab') return
-      const els = focusable()
-      if (!els.length) return
-      if (e.shiftKey && document.activeElement === els[0]) {
-        e.preventDefault(); els[els.length - 1].focus()
-      } else if (!e.shiftKey && document.activeElement === els[els.length - 1]) {
-        e.preventDefault(); els[0].focus()
-      }
-    }
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  // Focus trap, Escape, and focus restoration (issues #151/#152/#154)
+  useFocusTrap(dialogRef, onClose)
 
   const isIos     = isStandalone && os === 'ios'
   const isAndroid = isStandalone && os === 'android'

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useRef, useId } from 'react'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 export default function ConfirmModal({
   title,
@@ -8,32 +9,11 @@ export default function ConfirmModal({
   onCancel,
 }) {
   const dialogRef = useRef(null)
+  const titleId = useId() // useId, not a hardcoded id, so two ConfirmModals can coexist (issue #156)
 
-  useEffect(() => {
-    const el = dialogRef.current
-    if (!el) return
-
-    // Focus the Cancel button by default — safer for destructive actions
-    const buttons = el.querySelectorAll('button')
-    if (buttons.length > 1) buttons[1].focus()
-
-    const handleKey = (e) => {
-      if (e.key === 'Escape') { onCancel(); return }
-      if (e.key !== 'Tab') return
-      const focusable = Array.from(el.querySelectorAll('button:not([disabled])'))
-      if (!focusable.length) return
-      const first = focusable[0]
-      const last  = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault(); last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault(); first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [onCancel])
+  // Focus defaults to the Cancel button (data-autofocus) — safer for destructive
+  // actions; trap + restore + Escape handled by the shared hook (issues #151/#152/#154).
+  useFocusTrap(dialogRef, onCancel)
 
   return (
     <div
@@ -44,11 +24,11 @@ export default function ConfirmModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="confirm-modal-title"
+        aria-labelledby={titleId}
         className="w-full max-w-sm bg-appCard rounded-2xl border border-appBorder shadow-xl p-5 space-y-4"
       >
         <div>
-          <p id="confirm-modal-title" className="font-display font-semibold text-appText">{title}</p>
+          <p id={titleId} className="font-display font-semibold text-appText">{title}</p>
           {message && <p className="text-sm text-appTextMuted mt-1">{message}</p>}
         </div>
         <div className="flex gap-2">
@@ -60,6 +40,7 @@ export default function ConfirmModal({
           </button>
           <button
             onClick={onCancel}
+            data-autofocus
             className="flex-1 py-2.5 rounded-xl bg-appBg hover:bg-appInput text-appTextMuted text-sm transition-colors border border-appBorder focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:outline-none"
           >
             Cancel

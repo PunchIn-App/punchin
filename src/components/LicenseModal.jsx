@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import licenseRaw from '../../LICENSE?raw'
 import thirdPartyRaw from '../../docs/THIRD-PARTY-LICENSES.md?raw'
 
@@ -130,29 +131,9 @@ export default function LicenseModal({ onClose }) {
     }
   }, [onClose])
 
-  useEffect(() => {
-    const el = dialogRef.current
-    if (!el) return
-    el.focus()
-
-    const handleKey = e => {
-      if (e.key === 'Escape') { onClose(); return }
-      if (e.key !== 'Tab') return
-      const focusable = Array.from(
-        el.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')
-      )
-      if (!focusable.length) return
-      const first = focusable[0], last = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault(); last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault(); first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  // Focus the scrollable dialog container, trap Tab, restore focus on close,
+  // close on Escape (issues #151/#152/#154).
+  useFocusTrap(dialogRef, onClose, { initialFocus: (el) => el })
 
   return (
     <div
