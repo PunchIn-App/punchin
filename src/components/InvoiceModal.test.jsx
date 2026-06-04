@@ -174,6 +174,22 @@ describe('InvoiceModal — period presets', () => {
     expect(startInput.value).toBe('2025-06-01')
     expect(endInput.value).toBe('2025-06-30')
   })
+
+  it('clips the custom end to an inclusive end-of-day (23:59:59.999) (#157)', () => {
+    let capturedDeps
+    useLiveQuery.mockImplementation((_fn, deps) => { capturedDeps = deps; return [] })
+    renderModal()
+    fireEvent.click(screen.getByRole('button', { name: /^custom$/i }))
+    const [startInput, endInput] = document.querySelectorAll('input[type="date"]')
+    fireEvent.change(startInput, { target: { value: '2025-06-01' } })
+    fireEvent.change(endInput,   { target: { value: '2025-06-30' } })
+    // deps = [start.getTime(), end.getTime(), selectedJobId]; end must be 23:59:59.999
+    const end = new Date(capturedDeps[1])
+    expect(end.getHours()).toBe(23)
+    expect(end.getMinutes()).toBe(59)
+    expect(end.getSeconds()).toBe(59)
+    expect(end.getMilliseconds()).toBe(999)
+  })
 })
 
 describe('InvoiceModal — export and print', () => {
@@ -202,6 +218,16 @@ describe('InvoiceModal — export and print', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     expect(window.open).toHaveBeenCalled()
+  })
+
+  it('alerts instead of throwing when the popup is blocked (window.open → null) (#150)', async () => {
+    window.open.mockReturnValue(null)
+    global.alert = vi.fn()
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    expect(() => fireEvent.click(screen.getByRole('button', { name: /print/i }))).not.toThrow()
+    expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('pop-ups'))
   })
 })
 

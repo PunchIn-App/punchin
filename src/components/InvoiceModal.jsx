@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { X, Download, Printer } from 'lucide-react'
 import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-  subWeeks, subMonths,
+  startOfDay, endOfDay, subWeeks, subMonths,
 } from 'date-fns'
 import { db } from '../db'
 import { getEntryDuration } from '../utils/time'
@@ -58,8 +58,11 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     if (preset < RANGE_PRESETS.length - 1) {
       return RANGE_PRESETS[preset].getRange(currentDate, wsMon)
     }
-    const s = customStart ? new Date(customStart + 'T00:00:00') : null
-    const e = customEnd   ? new Date(customEnd   + 'T23:59:59') : null
+    // Parse as local midnight, then clip to the day with date-fns so the end is
+    // inclusive to 23:59:59.999 — the old 'T23:59:59' dropped the final sub-second
+    // and an entry punched in then was excluded (issue #157).
+    const s = customStart ? startOfDay(new Date(customStart + 'T00:00:00')) : null
+    const e = customEnd   ? endOfDay(new Date(customEnd   + 'T00:00:00')) : null
     return { start: s, end: e }
   }, [preset, customStart, customEnd, currentDate, wsMon])
 
@@ -175,6 +178,13 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 </table>
 </body></html>`
     const w = window.open('', '_blank', 'width=800,height=600')
+    // A popup blocker returns null; without this guard the next line throws in an
+    // onClick (the ErrorBoundary can't catch it) and the button silently dies.
+    // CSV export remains available as a fallback (issue #150).
+    if (!w) {
+      alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use Export CSV instead.')
+      return
+    }
     w.document.write(html)
     w.document.close()
     w.focus()

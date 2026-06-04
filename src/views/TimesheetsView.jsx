@@ -435,6 +435,12 @@ export default function TimesheetsView() {
 </body></html>`
 
     const w = window.open('', '_blank', 'width=900,height=700')
+    // Popup blocked → window.open returns null; guard so the button doesn't throw
+    // in its onClick handler (same hardening as InvoiceModal print, issue #150).
+    if (!w) {
+      alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use the CSV export instead.')
+      return
+    }
     w.document.write(html)
     w.document.close()
     w.focus()
