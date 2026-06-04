@@ -13,7 +13,6 @@ import { format } from 'date-fns'
 import { db, defaultSettingsRows } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { usePlatformContext } from '../hooks/usePlatformContext'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { runSync, disconnectSync, importSnapshot } from '../sync/syncManager'
 import { buildGitHubOAuthUrl } from '../sync/providers/github'
 import { buildGoogleOAuthUrl } from '../sync/providers/google'
@@ -251,11 +250,6 @@ export default function SettingsView() {
     if (activePanel !== 'data') setResetStage(null)
   }, [activePanel])
 
-  const syncSettings = useLiveQuery(async () => {
-    const rows = await db.settings.toArray()
-    return rows.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
-  }, [])
-
   const exportData = async () => {
     const [jobs, entries, laborTypes] = await Promise.all([
       db.jobs.toArray(),
@@ -413,9 +407,11 @@ export default function SettingsView() {
   const notifSupported = notificationsSupported()
   const remindersOn = !!settings.remindersEnabled && notifPerm === 'granted'
 
+  // Sync fields come from the same useSettings() object as everything else;
+  // a second live query on db.settings was redundant (issue #147).
   const tokenExpired =
-    (syncSettings?.syncTokenExpiry && Date.now() > syncSettings.syncTokenExpiry) ||
-    syncSettings?.syncError === 'TOKEN_EXPIRED'
+    (settings.syncTokenExpiry && Date.now() > settings.syncTokenExpiry) ||
+    settings.syncError === 'TOKEN_EXPIRED'
 
   // Haptics only fire on phones (iPhone via the Taptic polyfill, Android via
   // vibrate). iPads have no vibration motor and desktop has none, so hide the
@@ -829,14 +825,14 @@ export default function SettingsView() {
         {/* Sync */}
         <PanelGroup title="Sync">
         <div className="rounded-xl border border-appBorder bg-appCard overflow-hidden">
-          {syncSettings?.syncProvider ? (
+          {settings.syncProvider ? (
             <>
               <div className="flex items-center gap-3 px-4 py-4 border-b border-appBorderLight">
                 <Cloud className={`w-4 h-4 flex-shrink-0 ${tokenExpired ? 'text-red-400' : 'text-green-400'}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm text-appText font-medium">
-                      {PROVIDER_LABEL[syncSettings.syncProvider] ?? syncSettings.syncProvider}
+                      {PROVIDER_LABEL[settings.syncProvider] ?? settings.syncProvider}
                     </p>
                     {tokenExpired ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-400 uppercase tracking-wide">
@@ -848,16 +844,16 @@ export default function SettingsView() {
                       </span>
                     )}
                   </div>
-                  {syncSettings.syncUsername && (
-                    <p className="text-xs text-appTextMuted mt-0.5">@{syncSettings.syncUsername}</p>
+                  {settings.syncUsername && (
+                    <p className="text-xs text-appTextMuted mt-0.5">@{settings.syncUsername}</p>
                   )}
                   <p className="text-xs text-appTextMuted mt-0.5">
                     {tokenExpired
                       ? 'Token expired — reconnect to continue syncing'
-                      : `Last synced: ${formatLastSync(syncSettings.lastSyncedAt)}`}
+                      : `Last synced: ${formatLastSync(settings.lastSyncedAt)}`}
                   </p>
-                  {syncSettings.syncError && !tokenExpired && (
-                    <p className="text-xs text-red-400 mt-0.5 truncate">{syncSettings.syncError}</p>
+                  {settings.syncError && !tokenExpired && (
+                    <p className="text-xs text-red-400 mt-0.5 truncate">{settings.syncError}</p>
                   )}
                 </div>
               </div>

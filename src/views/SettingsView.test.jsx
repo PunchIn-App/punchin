@@ -25,11 +25,12 @@ const mockDbEntriesAdd        = vi.fn().mockResolvedValue(1)
 const mockDbDeletionsClear    = vi.fn().mockResolvedValue(undefined)
 const mockDbSecretsClear      = vi.fn().mockResolvedValue(undefined)
 
+// Configurable per-test: sync fields now come from useSettings (issue #147), so
+// the sync tests inject syncProvider/lastSyncedAt/etc. here rather than via a
+// second db.settings live query. Reset to defaults in beforeEach.
+const mockGetSettings = vi.fn()
 vi.mock('../hooks/useSettings', () => ({
-  useSettings: () => ({
-    settings: { allowConcurrentTimers: false, weekStartsMonday: true, theme: 'auto', accentColor: '#F59E0B' },
-    updateSetting: mockUpdateSetting,
-  }),
+  useSettings: () => ({ settings: mockGetSettings(), updateSetting: mockUpdateSetting }),
 }))
 
 vi.mock('../db', () => ({
@@ -135,6 +136,9 @@ vi.mock('../sync/providers/onedrive', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // mockClear doesn't reset return values, so re-seed the default settings each
+  // test; sync tests override with mockGetSettings.mockReturnValue({...}).
+  mockGetSettings.mockReturnValue({ allowConcurrentTimers: false, weekStartsMonday: true, theme: 'auto', accentColor: '#F59E0B' })
   global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
   global.URL.revokeObjectURL = vi.fn()
   global.alert = vi.fn()
@@ -656,6 +660,9 @@ describe('SettingsView — Danger Zone: cancel at final stage', () => {
   })
 })
 
+// Merge sync fields onto the default settings object useSettings now provides.
+const withSync = (sync) => ({ allowConcurrentTimers: false, weekStartsMonday: true, theme: 'auto', accentColor: '#F59E0B', ...sync })
+
 describe('SettingsView — Sync section', () => {
   it('renders the Sync group inside the Data & Sync page', () => {
     render(<SettingsView />)
@@ -673,10 +680,7 @@ describe('SettingsView — Sync section', () => {
   })
 
   it('shows connected state for GitHub when syncProvider is github', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'github' },
-      { key: 'lastSyncedAt', value: null },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'github', lastSyncedAt: null }))
     render(<SettingsView />)
     expand('Data & Sync')
     expect(await screen.findByRole('button', { name: /Sync Now/i })).toBeInTheDocument()
@@ -685,20 +689,14 @@ describe('SettingsView — Sync section', () => {
   })
 
   it('shows a clear "Connected" indicator when a provider is connected (issue #76)', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'github' },
-      { key: 'lastSyncedAt', value: null },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'github', lastSyncedAt: null }))
     render(<SettingsView />)
     expand('Data & Sync')
     expect(await screen.findByText('Connected')).toBeInTheDocument()
   })
 
   it('shows connected state for Google Drive', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'google' },
-      { key: 'lastSyncedAt', value: null },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'google', lastSyncedAt: null }))
     render(<SettingsView />)
     expand('Data & Sync')
     // Wait on a connected-only sentinel so the async live-query settle is
@@ -710,10 +708,7 @@ describe('SettingsView — Sync section', () => {
   })
 
   it('shows connected state for OneDrive', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'onedrive' },
-      { key: 'lastSyncedAt', value: Date.now() - 30000 },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'onedrive', lastSyncedAt: Date.now() - 30000 }))
     render(<SettingsView />)
     expand('Data & Sync')
     await screen.findByRole('button', { name: /Sync Now/i })
@@ -722,10 +717,7 @@ describe('SettingsView — Sync section', () => {
   })
 
   it('shows "Token expired" and disables Sync Now when token is expired', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'google' },
-      { key: 'syncTokenExpiry', value: Date.now() - 1000 },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'google', syncTokenExpiry: Date.now() - 1000 }))
     render(<SettingsView />)
     expand('Data & Sync')
     expect(await screen.findByText(/Token expired/)).toBeInTheDocument()
@@ -733,21 +725,14 @@ describe('SettingsView — Sync section', () => {
   })
 
   it('shows sync error when present', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'github' },
-      { key: 'syncError', value: 'GitHub 401' },
-      { key: 'lastSyncedAt', value: null },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'github', syncError: 'GitHub 401', lastSyncedAt: null }))
     render(<SettingsView />)
     expand('Data & Sync')
     expect(await screen.findByText('GitHub 401')).toBeInTheDocument()
   })
 
   it('calls runSync when Sync Now is clicked', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'github' },
-      { key: 'lastSyncedAt', value: null },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'github', lastSyncedAt: null }))
     render(<SettingsView />)
     expand('Data & Sync')
     fireEvent.click(await screen.findByRole('button', { name: /Sync Now/i }))
@@ -755,10 +740,7 @@ describe('SettingsView — Sync section', () => {
   })
 
   it('calls disconnectSync when Disconnect is confirmed in the modal (issue #76)', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'github' },
-      { key: 'lastSyncedAt', value: null },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'github', lastSyncedAt: null }))
     render(<SettingsView />)
     expand('Data & Sync')
     fireEvent.click(await screen.findByRole('button', { name: /Disconnect/i }))
@@ -770,10 +752,7 @@ describe('SettingsView — Sync section', () => {
   })
 
   it('does not call disconnectSync when the confirmation is cancelled (issue #76)', async () => {
-    mockDbSettingsToArray.mockResolvedValue([
-      { key: 'syncProvider', value: 'github' },
-      { key: 'lastSyncedAt', value: null },
-    ])
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'github', lastSyncedAt: null }))
     render(<SettingsView />)
     expand('Data & Sync')
     fireEvent.click(await screen.findByRole('button', { name: /Disconnect/i }))
