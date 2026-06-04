@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Clock } from 'lucide-react'
 import { db } from '../db'
@@ -22,8 +22,12 @@ export default function TimerView() {
     return results[0] ?? null
   }, [])
 
-  const getJob = id => jobs?.find(j => j.id === id)
-  const getLT  = id => laborTypes?.find(lt => lt.id === id)
+  // Build id→record lookups once per data change instead of an O(n) array.find
+  // on every render and every card lookup (issue #138).
+  const jobMap = useMemo(() => new Map((jobs ?? []).map(j => [j.id, j])), [jobs])
+  const ltMap  = useMemo(() => new Map((laborTypes ?? []).map(lt => [lt.id, lt])), [laborTypes])
+  const getJob = id => jobMap.get(id)
+  const getLT  = id => ltMap.get(id)
 
   return (
     <div className="h-full flex flex-col scrollable">

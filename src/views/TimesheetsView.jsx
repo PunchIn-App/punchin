@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronLeft, ChevronRight, Calendar, Pencil, Trash2, Plus, Search, FileDown, Receipt, Printer } from 'lucide-react'
 import { format, addDays, subDays, addWeeks, subWeeks } from 'date-fns'
@@ -32,30 +32,39 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
     () => db.entries.where('punchIn').between(queryStart, end, true, true).toArray(),
     [start.getTime()]
   )
-  const getJob = id => jobs?.find(j => j.id === id)
-  const getLT  = id => laborTypes?.find(l => l.id === id)
+  // id→record lookups built once per data change, not an O(n) find per row (#138).
+  const jobMap = useMemo(() => new Map((jobs ?? []).map(j => [j.id, j])), [jobs])
+  const ltMap  = useMemo(() => new Map((laborTypes ?? []).map(l => [l.id, l])), [laborTypes])
+  const getJob = id => jobMap.get(id)
+  const getLT  = id => ltMap.get(id)
 
-  if (!entries) return null
+  // Memoised so the overlap + search/filter pass only re-runs when its inputs
+  // change, not on every parent render (e.g. typing in an unrelated field) (#138).
+  const filteredEntries = useMemo(() => {
+    if (!entries) return null
+    return entries.filter(e => {
+      if (!entryOverlapsRange(e, start, end)) return false // drop look-back non-overlaps (#136)
+      const job = getJob(e.jobId)
+      const lt = getLT(e.laborTypeId)
 
-  const filteredEntries = entries.filter(e => {
-    if (!entryOverlapsRange(e, start, end)) return false // drop look-back non-overlaps (#136)
-    const job = getJob(e.jobId)
-    const lt = getLT(e.laborTypeId)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matchesJob = job?.name?.toLowerCase().includes(q)
+        const matchesClient = job?.clientName?.toLowerCase().includes(q)
+        const matchesLt = lt?.name?.toLowerCase().includes(q)
+        const matchesNotes = e.notes?.toLowerCase().includes(q)
+        if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
+      }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      const matchesJob = job?.name?.toLowerCase().includes(q)
-      const matchesClient = job?.clientName?.toLowerCase().includes(q)
-      const matchesLt = lt?.name?.toLowerCase().includes(q)
-      const matchesNotes = e.notes?.toLowerCase().includes(q)
-      if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
-    }
+      if (filterJobId && e.jobId !== Number(filterJobId)) return false
+      if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
 
-    if (filterJobId && e.jobId !== Number(filterJobId)) return false
-    if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
+      return true
+    })
+    // start.getTime() keys the day; jobMap/ltMap back getJob/getLT.
+  }, [entries, start.getTime(), searchQuery, filterJobId, filterLaborTypeId, jobMap, ltMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    return true
-  })
+  if (!filteredEntries) return null
 
   return (
     <div className="space-y-3">
@@ -127,36 +136,65 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
     () => db.entries.where('punchIn').between(queryStart, end, true, true).toArray(),
     [start.getTime()]
   )
-  const getJob = id => jobs?.find(j => j.id === id)
-  const getLT  = id => laborTypes?.find(l => l.id === id)
-  if (!allEntries) return null
+  // id→record lookups built once per data change, not an O(n) find per row (#138).
+  const jobMap = useMemo(() => new Map((jobs ?? []).map(j => [j.id, j])), [jobs])
+  const ltMap  = useMemo(() => new Map((laborTypes ?? []).map(l => [l.id, l])), [laborTypes])
+  const getJob = id => jobMap.get(id)
+  const getLT  = id => ltMap.get(id)
 
-  const filteredEntries = allEntries.filter(e => {
-    if (!entryOverlapsRange(e, start, end)) return false // drop look-back non-overlaps (#136)
-    const job = getJob(e.jobId)
-    const lt = getLT(e.laborTypeId)
+  // Filter once per input change (#138).
+  const filteredEntries = useMemo(() => {
+    if (!allEntries) return null
+    return allEntries.filter(e => {
+      if (!entryOverlapsRange(e, start, end)) return false // drop look-back non-overlaps (#136)
+      const job = getJob(e.jobId)
+      const lt = getLT(e.laborTypeId)
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      const matchesJob = job?.name?.toLowerCase().includes(q)
-      const matchesClient = job?.clientName?.toLowerCase().includes(q)
-      const matchesLt = lt?.name?.toLowerCase().includes(q)
-      const matchesNotes = e.notes?.toLowerCase().includes(q)
-      if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matchesJob = job?.name?.toLowerCase().includes(q)
+        const matchesClient = job?.clientName?.toLowerCase().includes(q)
+        const matchesLt = lt?.name?.toLowerCase().includes(q)
+        const matchesNotes = e.notes?.toLowerCase().includes(q)
+        if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
+      }
+
+      if (filterJobId && e.jobId !== Number(filterJobId)) return false
+      if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
+
+      return true
+    })
+  }, [allEntries, start.getTime(), searchQuery, filterJobId, filterLaborTypeId, jobMap, ltMap]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Week total + per-job breakdown, derived once from the filtered set (#138).
+  const { total, jobTotals } = useMemo(() => {
+    if (!filteredEntries) return { total: 0, jobTotals: {} }
+    return {
+      total: sumDurationsInRange(filteredEntries, start, end),
+      jobTotals: filteredEntries.reduce((acc, e) => {
+        if (!e.punchOut) return acc // running timers excluded from totals (#137)
+        acc[e.jobId] = (acc[e.jobId] || 0) + getEntryDurationInRange(e, start, end) // clip to week (#136)
+        return acc
+      }, {}),
     }
+  }, [filteredEntries, start.getTime(), end.getTime()])
 
-    if (filterJobId && e.jobId !== Number(filterJobId)) return false
-    if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
+  // Bucket entries into the seven days once, instead of re-filtering the whole
+  // week per day on every render (the O(7×entries) pass the finding flags) (#138).
+  const dayData = useMemo(() => {
+    if (!filteredEntries) return []
+    return days.map(day => {
+      const ds = new Date(day); ds.setHours(0,0,0,0)
+      const de = new Date(day); de.setHours(23,59,59,999)
+      // Overlap (not punchIn-only) so an overnight entry appears under both days
+      // it touches; totals clip each entry to the day it's shown under and skip
+      // running timers, so the rows sum to dayTotal (#136, #137).
+      const dayEntries = filteredEntries.filter(e => entryOverlapsRange(e, ds, de))
+      return { day, ds, de, dayEntries, dayTotal: sumDurationsInRange(dayEntries, ds, de) }
+    })
+  }, [filteredEntries, start.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    return true
-  })
-
-  const total = sumDurationsInRange(filteredEntries, start, end)
-  const jobTotals = filteredEntries.reduce((acc, e) => {
-    if (!e.punchOut) return acc // running timers excluded from totals (#137)
-    acc[e.jobId] = (acc[e.jobId] || 0) + getEntryDurationInRange(e, start, end) // clip to week (#136)
-    return acc
-  }, {})
+  if (!filteredEntries) return null
 
   return (
     <div className="space-y-3">
@@ -188,15 +226,8 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
       )}
 
       {/* Day-by-day */}
-      {days.map(day => {
-        const ds = new Date(day); ds.setHours(0,0,0,0)
-        const de = new Date(day); de.setHours(23,59,59,999)
-        // Overlap (not punchIn-only) so an overnight entry appears under both
-        // days it touches; totals clip each entry to the day it's shown under
-        // and skip running timers, so the rows sum to dayTotal (#136, #137).
-        const dayEntries = filteredEntries.filter(e => entryOverlapsRange(e, ds, de))
-        const dayTotal   = sumDurationsInRange(dayEntries, ds, de)
-        const isToday    = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+      {dayData.map(({ day, ds, de, dayEntries, dayTotal }) => {
+        const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
         return (
           <div key={day.toISOString()}

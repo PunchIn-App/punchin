@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { subDays, format, startOfDay, endOfDay } from 'date-fns'
@@ -34,6 +34,46 @@ export default function AnalyticsView() {
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
 
+  // Derive every chart dataset in one memo so the O(days×entries) bucketing and
+  // the per-job / per-labor-type filter passes only re-run when the data or the
+  // period changes, not on unrelated re-renders (issue #138).
+  const { total, dailyData, jobData, ltData } = useMemo(() => {
+    if (!entries || !jobs || !laborTypes) return { total: 0, dailyData: [], jobData: [], ltData: [] }
+
+    const total = sumDurations(entries)
+
+    // Daily bar chart. Each entry is clipped to the local day (issue #140) so a
+    // shift that crosses midnight is split across both days instead of dumped
+    // whole onto its start day — the same per-day clipping the timesheet totals
+    // use. Durations are local-time elapsed ms, so a fixed 9–5 shift reads 7h or
+    // 9h on the two DST changeover days each year: that's the real elapsed time
+    // worked, surfaced intentionally rather than normalised away.
+    const dailyData = Array.from({ length: days }, (_, i) => {
+      const day  = subDays(new Date(), days - 1 - i)
+      const ds   = startOfDay(day)
+      const de   = endOfDay(day)
+      const hrs  = entries
+        .filter(e => entryOverlapsRange(e, ds, de))
+        .reduce((a, e) => a + getEntryDurationInRange(e, ds, de), 0) / 3600000
+      return { date: format(day, days === 7 ? 'EEE' : 'M/d'), hours: parseFloat(hrs.toFixed(2)) }
+    })
+
+    // Job breakdown
+    const jobData = jobs.map(j => ({
+      name: j.name,
+      hours: parseFloat((entries.filter(e => e.jobId === j.id).reduce((a, e) => a + getEntryDuration(e), 0) / 3600000).toFixed(2)),
+    })).filter(d => d.hours > 0).sort((a, b) => b.hours - a.hours)
+
+    // Labor type pie
+    const ltData = laborTypes.map(lt => ({
+      name: lt.name,
+      value: entries.filter(e => e.laborTypeId === lt.id).reduce((a, e) => a + getEntryDuration(e), 0),
+      color: lt.color,
+    })).filter(d => d.value > 0)
+
+    return { total, dailyData, jobData, ltData }
+  }, [entries, jobs, laborTypes, days])
+
   if (!entries || !jobs || !laborTypes) {
     return (
       <div
@@ -45,38 +85,6 @@ export default function AnalyticsView() {
       </div>
     )
   }
-
-  const total = sumDurations(entries)
-  const totalHours = total / 3600000
-
-  // Daily bar chart. Each entry is clipped to the local day (issue #140) so a
-  // shift that crosses midnight is split across both days instead of dumped
-  // whole onto its start day — the same per-day clipping the timesheet totals
-  // use. Durations are local-time elapsed ms, so a fixed 9–5 shift reads 7h or
-  // 9h on the two DST changeover days each year: that's the real elapsed time
-  // worked, surfaced intentionally rather than normalised away.
-  const dailyData = Array.from({ length: days }, (_, i) => {
-    const day  = subDays(new Date(), days - 1 - i)
-    const ds   = startOfDay(day)
-    const de   = endOfDay(day)
-    const hrs  = entries
-      .filter(e => entryOverlapsRange(e, ds, de))
-      .reduce((a, e) => a + getEntryDurationInRange(e, ds, de), 0) / 3600000
-    return { date: format(day, days === 7 ? 'EEE' : 'M/d'), hours: parseFloat(hrs.toFixed(2)) }
-  })
-
-  // Job breakdown
-  const jobData = jobs.map(j => ({
-    name: j.name,
-    hours: parseFloat((entries.filter(e => e.jobId === j.id).reduce((a, e) => a + getEntryDuration(e), 0) / 3600000).toFixed(2)),
-  })).filter(d => d.hours > 0).sort((a, b) => b.hours - a.hours)
-
-  // Labor type pie
-  const ltData = laborTypes.map(lt => ({
-    name: lt.name,
-    value: entries.filter(e => e.laborTypeId === lt.id).reduce((a, e) => a + getEntryDuration(e), 0),
-    color: lt.color,
-  })).filter(d => d.value > 0)
 
   return (
     <div className="h-full scrollable px-4 pt-4 pb-24 space-y-4 lg:max-w-5xl lg:mx-auto">
