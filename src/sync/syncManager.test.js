@@ -770,3 +770,71 @@ describe('runSync — merge entry edits (last-write-wins)', () => {
     expect(entries[0].notes).toBe('local-newer') // local kept
   })
 })
+
+// ---------------------------------------------------------------------------
+// runSync — merge: job / labor-type field propagation (issue #120)
+// ---------------------------------------------------------------------------
+
+describe('runSync — merge job / labor-type fields (last-write-wins)', () => {
+  it('propagates a job rename, archive, and laborRates when the remote is newer', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false })
+    const jobId = await db.jobs.add({ name: 'Old Name', isActive: true, laborRates: {}, updatedAt: 1000 })
+    const [lt, job] = await Promise.all([db.laborTypes.get(ltId), db.jobs.get(jobId)])
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Design', color: '#6366F1', isArchived: false }],
+      jobs: [{
+        id: 200, uuid: job.uuid, name: 'New Name', laborTypeId: 100,
+        isActive: false, laborRates: { 100: 75 }, updatedAt: 5000, // keyed by REMOTE lt id
+      }],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const jobs = await db.jobs.toArray()
+    expect(jobs).toHaveLength(1) // updated in place, not split into two
+    expect(jobs[0].name).toBe('New Name')
+    expect(jobs[0].isActive).toBe(false) // archive propagated
+    expect(jobs[0].laborRates[ltId]).toBe(75) // rate remapped to the LOCAL labor type id
+  })
+
+  it('propagates labor-type archive state via LWW', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false, updatedAt: 1000 })
+    const lt = await db.laborTypes.get(ltId)
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Design', color: '#6366F1', isArchived: true, updatedAt: 5000 }],
+      jobs: [], entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const lts = await db.laborTypes.toArray()
+    expect(lts).toHaveLength(1)
+    expect(lts[0].isArchived).toBe(true)
+  })
+
+  it('copies laborRates (remapped) when first importing a job from a remote device', async () => {
+    await seedSyncSettings()
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 5, uuid: 'lt-uuid-x', name: 'Dev', color: '#F59E0B', isArchived: false }],
+      jobs: [{ id: 9, uuid: 'job-uuid-x', name: 'Imported', laborTypeId: 5, isActive: true, laborRates: { 5: 50 }, updatedAt: 1000 }],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [importedJob] = await db.jobs.toArray()
+    const [importedLt] = await db.laborTypes.toArray()
+    expect(importedJob.laborRates[importedLt.id]).toBe(50) // not lost, keyed by local lt id
+  })
+})

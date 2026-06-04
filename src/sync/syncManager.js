@@ -32,6 +32,19 @@ export async function importSnapshot(remote) {
   return mergeSnapshot(remote)
 }
 
+// laborRates is a map keyed by laborTypeId — a device-local autoincrement id.
+// Remap the keys through ltMap (remote laborTypeId -> local id) so per-type rates
+// land under the right labor type on the receiving device. Rates whose labor type
+// isn't present in the snapshot are dropped.
+function remapLaborRates(rates, ltMap) {
+  const out = {}
+  for (const [remoteLtId, rate] of Object.entries(rates ?? {})) {
+    const localLtId = ltMap[remoteLtId]
+    if (localLtId != null) out[localLtId] = rate
+  }
+  return out
+}
+
 async function mergeSnapshot(remote) {
   if (!remote?.version || !Array.isArray(remote.jobs)) return 0
 
@@ -49,12 +62,19 @@ async function mergeSnapshot(remote) {
         existingLts.find(e => e.name.toLowerCase() === lt.name.toLowerCase())
       if (match) {
         ltMap[lt.id] = match.id
+        // Last-write-wins for mutable fields (issue #120): name, color, archive.
+        if (lt.uuid && (lt.updatedAt ?? 0) > (match.updatedAt ?? 0)) {
+          const fields = { name: lt.name, color: lt.color, isArchived: lt.isArchived ?? false }
+          await db.laborTypes.update(match.id, { ...fields, updatedAt: lt.updatedAt })
+          Object.assign(match, fields, { updatedAt: lt.updatedAt })
+        }
       } else {
         const newId = await db.laborTypes.add({
-          name: lt.name, color: lt.color, uuid: lt.uuid, updatedAt: lt.updatedAt,
+          name: lt.name, color: lt.color, isArchived: lt.isArchived ?? false,
+          uuid: lt.uuid, updatedAt: lt.updatedAt,
         })
         ltMap[lt.id] = newId
-        existingLts.push({ id: newId, name: lt.name, uuid: lt.uuid })
+        existingLts.push({ id: newId, name: lt.name, uuid: lt.uuid, updatedAt: lt.updatedAt })
       }
     }
 
@@ -64,18 +84,25 @@ async function mergeSnapshot(remote) {
       const match =
         (job.uuid && existingJobs.find(j => j.uuid === job.uuid)) ||
         existingJobs.find(j => j.name.toLowerCase() === job.name.toLowerCase())
+      const jobFields = {
+        name: job.name,
+        clientName: job.clientName ?? null,
+        laborTypeId: job.laborTypeId ? ltMap[job.laborTypeId] : null,
+        isActive: job.isActive !== false,
+        laborRates: remapLaborRates(job.laborRates, ltMap),
+      }
       if (match) {
         jobMap[job.id] = match.id
+        // Last-write-wins for mutable fields (issue #120): name, client, active,
+        // labor type, and per-type rates (which were previously dropped entirely).
+        if (job.uuid && (job.updatedAt ?? 0) > (match.updatedAt ?? 0)) {
+          await db.jobs.update(match.id, { ...jobFields, updatedAt: job.updatedAt })
+          Object.assign(match, jobFields, { updatedAt: job.updatedAt })
+        }
       } else {
-        const newId = await db.jobs.add({
-          name: job.name,
-          clientName: job.clientName ?? null,
-          laborTypeId: job.laborTypeId ? ltMap[job.laborTypeId] : null,
-          isActive: job.isActive !== false,
-          uuid: job.uuid, updatedAt: job.updatedAt,
-        })
+        const newId = await db.jobs.add({ ...jobFields, uuid: job.uuid, updatedAt: job.updatedAt })
         jobMap[job.id] = newId
-        existingJobs.push({ id: newId, name: job.name, uuid: job.uuid })
+        existingJobs.push({ id: newId, name: job.name, uuid: job.uuid, updatedAt: job.updatedAt })
       }
     }
 
