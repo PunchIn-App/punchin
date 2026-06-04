@@ -123,6 +123,15 @@ export default function EditEntryModal({ entry, onClose }) {
     const punchInDate = combineDateAndTime(dateStr, startTime)
     let punchOutDate = null
 
+    // An active timer can't start in the future: a future punchIn with no
+    // punchOut makes getEntryDuration (now − punchIn) negative, so the live
+    // TimerCard renders garbage. Completed entries are bounded by the end-after-
+    // start check below, so this targets the active-timer path (issue #153).
+    if (isActiveTimer && punchInDate.getTime() > Date.now()) {
+      setError('Start can’t be in the future.')
+      return
+    }
+
     if (!isActiveTimer) {
       punchOutDate = combineDateAndTime(endDateStr, endTime)
       if (punchOutDate.getTime() <= punchInDate.getTime()) {

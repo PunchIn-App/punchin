@@ -193,6 +193,17 @@ describe('EditEntryModal — validation', () => {
       expect(screen.getByText('End must be after start.')).toBeInTheDocument()
     )
   })
+
+  it('rejects a future start on an active timer (#153)', async () => {
+    render(<EditEntryModal entry={ACTIVE_ENTRY} onClose={vi.fn()} />)
+    // Active timer has one date input (start); push it far into the future
+    fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: '2999-01-01' } })
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() =>
+      expect(screen.getByText(/start can.t be in the future/i)).toBeInTheDocument()
+    )
+    expect(mockEntriesUpdate).not.toHaveBeenCalled()
+  })
 })
 
 describe('EditEntryModal — save', () => {
