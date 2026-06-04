@@ -16,6 +16,11 @@ export default defineConfig({
   build: {
     outDir: '../dist',   // relative to root (app/) → resolves to project root/dist
     emptyOutDir: true,
+    // Guardrail for the "intentionally small bundle" posture (issue #167):
+    // recharts is split out via the lazy AnalyticsView import, so the main chunk
+    // sits well under this; a build that pushes any chunk past it (an accidental
+    // heavy top-level import) surfaces a warning to investigate.
+    chunkSizeWarningLimit: 600,
   },
   css: {
     postcss: fileURLToPath(new URL('./postcss.config.js', import.meta.url)),

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import Layout from './components/Layout'
 import ErrorBoundary  from './components/ErrorBoundary'
 import InstallPromptModal from './components/InstallPromptModal'
@@ -6,8 +6,11 @@ import ConfirmModal from './components/ConfirmModal'
 import TimerView      from './views/TimerView'
 import JobsView       from './views/JobsView'
 import TimesheetsView from './views/TimesheetsView'
-import AnalyticsView  from './views/AnalyticsView'
 import SettingsView   from './views/SettingsView'
+// Analytics is the only recharts consumer; lazy-load it so the (large) chart
+// library lands in its own chunk fetched on demand, keeping the initial bundle
+// small for an offline-first PWA (issue #167).
+const AnalyticsView = lazy(() => import('./views/AnalyticsView'))
 import { useSettings } from './hooks/useSettings'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { useReminders } from './hooks/useReminders'
@@ -408,7 +411,13 @@ export default function App() {
   return (
     <Layout activeView={activeView} onNavigate={navigate}>
       <ErrorBoundary key={activeView}>
-        {views[activeView]}
+        <Suspense fallback={
+          <div className="flex items-center justify-center h-full text-appTextMuted text-sm" aria-live="polite" aria-busy="true">
+            Loading…
+          </div>
+        }>
+          {views[activeView]}
+        </Suspense>
       </ErrorBoundary>
       {showInstall && installMode && (
         <InstallPromptModal
