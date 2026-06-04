@@ -3,7 +3,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { subDays, format, startOfDay, endOfDay } from 'date-fns'
 import { db } from '../db'
-import { getEntryDuration, formatDurationHM, sumDurations } from '../utils/time'
+import {
+  getEntryDuration, getEntryDurationInRange, entryOverlapsRange,
+  formatDurationHM, sumDurations,
+} from '../utils/time'
 
 const TOOLTIP = {
   backgroundColor: 'var(--bg-tertiary)',
@@ -17,7 +20,12 @@ export default function AnalyticsView() {
   const [period, setPeriod] = useState('7d')
   const days = period === '7d' ? 7 : 30
 
-  const startDate = subDays(new Date(), days)
+  // Anchor the window to the start of the earliest day shown rather than a
+  // rolling `days`×24h instant. That way the chart's `days` calendar buckets
+  // exactly cover the queried span, so total = sum of the buckets and the
+  // Avg/day denominator (total/days) lines up with no off-by-one from a partial
+  // leading day (issue #140).
+  const startDate = startOfDay(subDays(new Date(), days - 1))
 
   // Indexed range query (issue #132): the `punchIn` index narrows to the period
   // window; the completed-only predicate (.and) runs on that small set, not the
@@ -41,14 +49,19 @@ export default function AnalyticsView() {
   const total = sumDurations(entries)
   const totalHours = total / 3600000
 
-  // Daily bar chart
+  // Daily bar chart. Each entry is clipped to the local day (issue #140) so a
+  // shift that crosses midnight is split across both days instead of dumped
+  // whole onto its start day — the same per-day clipping the timesheet totals
+  // use. Durations are local-time elapsed ms, so a fixed 9–5 shift reads 7h or
+  // 9h on the two DST changeover days each year: that's the real elapsed time
+  // worked, surfaced intentionally rather than normalised away.
   const dailyData = Array.from({ length: days }, (_, i) => {
     const day  = subDays(new Date(), days - 1 - i)
     const ds   = startOfDay(day)
     const de   = endOfDay(day)
     const hrs  = entries
-      .filter(e => { const d = new Date(e.punchIn); return d >= ds && d <= de })
-      .reduce((a, e) => a + getEntryDuration(e), 0) / 3600000
+      .filter(e => entryOverlapsRange(e, ds, de))
+      .reduce((a, e) => a + getEntryDurationInRange(e, ds, de), 0) / 3600000
     return { date: format(day, days === 7 ? 'EEE' : 'M/d'), hours: parseFloat(hrs.toFixed(2)) }
   })
 

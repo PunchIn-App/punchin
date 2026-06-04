@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import AnalyticsView from './AnalyticsView'
 
@@ -110,6 +110,22 @@ describe('AnalyticsView — empty state', () => {
     setupMocks({ entries: [] })
     render(<AnalyticsView />)
     expect(screen.getByText('Punch in and out to see analytics.')).toBeInTheDocument()
+  })
+})
+
+describe('AnalyticsView — daily chart bucketing (#140)', () => {
+  it('splits a cross-midnight entry across both local days instead of dumping it on one', () => {
+    // Yesterday 23:00 → today 01:00 = 2h total, one hour on each calendar day.
+    const y23 = new Date(); y23.setDate(y23.getDate() - 1); y23.setHours(23, 0, 0, 0)
+    const t01 = new Date(); t01.setHours(1, 0, 0, 0)
+    setupMocks({ entries: [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: y23, punchOut: t01 }] })
+    render(<AnalyticsView />)
+    // The sr-only daily table is the deterministic view of the bucket data
+    // (recharts is mocked out). Old behaviour put the whole 2h on the start day;
+    // per-day clipping yields ~1h on each of the two days.
+    const table = within(screen.getByText(/daily hours for the last/i).closest('table'))
+    expect(table.queryByText('2h')).not.toBeInTheDocument()
+    expect(table.getAllByText('1h').length).toBeGreaterThanOrEqual(2)
   })
 })
 
