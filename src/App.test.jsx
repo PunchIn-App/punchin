@@ -31,6 +31,13 @@ vi.mock('./sync/providers/github', () => ({
   fetchGitHubUser: (...a) => mockFetchGitHubUser(...a),
 }))
 
+// Token is encrypted at rest via tokenStore (issue #126); mock it so the OAuth
+// tests can assert the token is handed off without real WebCrypto/Dexie.
+const mockSetSyncToken = vi.fn().mockResolvedValue(undefined)
+vi.mock('./sync/tokenStore', () => ({
+  setSyncToken: (...a) => mockSetSyncToken(...a),
+}))
+
 vi.mock('./db', () => ({
   db: {
     settings: {
@@ -188,10 +195,10 @@ describe('App — OAuth callback handling', () => {
     render(<App />)
     await waitFor(() => screen.getByRole('dialog'))
     await act(async () => { screen.getByRole('button', { name: 'Connect' }).click() })
+    expect(mockSetSyncToken).toHaveBeenCalledWith('ghtoken123') // encrypted at rest (issue #126)
     expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
       expect.arrayContaining([
         { key: 'syncProvider', value: 'github' },
-        { key: 'syncToken',    value: 'ghtoken123' },
         { key: 'syncUsername', value: 'octocat'    },
       ])
     )
@@ -232,12 +239,10 @@ describe('App — OAuth callback handling', () => {
   it('stores Google token when hash has access_token + state=google', async () => {
     window.location.hash = `#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google:${NONCE}`
     render(<App />)
-    await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        { key: 'syncProvider', value: 'google' },
-        { key: 'syncToken',    value: 'googletoken' },
-      ])
-    ))
+    await waitFor(() => expect(mockSetSyncToken).toHaveBeenCalledWith('googletoken'))
+    expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
+      expect.arrayContaining([{ key: 'syncProvider', value: 'google' }])
+    )
   })
 
   it('navigates to Settings after Google OAuth callback', async () => {
@@ -249,12 +254,10 @@ describe('App — OAuth callback handling', () => {
   it('stores OneDrive token when hash has access_token + state=onedrive', async () => {
     window.location.hash = `#access_token=odtoken&expires_in=3600&state=onedrive:${NONCE}`
     render(<App />)
-    await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        { key: 'syncProvider', value: 'onedrive' },
-        { key: 'syncToken',    value: 'odtoken' },
-      ])
-    ))
+    await waitFor(() => expect(mockSetSyncToken).toHaveBeenCalledWith('odtoken'))
+    expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
+      expect.arrayContaining([{ key: 'syncProvider', value: 'onedrive' }])
+    )
   })
 
   it('rejects the GitHub callback when the CSRF state does not match (no token, no dialog)', async () => {

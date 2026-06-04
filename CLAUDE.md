@@ -55,6 +55,7 @@ punchin/
 │   ├── sync/
 │   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
 │   │   ├── oauthState.js       # OAuth CSRF protection (issue #125): createOAuthState (mint+store a nonce in sessionStorage), consumeOAuthState (verify the returned nonce, fail closed). The nonce is embedded in the OAuth `state` and checked in App.jsx's callback handler
+│   │   ├── tokenStore.js       # At-rest encryption of the sync token (issue #126): setSyncToken/getSyncToken/clearSyncToken, backed by the `secrets` table (non-extractable AES-GCM key). Lazily migrates a legacy plaintext settings.syncToken. runSync/disconnectSync/App.jsx go through this — the token is never in plaintext IndexedDB
 │   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), importSnapshot (public merge for transfer links, issue #77), runSync (pull→merge→push), disconnectSync
 │   │   └── providers/
 │   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, fetchGitHubUser, findExistingPunchInGist, createGist (marker + device file), fetchAllDeviceData (reads all punchin-data-*.json + legacy file), pushDeviceData (writes marker + own device file), deleteDeviceFile (nulls file on disconnect), updateGist/fetchGist (legacy, kept for backward compat)
@@ -350,6 +351,7 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 | `jobs` | `id, name, laborTypeId, isActive, uuid` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field |
 | `entries` | `id, jobId, laborTypeId, punchIn, punchOut, uuid` | Time records; optional `notes` (string) field |
 | `deletions` | `uuid, deletedAt` | Delete **tombstones**: when an entry is removed it is hard-deleted from `entries` (so every view/analytics/export query is unaffected) and its `uuid` is recorded here with a `deletedAt` timestamp, so cloud merge propagates the deletion across devices instead of the entry resurrecting from a peer's snapshot. Use `deleteEntry(id)` (in `db.js`) to delete an entry — never `db.entries.delete` directly. |
+| `secrets` | `name` | At-rest-encrypted sync credentials (issue #126): a non-extractable AES-GCM `CryptoKey` and the encrypted sync token. The OAuth token is **never** stored in plaintext IndexedDB. Access only through `src/sync/tokenStore.js` (`setSyncToken`/`getSyncToken`/`clearSyncToken`) — never read/write the token directly. |
 
 All three data tables also carry a `uuid` (stable cross-device identifier) and an `updatedAt` (ms epoch) field, stamped automatically by Dexie `creating`/`updating` hooks in `db.js`. `uuid` survives sync/transfer so cloud merge can identify the *same* record across devices (independent of the local-only auto-increment `id`); `updatedAt` is the basis for last-write-wins conflict resolution. The `creating` hook only fills in missing values, so a record merged in from another device keeps its remote `uuid`/`updatedAt`.
 

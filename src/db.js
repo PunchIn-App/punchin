@@ -99,6 +99,15 @@ db.version(4).stores({
   deletions: 'uuid, deletedAt',
 })
 
+// v5 — `secrets` table for at-rest-encrypted sync credentials (issue #126).
+// Holds a non-extractable AES-GCM CryptoKey and the encrypted sync token, so the
+// OAuth token is never stored in plaintext IndexedDB. All access goes through
+// src/sync/tokenStore.js (set/get/clearSyncToken), which also lazily migrates a
+// pre-existing plaintext `settings.syncToken` into this encrypted store.
+db.version(5).stores({
+  secrets: 'name',
+})
+
 // Stamp identity metadata on every write, centrally — so the ~10 create/update
 // call sites across the app don't each have to remember to. `creating` only
 // fills in missing values, so a record merged from another device keeps its

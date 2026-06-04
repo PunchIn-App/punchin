@@ -23,6 +23,7 @@ const mockDbLaborTypesAdd     = vi.fn().mockResolvedValue(1)
 const mockDbJobsAdd           = vi.fn().mockResolvedValue(1)
 const mockDbEntriesAdd        = vi.fn().mockResolvedValue(1)
 const mockDbDeletionsClear    = vi.fn().mockResolvedValue(undefined)
+const mockDbSecretsClear      = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../hooks/useSettings', () => ({
   useSettings: () => ({
@@ -56,6 +57,9 @@ vi.mock('../db', () => ({
     },
     deletions: {
       get clear()   { return mockDbDeletionsClear },
+    },
+    secrets: {
+      get clear()   { return mockDbSecretsClear },
     },
     transaction: (_mode, _tables, fn) => fn(),
   },
@@ -421,6 +425,7 @@ describe('SettingsView — Danger Zone', () => {
       expect(mockDbJobsClear).toHaveBeenCalled()
       expect(mockDbLaborTypesClear).toHaveBeenCalled()
       expect(mockDbDeletionsClear).toHaveBeenCalled()
+      expect(mockDbSecretsClear).toHaveBeenCalled()
       expect(mockDbSettingsClear).toHaveBeenCalled()
       expect(mockDbSettingsBulkPut).toHaveBeenCalled()
     })

@@ -547,11 +547,12 @@ export default function SettingsView() {
   }
 
   const factoryReset = async () => {
-    await db.transaction('rw', [db.entries, db.jobs, db.laborTypes, db.settings, db.deletions], async () => {
+    await db.transaction('rw', [db.entries, db.jobs, db.laborTypes, db.settings, db.deletions, db.secrets], async () => {
       await db.entries.clear()
       await db.jobs.clear()
       await db.laborTypes.clear()
       await db.deletions.clear()
+      await db.secrets.clear() // wipe the encrypted sync token + key (issue #126)
       await db.settings.clear()
       await db.settings.bulkPut([
         { key: 'allowConcurrentTimers', value: false },

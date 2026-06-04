@@ -9,6 +9,7 @@ import {
 } from './providers/github'
 import { pushToDrive, pullFromDrive } from './providers/google'
 import { pushToOneDrive, pullFromOneDrive } from './providers/onedrive'
+import { getSyncToken, clearSyncToken } from './tokenStore'
 
 async function getSettings() {
   const rows = await db.settings.toArray()
@@ -195,7 +196,8 @@ async function syncStep(phase, work) {
 
 export async function runSync() {
   const s = await getSettings()
-  if (!s.syncProvider || !s.syncToken) throw new Error('Not connected')
+  const token = await getSyncToken() // decrypted from the at-rest store (issue #126)
+  if (!s.syncProvider || !token) throw new Error('Not connected')
   // Treat a token within the safety margin of expiry as already expired, so a
   // sync can't start and then have the (~1h, non-refreshable) Google/OneDrive
   // token expire mid-flight, leaving remote state half-updated.
@@ -208,33 +210,33 @@ export async function runSync() {
     const deviceId = getDeviceId()
 
     if (!fileId) {
-      fileId = await syncStep('download', () => findExistingPunchInGist(s.syncToken))
+      fileId = await syncStep('download', () => findExistingPunchInGist(token))
       if (fileId) await db.settings.put({ key: 'syncFileId', value: fileId })
     }
 
     if (fileId) {
-      const snapshots = await syncStep('download', () => fetchAllDeviceData(s.syncToken, fileId))
+      const snapshots = await syncStep('download', () => fetchAllDeviceData(token, fileId))
       for (const snapshot of snapshots) await mergeSnapshot(snapshot)
     }
 
     const snapshot = await exportSnapshot()
 
     if (fileId) {
-      await syncStep('upload', () => pushDeviceData(s.syncToken, fileId, deviceId, snapshot))
+      await syncStep('upload', () => pushDeviceData(token, fileId, deviceId, snapshot))
     } else {
-      fileId = await syncStep('upload', () => createGist(s.syncToken, deviceId, snapshot))
+      fileId = await syncStep('upload', () => createGist(token, deviceId, snapshot))
       await db.settings.put({ key: 'syncFileId', value: fileId })
     }
   } else if (s.syncProvider === 'google') {
-    const remote = await syncStep('download', () => pullFromDrive(s.syncToken))
+    const remote = await syncStep('download', () => pullFromDrive(token))
     if (remote) await mergeSnapshot(remote)
     const snapshot = await exportSnapshot()
-    await syncStep('upload', () => pushToDrive(s.syncToken, snapshot))
+    await syncStep('upload', () => pushToDrive(token, snapshot))
   } else if (s.syncProvider === 'onedrive') {
-    const remote = await syncStep('download', () => pullFromOneDrive(s.syncToken))
+    const remote = await syncStep('download', () => pullFromOneDrive(token))
     if (remote) await mergeSnapshot(remote)
     const snapshot = await exportSnapshot()
-    await syncStep('upload', () => pushToOneDrive(s.syncToken, snapshot))
+    await syncStep('upload', () => pushToOneDrive(token, snapshot))
   }
 
   const now = Date.now()
@@ -244,15 +246,16 @@ export async function runSync() {
 
 export async function disconnectSync() {
   const s = await getSettings()
+  const token = await getSyncToken()
 
   // Best-effort: delete this device's file from the gist before clearing credentials
-  if (s.syncProvider === 'github' && s.syncToken && s.syncFileId) {
-    try { await deleteDeviceFile(s.syncToken, s.syncFileId, getDeviceId()) } catch {}
+  if (s.syncProvider === 'github' && token && s.syncFileId) {
+    try { await deleteDeviceFile(token, s.syncFileId, getDeviceId()) } catch {}
   }
 
+  await clearSyncToken() // remove the encrypted token (and any legacy plaintext)
   await db.settings.bulkPut([
     { key: 'syncProvider', value: null },
-    { key: 'syncToken', value: null },
     { key: 'syncTokenExpiry', value: null },
     { key: 'syncFileId', value: null },
     { key: 'lastSyncedAt', value: null },

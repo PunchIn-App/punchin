@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { db, deleteEntry } from '../db'
 import { exportSnapshot, runSync, disconnectSync } from './syncManager'
+import { getSyncToken } from './tokenStore'
 import * as github from './providers/github'
 import * as google from './providers/google'
 import * as onedrive from './providers/onedrive'
@@ -50,6 +51,7 @@ beforeEach(async () => {
   await db.laborTypes.clear()
   await db.entries.clear()
   await db.deletions.clear()
+  await db.secrets.clear() // encrypted sync token store (issue #126)
   for (const key of ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt', 'syncUsername']) {
     await db.settings.delete(key)
   }
@@ -123,11 +125,13 @@ describe('disconnectSync', () => {
     await seedSyncSettings({ syncProvider: 'google', syncToken: 'tok', lastSyncedAt: 12345 })
     await db.settings.put({ key: 'syncUsername', value: 'octocat' })
     await disconnectSync()
-    const keys = ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt', 'syncUsername']
+    const keys = ['syncProvider', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt', 'syncUsername']
     for (const key of keys) {
       const row = await db.settings.get(key)
       expect(row?.value).toBeNull()
     }
+    // the token lives in the encrypted store now and is wiped on disconnect (issue #126)
+    expect(await getSyncToken()).toBeNull()
   })
 
   it('calls deleteDeviceFile before clearing settings for GitHub', async () => {

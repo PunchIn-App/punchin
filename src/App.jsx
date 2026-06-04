@@ -16,6 +16,7 @@ import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
 import { consumeOAuthState } from './sync/oauthState'
+import { setSyncToken } from './sync/tokenStore'
 import { db } from './db'
 
 // localStorage keys for the first-run install nudge. Kept out of the Dexie
@@ -225,9 +226,9 @@ export default function App() {
 
   const confirmGitHubConnect = useCallback(async () => {
     if (!pendingGitHubAuth) return
+    await setSyncToken(pendingGitHubAuth.token) // encrypted at rest (issue #126)
     await db.settings.bulkPut([
       { key: 'syncProvider', value: 'github' },
-      { key: 'syncToken', value: pendingGitHubAuth.token },
       { key: 'syncTokenExpiry', value: null },
       { key: 'syncFileId', value: null },
       { key: 'syncError', value: null },
@@ -286,13 +287,12 @@ export default function App() {
         setActiveView('settings')
         // Reject the callback unless the returned nonce matches the one we stored (issue #125).
         if (consumeOAuthState(nonce)) {
-          db.settings.bulkPut([
+          setSyncToken(token).then(() => db.settings.bulkPut([ // encrypted at rest (issue #126)
             { key: 'syncProvider', value: provider },
-            { key: 'syncToken', value: token },
             { key: 'syncTokenExpiry', value: Date.now() + expiresIn },
             { key: 'syncFileId', value: null },
             { key: 'syncError', value: null },
-          ])
+          ]))
         } else {
           db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
         }
