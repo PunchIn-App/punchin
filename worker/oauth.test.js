@@ -60,3 +60,40 @@ describe('worker GitHub OAuth callback — CSRF state passthrough (issue #125)',
     expect(res.headers.get('location')).not.toContain('state=')
   })
 })
+
+describe('worker GitHub OAuth callback — edge cases (issue #165)', () => {
+  const env = { GITHUB_CLIENT_ID: 'id', GITHUB_CLIENT_SECRET: 'secret', APP_URL: 'https://app.example' }
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('redirects with missing_code when the callback has no code', async () => {
+    const res = await worker.fetch({ url: 'https://app.example/oauth/github/callback?state=x' }, env)
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('https://app.example/#sync_error=missing_code')
+  })
+
+  it("passes GitHub's error_description through when no access_token comes back", async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ error_description: 'bad_verification_code' }) }))
+    const res = await worker.fetch({ url: 'https://app.example/oauth/github/callback?code=abc' }, env)
+    expect(res.headers.get('location')).toBe('https://app.example/#sync_error=bad_verification_code')
+  })
+
+  it('falls back to auth_failed when GitHub returns neither token nor error_description', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({}) }))
+    const res = await worker.fetch({ url: 'https://app.example/oauth/github/callback?code=abc' }, env)
+    expect(res.headers.get('location')).toBe('https://app.example/#sync_error=auth_failed')
+  })
+
+  it('redirects with server_error when the token exchange throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
+    const res = await worker.fetch({ url: 'https://app.example/oauth/github/callback?code=abc' }, env)
+    expect(res.headers.get('location')).toBe('https://app.example/#sync_error=server_error')
+  })
+
+  it('uses the request origin as the redirect base when APP_URL is unset', async () => {
+    const res = await worker.fetch(
+      { url: 'https://fallback.example/oauth/github/callback' },
+      { GITHUB_CLIENT_ID: 'id', GITHUB_CLIENT_SECRET: 'secret' },
+    )
+    expect(res.headers.get('location')).toBe('https://fallback.example/#sync_error=missing_code')
+  })
+})

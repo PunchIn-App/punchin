@@ -33,8 +33,10 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/**/*.{js,jsx}'],
-      exclude: ['src/main.jsx', 'src/**/*.test.{js,jsx}', 'src/test-setup.js'],
+      // Cover the deployed Cloudflare Worker too — it's the GitHub-sync security
+      // boundary, so excluding it from coverage gave false assurance (issue #165).
+      include: ['src/**/*.{js,jsx}', 'worker/**/*.{js,jsx}'],
+      exclude: ['src/main.jsx', '**/*.test.{js,jsx}', 'src/test-setup.js'],
       thresholds: {
         lines: 88,
         functions: 77,
