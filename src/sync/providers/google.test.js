@@ -87,9 +87,9 @@ describe('pushToDrive', () => {
     await expect(pushToDrive('token', {})).rejects.toThrow('Drive 403')
   })
 
-  it('throws when findFileId itself fails', async () => {
+  it('throws TOKEN_EXPIRED on a 401 (expired/revoked token) so the UI prompts re-auth', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 401 })
-    await expect(pushToDrive('token', {})).rejects.toThrow('Drive 401')
+    await expect(pushToDrive('token', {})).rejects.toThrow('TOKEN_EXPIRED')
   })
 })
 

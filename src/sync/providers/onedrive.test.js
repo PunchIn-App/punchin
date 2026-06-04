@@ -129,8 +129,8 @@ describe('pullFromOneDrive', () => {
     await expect(pullFromOneDrive('token')).rejects.toThrow('OneDrive 500')
   })
 
-  it('does not throw on 401 (not treated as "no file")', async () => {
+  it('throws TOKEN_EXPIRED on a 401 (not treated as "no file"), so the UI prompts re-auth', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 401 })
-    await expect(pullFromOneDrive('token')).rejects.toThrow('OneDrive 401')
+    await expect(pullFromOneDrive('token')).rejects.toThrow('TOKEN_EXPIRED')
   })
 })

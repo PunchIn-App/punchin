@@ -181,7 +181,11 @@ async function mergeSnapshot(remote) {
 export async function runSync() {
   const s = await getSettings()
   if (!s.syncProvider || !s.syncToken) throw new Error('Not connected')
-  if (s.syncTokenExpiry && Date.now() > s.syncTokenExpiry) throw new Error('TOKEN_EXPIRED')
+  // Treat a token within the safety margin of expiry as already expired, so a
+  // sync can't start and then have the (~1h, non-refreshable) Google/OneDrive
+  // token expire mid-flight, leaving remote state half-updated.
+  const EXPIRY_MARGIN_MS = 30_000
+  if (s.syncTokenExpiry && Date.now() > s.syncTokenExpiry - EXPIRY_MARGIN_MS) throw new Error('TOKEN_EXPIRED')
 
   let fileId = s.syncFileId ?? null
 

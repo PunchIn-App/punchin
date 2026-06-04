@@ -838,3 +838,23 @@ describe('runSync — merge job / labor-type fields (last-write-wins)', () => {
     expect(importedJob.laborRates[importedLt.id]).toBe(50) // not lost, keyed by local lt id
   })
 })
+
+// ---------------------------------------------------------------------------
+// runSync — token expiry handling (issue #121)
+// ---------------------------------------------------------------------------
+
+describe('runSync — token expiry handling', () => {
+  it('throws TOKEN_EXPIRED when the token is within the safety margin of expiry', async () => {
+    await seedSyncSettings({ syncTokenExpiry: Date.now() + 10_000 }) // inside the 30s margin
+    await expect(runSync()).rejects.toThrow('TOKEN_EXPIRED')
+  })
+
+  it('surfaces a mid-sync provider 401 as TOKEN_EXPIRED and does not update lastSyncedAt', async () => {
+    await seedSyncSettings({ syncProvider: 'google', syncFileId: null })
+    google.pullFromDrive.mockResolvedValueOnce(null)
+    google.pushToDrive.mockRejectedValueOnce(new Error('TOKEN_EXPIRED')) // token expired mid-sync
+    await expect(runSync()).rejects.toThrow('TOKEN_EXPIRED')
+    const stored = await db.settings.get('lastSyncedAt')
+    expect(stored?.value ?? null).toBeNull()
+  })
+})

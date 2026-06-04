@@ -1,5 +1,12 @@
 const FILE_NAME = 'punchin-data.json'
 
+// A 401 means the (implicit-flow, ~1h) access token has expired or been revoked.
+// Surface the shared TOKEN_EXPIRED signal so the UI prompts re-authentication
+// instead of showing a raw status code (issue #121). Other statuses pass through.
+function httpError(label, status) {
+  return new Error(status === 401 ? 'TOKEN_EXPIRED' : `${label} ${status}`)
+}
+
 export function buildGoogleOAuthUrl(clientId) {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -16,7 +23,7 @@ async function findFileId(token) {
     `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id)`,
     { headers: { Authorization: `Bearer ${token}` } }
   )
-  if (!res.ok) throw new Error(`Drive ${res.status}`)
+  if (!res.ok) throw httpError('Drive', res.status)
   const { files } = await res.json()
   return files?.[0]?.id ?? null
 }
@@ -34,7 +41,7 @@ export async function pushToDrive(token, data) {
         body: content,
       }
     )
-    if (!res.ok) throw new Error(`Drive ${res.status}`)
+    if (!res.ok) throw httpError('Drive', res.status)
     return existingId
   }
 
@@ -52,7 +59,7 @@ export async function pushToDrive(token, data) {
       body,
     }
   )
-  if (!res.ok) throw new Error(`Drive ${res.status}`)
+  if (!res.ok) throw httpError('Drive', res.status)
   return (await res.json()).id
 }
 
@@ -63,6 +70,6 @@ export async function pullFromDrive(token) {
     `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
     { headers: { Authorization: `Bearer ${token}` } }
   )
-  if (!res.ok) throw new Error(`Drive ${res.status}`)
+  if (!res.ok) throw httpError('Drive', res.status)
   return res.json()
 }

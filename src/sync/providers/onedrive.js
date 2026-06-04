@@ -1,5 +1,12 @@
 const FILE_NAME = 'punchin-data.json'
 
+// A 401 means the (implicit-flow, ~1h) access token has expired or been revoked.
+// Surface the shared TOKEN_EXPIRED signal so the UI prompts re-authentication
+// instead of showing a raw status code (issue #121). Other statuses pass through.
+function httpError(label, status) {
+  return new Error(status === 401 ? 'TOKEN_EXPIRED' : `${label} ${status}`)
+}
+
 export function buildOneDriveOAuthUrl(clientId) {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -20,7 +27,7 @@ export async function pushToOneDrive(token, data) {
       body: JSON.stringify(data),
     }
   )
-  if (!res.ok) throw new Error(`OneDrive ${res.status}`)
+  if (!res.ok) throw httpError('OneDrive', res.status)
   return (await res.json()).id
 }
 
@@ -30,6 +37,6 @@ export async function pullFromOneDrive(token) {
     { headers: { Authorization: `Bearer ${token}` } }
   )
   if (res.status === 404) return null
-  if (!res.ok) throw new Error(`OneDrive ${res.status}`)
+  if (!res.ok) throw httpError('OneDrive', res.status)
   return res.json()
 }

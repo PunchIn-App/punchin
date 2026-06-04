@@ -630,7 +630,9 @@ export default function SettingsView() {
   const notifSupported = notificationsSupported()
   const remindersOn = !!settings.remindersEnabled && notifPerm === 'granted'
 
-  const tokenExpired = syncSettings?.syncTokenExpiry && Date.now() > syncSettings.syncTokenExpiry
+  const tokenExpired =
+    (syncSettings?.syncTokenExpiry && Date.now() > syncSettings.syncTokenExpiry) ||
+    syncSettings?.syncError === 'TOKEN_EXPIRED'
 
   // Haptics only fire on phones (iPhone via the Taptic polyfill, Android via
   // vibrate). iPads have no vibration motor and desktop has none, so hide the
