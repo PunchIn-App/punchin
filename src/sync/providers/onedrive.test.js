@@ -1,4 +1,4 @@
-import { buildOneDriveOAuthUrl, pushToOneDrive, pullFromOneDrive } from './onedrive'
+import { buildOneDriveOAuthUrl, exchangeOneDriveCode, pushToOneDrive, pullFromOneDrive } from './onedrive'
 
 // ---------------------------------------------------------------------------
 // buildOneDriveOAuthUrl
@@ -15,9 +15,11 @@ describe('buildOneDriveOAuthUrl', () => {
     expect(url).toContain('client_id=od-client-id')
   })
 
-  it('uses response_type=token (implicit flow)', () => {
-    const url = buildOneDriveOAuthUrl('id')
-    expect(url).toContain('response_type=token')
+  it('uses response_type=code with PKCE (Auth Code flow, issue #128)', () => {
+    const url = buildOneDriveOAuthUrl('id', 'nonce', 'challenge123')
+    expect(url).toContain('response_type=code')
+    expect(url).toContain('code_challenge=challenge123')
+    expect(url).toContain('code_challenge_method=S256')
   })
 
   it('requests the AppFolder scope', () => {
@@ -37,6 +39,37 @@ describe('buildOneDriveOAuthUrl', () => {
   it('includes a redirect_uri', () => {
     const url = buildOneDriveOAuthUrl('id')
     expect(url).toContain('redirect_uri=')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// exchangeOneDriveCode (Auth Code + PKCE, issue #128)
+// ---------------------------------------------------------------------------
+
+describe('exchangeOneDriveCode', () => {
+  let fetchMock
+  beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock) })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('POSTs code + verifier to the token endpoint and returns the token JSON', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'odtoken', expires_in: 3600 }) })
+    const data = await exchangeOneDriveCode('client-id', 'authcode', 'verifier-xyz')
+    expect(data.access_token).toBe('odtoken')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://login.microsoftonline.com/common/oauth2/v2.0/token')
+    expect(opts.method).toBe('POST')
+    const body = new URLSearchParams(opts.body)
+    expect(body.get('grant_type')).toBe('authorization_code')
+    expect(body.get('code')).toBe('authcode')
+    expect(body.get('code_verifier')).toBe('verifier-xyz')
+    expect(body.get('client_id')).toBe('client-id')
+  })
+
+  it('throws TOKEN_EXPIRED on a 401 and a status error otherwise', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 401 })
+    await expect(exchangeOneDriveCode('id', 'c', 'v')).rejects.toThrow('TOKEN_EXPIRED')
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 400 })
+    await expect(exchangeOneDriveCode('id', 'c', 'v')).rejects.toThrow('OneDrive 400')
   })
 })
 

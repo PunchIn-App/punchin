@@ -18,6 +18,7 @@ import { buildGitHubOAuthUrl } from '../sync/providers/github'
 import { buildGoogleOAuthUrl } from '../sync/providers/google'
 import { buildOneDriveOAuthUrl } from '../sync/providers/onedrive'
 import { createOAuthState } from '../sync/oauthState'
+import { createPkceChallenge } from '../sync/pkce'
 import { SYNC_CONFIG } from '../sync/config'
 
 const ACCENT_PRESETS = [
@@ -1134,7 +1135,7 @@ export default function SettingsView() {
                 )}
                 {SYNC_CONFIG.onedrive.clientId && (
                   <button
-                    onClick={() => { window.location.href = buildOneDriveOAuthUrl(SYNC_CONFIG.onedrive.clientId, createOAuthState()) }}
+                    onClick={async () => { window.location.href = buildOneDriveOAuthUrl(SYNC_CONFIG.onedrive.clientId, createOAuthState(), await createPkceChallenge()) }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
                   >
                     <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />

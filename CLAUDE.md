@@ -56,11 +56,12 @@ punchin/
 │   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
 │   │   ├── oauthState.js       # OAuth CSRF protection (issue #125): createOAuthState (mint+store a nonce in sessionStorage), consumeOAuthState (verify the returned nonce, fail closed). The nonce is embedded in the OAuth `state` and checked in App.jsx's callback handler
 │   │   ├── tokenStore.js       # At-rest encryption of the sync token (issue #126): setSyncToken/getSyncToken/clearSyncToken, backed by the `secrets` table (non-extractable AES-GCM key). Lazily migrates a legacy plaintext settings.syncToken. runSync/disconnectSync/App.jsx go through this — the token is never in plaintext IndexedDB
+│   │   ├── pkce.js             # PKCE helpers for OneDrive's Auth Code flow (issue #128): createPkceChallenge (verifier→sessionStorage, returns the S256 challenge), consumePkceVerifier (one-time read)
 │   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), importSnapshot (public merge for transfer links, issue #77), runSync (pull→merge→push), disconnectSync
 │   │   └── providers/
 │   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, fetchGitHubUser, findExistingPunchInGist, createGist (marker + device file), fetchAllDeviceData (reads all punchin-data-*.json + legacy file), pushDeviceData (writes marker + own device file), deleteDeviceFile (nulls file on disconnect), updateGist/fetchGist (legacy, kept for backward compat)
-│   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope), pushToDrive, pullFromDrive
-│   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (implicit flow, AppFolder scope), pushToOneDrive, pullFromOneDrive
+│   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope — stays implicit; see the #128 comment for why), pushToDrive, pullFromDrive
+│   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (Auth Code + PKCE, AppFolder scope, issue #128) + exchangeOneDriveCode (client-side token exchange, token never in URL), pushToOneDrive, pullFromOneDrive
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
 │   ├── db.js               # Dexie schema, seed data, migrations
 │   ├── components/

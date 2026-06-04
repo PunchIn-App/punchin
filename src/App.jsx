@@ -15,8 +15,11 @@ import { updateFavicon } from './utils/favicon'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
+import { exchangeOneDriveCode } from './sync/providers/onedrive'
 import { consumeOAuthState } from './sync/oauthState'
+import { consumePkceVerifier } from './sync/pkce'
 import { setSyncToken } from './sync/tokenStore'
+import { SYNC_CONFIG } from './sync/config'
 import { db } from './db'
 
 // localStorage keys for the first-run install nudge. Kept out of the Dexie
@@ -246,8 +249,37 @@ export default function App() {
   // setState after the effect is torn down (avoids a stale dialog re-appearing).
   useEffect(() => {
     let cancelled = false
+
+    // OneDrive Auth Code + PKCE (issue #128) returns a single-use `code` in the
+    // query string — exchanged for the token via a direct POST, so the token is
+    // never in the URL. (GitHub/Google still use the hash, handled below.)
+    const search = new URLSearchParams(window.location.search)
+    if (search.get('code') && search.get('state')?.startsWith('onedrive:')) {
+      const code = search.get('code')
+      const [, nonce] = (search.get('state') || '').split(':')
+      history.replaceState({ piView: 'settings' }, '', window.location.pathname)
+      setActiveView('settings')
+      if (consumeOAuthState(nonce)) {
+        const verifier = consumePkceVerifier()
+        exchangeOneDriveCode(SYNC_CONFIG.onedrive.clientId, code, verifier)
+          .then(data => {
+            if (cancelled || !data?.access_token) throw new Error('no token')
+            return setSyncToken(data.access_token).then(() => db.settings.bulkPut([
+              { key: 'syncProvider', value: 'onedrive' },
+              { key: 'syncTokenExpiry', value: Date.now() + (data.expires_in ?? 3600) * 1000 },
+              { key: 'syncFileId', value: null },
+              { key: 'syncError', value: null },
+            ]))
+          })
+          .catch(() => { if (!cancelled) db.settings.put({ key: 'syncError', value: describeSyncError('auth_failed') }) })
+      } else {
+        db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
+      }
+      return () => { cancelled = true }
+    }
+
     const hash = window.location.hash
-    if (!hash || hash === '#') return
+    if (!hash || hash === '#') return () => { cancelled = true }
     const params = new URLSearchParams(hash.slice(1))
 
     // Device-to-device transfer link (issue #77)
@@ -277,10 +309,11 @@ export default function App() {
         db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
       }
 
-    // Google / OneDrive: token comes via implicit flow; `state` is `provider:nonce`
+    // Google: token comes via the implicit flow; `state` is `google:<nonce>`.
+    // (OneDrive uses the Auth Code + PKCE query callback handled above, #128.)
     } else if (params.has('access_token') && params.has('state')) {
       const [provider, nonce] = (params.get('state') || '').split(':')
-      if (provider === 'google' || provider === 'onedrive') {
+      if (provider === 'google') {
         const token = params.get('access_token')
         const expiresIn = parseInt(params.get('expires_in') || '3600', 10) * 1000
         history.replaceState({ piView: 'settings' }, '', window.location.pathname + window.location.search)

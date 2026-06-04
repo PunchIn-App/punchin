@@ -7,6 +7,15 @@ function httpError(label, status) {
   return new Error(status === 401 ? 'TOKEN_EXPIRED' : `${label} ${status}`)
 }
 
+// Google intentionally stays on the implicit flow (response_type=token), unlike
+// OneDrive's Auth Code + PKCE (issue #128). Google "Web application" OAuth
+// clients require the client *secret* for the code→token exchange even with
+// PKCE — there is no no-secret public-client web flow. Doing Auth Code for
+// Google would therefore require routing the exchange through a server with the
+// secret, and a stateless Cloudflare Worker can only hand the token back to the
+// SPA via the URL fragment again — so it wouldn't achieve the goal of keeping
+// the token out of the URL without a stateful backend. The fragment is already
+// scrubbed immediately on return (App.jsx), which is the available mitigation.
 export function buildGoogleOAuthUrl(clientId, state) {
   const params = new URLSearchParams({
     client_id: clientId,

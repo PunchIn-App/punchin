@@ -38,6 +38,23 @@ vi.mock('./sync/tokenStore', () => ({
   setSyncToken: (...a) => mockSetSyncToken(...a),
 }))
 
+// OneDrive Auth Code + PKCE (issue #128): mock the token exchange + verifier.
+const mockExchangeOneDriveCode = vi.fn()
+vi.mock('./sync/providers/onedrive', () => ({
+  exchangeOneDriveCode: (...a) => mockExchangeOneDriveCode(...a),
+}))
+const mockConsumePkceVerifier = vi.fn(() => 'verifier')
+vi.mock('./sync/pkce', () => ({
+  consumePkceVerifier: () => mockConsumePkceVerifier(),
+}))
+vi.mock('./sync/config', () => ({
+  SYNC_CONFIG: {
+    github: { clientId: 'gh', callbackBase: 'https://app' },
+    google: { clientId: 'g' },
+    onedrive: { clientId: 'od' },
+  },
+}))
+
 vi.mock('./db', () => ({
   db: {
     settings: {
@@ -71,9 +88,9 @@ beforeEach(() => {
   document.documentElement.style.removeProperty('--accent-rgb')
   window.location.hash = ''
   sessionStorage.clear() // clear any leftover OAuth CSRF nonce between tests (issue #125)
-  // Reset the global history state so back-button / OAuth tests can't leak state
-  // into each other and become order-dependent.
-  window.history.replaceState(null, '')
+  // Reset the URL (path/search/hash) + global history state so back-button /
+  // OAuth tests can't leak state into each other and become order-dependent.
+  window.history.replaceState(null, '', '/')
   mockUseSettings.mockReturnValue({
     settings: { theme: 'dark', accentColor: '#F59E0B' },
     updateSetting: vi.fn(),
@@ -251,9 +268,11 @@ describe('App — OAuth callback handling', () => {
     await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
   })
 
-  it('stores OneDrive token when hash has access_token + state=onedrive', async () => {
-    window.location.hash = `#access_token=odtoken&expires_in=3600&state=onedrive:${NONCE}`
+  it('exchanges the OneDrive auth code (PKCE) and stores the token (issue #128)', async () => {
+    mockExchangeOneDriveCode.mockResolvedValueOnce({ access_token: 'odtoken', expires_in: 3600 })
+    window.history.replaceState(null, '', `/?code=AUTHCODE&state=onedrive:${NONCE}`)
     render(<App />)
+    await waitFor(() => expect(mockExchangeOneDriveCode).toHaveBeenCalledWith('od', 'AUTHCODE', 'verifier'))
     await waitFor(() => expect(mockSetSyncToken).toHaveBeenCalledWith('odtoken'))
     expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
       expect.arrayContaining([{ key: 'syncProvider', value: 'onedrive' }])
