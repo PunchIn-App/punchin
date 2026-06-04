@@ -19,7 +19,10 @@ export default function AnalyticsView() {
 
   const startDate = subDays(new Date(), days)
 
-  const entries    = useLiveQuery(() => db.entries.filter(e => new Date(e.punchIn) >= startDate && !!e.punchOut).toArray(), [period])
+  // Indexed range query (issue #132): the `punchIn` index narrows to the period
+  // window; the completed-only predicate (.and) runs on that small set, not the
+  // whole table.
+  const entries    = useLiveQuery(() => db.entries.where('punchIn').aboveOrEqual(startDate).and(e => !!e.punchOut).toArray(), [period])
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
 

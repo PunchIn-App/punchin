@@ -9,7 +9,7 @@ vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({
   db: {
     entries: {
-      filter: vi.fn(() => ({ toArray: vi.fn().mockResolvedValue([]) })),
+      where: vi.fn(() => ({ between: vi.fn(() => ({ toArray: vi.fn().mockResolvedValue([]) })) })),
       get delete() { return mockEntriesDelete },
     },
   },

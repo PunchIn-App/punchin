@@ -16,7 +16,9 @@ import ConfirmModal from '../components/ConfirmModal'
 function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { start, end } = getDayRange(date)
   const entries = useLiveQuery(
-    () => db.entries.filter(e => isEntryInRange(e, start, end)).toArray(),
+    // Indexed range query (issue #132): punchIn is a Date key, so Dexie can
+    // satisfy this from the `punchIn` index instead of scanning the whole table.
+    () => db.entries.where('punchIn').between(start, end, true, true).toArray(),
     [start.getTime()]
   )
   const getJob = id => jobs?.find(j => j.id === id)
@@ -104,7 +106,9 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const days = getWeekDays(date, wsMon)
 
   const allEntries = useLiveQuery(
-    () => db.entries.filter(e => isEntryInRange(e, start, end)).toArray(),
+    // Indexed range query (issue #132): punchIn is a Date key, so Dexie can
+    // satisfy this from the `punchIn` index instead of scanning the whole table.
+    () => db.entries.where('punchIn').between(start, end, true, true).toArray(),
     [start.getTime()]
   )
   const getJob = id => jobs?.find(j => j.id === id)
@@ -276,11 +280,11 @@ export default function TimesheetsView() {
     let entries, rangeLabel
     if (tab === 'daily') {
       const { start, end } = getDayRange(currentDate)
-      entries = await db.entries.filter(e => isEntryInRange(e, start, end)).toArray()
+      entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
       rangeLabel = format(currentDate, 'yyyy-MM-dd')
     } else {
       const { start, end } = getWeekRange(currentDate, wsMon)
-      entries = await db.entries.filter(e => isEntryInRange(e, start, end)).toArray()
+      entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
       rangeLabel = `${format(start, 'yyyy-MM-dd')}_${format(end, 'yyyy-MM-dd')}`
     }
 
@@ -315,11 +319,11 @@ export default function TimesheetsView() {
     let entries, titleStr
     if (tab === 'daily') {
       const { start, end } = getDayRange(currentDate)
-      entries = await db.entries.filter(e => isEntryInRange(e, start, end)).toArray()
+      entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
       titleStr = format(currentDate, 'EEEE, MMMM d, yyyy')
     } else {
       const { start, end } = getWeekRange(currentDate, wsMon)
-      entries = await db.entries.filter(e => isEntryInRange(e, start, end)).toArray()
+      entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
       titleStr = `Week of ${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
     }
 

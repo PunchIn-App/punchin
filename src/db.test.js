@@ -171,3 +171,38 @@ describe('db — deleteEntry tombstones (issue #118)', () => {
     expect(await db.deletions.toArray()).toHaveLength(0)
   })
 })
+
+describe('db — indexed punchIn range queries (issue #132)', () => {
+  afterEach(async () => { await db.entries.clear() })
+
+  // Guards the perf refactor: the views now query the punchIn index via
+  // .where('punchIn').between(...) instead of scanning the whole table. Because
+  // punchIn is stored as a Date, the index range must return exactly the same
+  // rows the old isEntryInRange() predicate did — including the boundaries.
+  it('between() returns only entries whose Date punchIn falls in [start, end] inclusive', async () => {
+    const start = new Date('2025-03-10T00:00:00')
+    const end   = new Date('2025-03-10T23:59:59.999')
+    await db.entries.bulkAdd([
+      { jobId: 1, laborTypeId: 1, punchIn: new Date('2025-03-09T23:59:59'), punchOut: null }, // before
+      { jobId: 1, laborTypeId: 1, punchIn: start,                                punchOut: null }, // start boundary
+      { jobId: 1, laborTypeId: 1, punchIn: new Date('2025-03-10T12:00:00'), punchOut: null }, // inside
+      { jobId: 1, laborTypeId: 1, punchIn: end,                                  punchOut: null }, // end boundary
+      { jobId: 1, laborTypeId: 1, punchIn: new Date('2025-03-11T00:00:01'), punchOut: null }, // after
+    ])
+    const inRange = await db.entries.where('punchIn').between(start, end, true, true).toArray()
+    const times = inRange.map(e => e.punchIn.getTime()).sort()
+    expect(times).toEqual([start, new Date('2025-03-10T12:00:00'), end].map(d => d.getTime()).sort())
+  })
+
+  it('aboveOrEqual() with a completed-only .and() predicate matches the Analytics query', async () => {
+    const cutoff = new Date('2025-03-10T00:00:00')
+    await db.entries.bulkAdd([
+      { jobId: 1, laborTypeId: 1, punchIn: new Date('2025-03-09T10:00:00'), punchOut: new Date('2025-03-09T11:00:00') }, // before cutoff
+      { jobId: 1, laborTypeId: 1, punchIn: new Date('2025-03-10T10:00:00'), punchOut: new Date('2025-03-10T11:00:00') }, // after, completed
+      { jobId: 1, laborTypeId: 1, punchIn: new Date('2025-03-11T10:00:00'), punchOut: null },                            // after, still running
+    ])
+    const result = await db.entries.where('punchIn').aboveOrEqual(cutoff).and(e => !!e.punchOut).toArray()
+    expect(result).toHaveLength(1)
+    expect(result[0].punchIn.getTime()).toBe(new Date('2025-03-10T10:00:00').getTime())
+  })
+})
