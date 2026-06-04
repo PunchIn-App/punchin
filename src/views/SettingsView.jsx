@@ -7,8 +7,8 @@ import DataTransfer from '../components/DataTransfer'
 import { Download, Upload, Trash2, Layers, Calendar, Info, Sun, Moon, Monitor, RefreshCw, ExternalLink, ScrollText, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Palette, Bug, MonitorDown, Cloud, CloudOff, LogOut, Check, Share, Plus, Compass, Vibrate, SlidersHorizontal, Database, Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck, Share2, Lightbulb, Scale, Heart } from 'lucide-react'
 import { notificationsSupported, notificationPermission, requestNotificationPermission } from '../utils/notifications'
 import { buildBugReportUrl, buildFeatureRequestUrl } from '../utils/issueUrl'
-import { applyUpdate, hasWaitingUpdate } from '../utils/pwa'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
+import { usePwaUpdate } from '../hooks/usePwaUpdate'
 import { format } from 'date-fns'
 import { db, defaultSettingsRows } from '../db'
 import { useSettings } from '../hooks/useSettings'
@@ -210,11 +210,11 @@ export default function SettingsView() {
   const [activePanel, setActivePanel] = useState(() =>
     (typeof window !== 'undefined' && window.__pwaUpdateAvailable) ? 'about' : null
   )
-  const [updateStatus, setUpdateStatus] = useState(null) // null | 'checking' | 'latest'
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showChangelog, setShowChangelog] = useState(false)
   const [showLicense, setShowLicense] = useState(false)
-  const [updateAvailable, setUpdateAvailable] = useState(() => !!window.__pwaUpdateAvailable)
+  // PWA update state + check action live in usePwaUpdate (issue #149).
+  const { updateAvailable, updateStatus, checkForUpdates } = usePwaUpdate()
   const [iosHelpOpen, setIosHelpOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
@@ -266,26 +266,6 @@ export default function SettingsView() {
   const syncSettings = useLiveQuery(async () => {
     const rows = await db.settings.toArray()
     return rows.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
-  }, [])
-
-  useEffect(() => {
-    const onUpdateReady = () => setUpdateAvailable(true)
-    window.addEventListener('pwa:update-ready', onUpdateReady)
-    return () => window.removeEventListener('pwa:update-ready', onUpdateReady)
-  }, [])
-
-  // An update may have downloaded in a previous page load and still be waiting
-  // to activate, but the in-memory flag resets on mount. Re-surface it so the
-  // "Update available" affordance survives reloads / factory reset (issue #57).
-  useEffect(() => {
-    let cancelled = false
-    hasWaitingUpdate().then(waiting => {
-      if (waiting && !cancelled) {
-        window.__pwaUpdateAvailable = true
-        setUpdateAvailable(true)
-      }
-    })
-    return () => { cancelled = true }
   }, [])
 
   const exportData = async () => {
@@ -421,61 +401,6 @@ export default function SettingsView() {
       alert('Error importing data: ' + err.message)
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }
-
-  const checkForUpdates = async () => {
-    if (updateAvailable) {
-      applyUpdate()
-      return
-    }
-
-    setUpdateStatus('checking')
-
-    if (!('serviceWorker' in navigator)) {
-      setUpdateStatus('latest')
-      setTimeout(() => setUpdateStatus(null), 3000)
-      return
-    }
-
-    try {
-      const reg = await navigator.serviceWorker.getRegistration()
-      if (!reg) {
-        setUpdateStatus('latest')
-        setTimeout(() => setUpdateStatus(null), 3000)
-        return
-      }
-
-      // Prompt the browser to fetch the SW from the server right now.
-      // If a new version is found, onNeedRefresh in main.jsx fires and
-      // dispatches pwa:update-ready, which sets updateAvailable via the
-      // useEffect listener above.
-      await reg.update()
-
-      // Wait long enough for the new SW to download and trigger onNeedRefresh.
-      await new Promise(r => setTimeout(r, 2500))
-
-      // Treat the update as available if either onNeedRefresh fired during the
-      // wait OR a worker is already sitting in reg.waiting (downloaded earlier,
-      // e.g. before a reload, so the in-memory flag never got set). Without the
-      // reg.waiting check, a pending update reports "Already up to date" and
-      // can never be applied (issue #57).
-      const updateReady = window.__pwaUpdateAvailable || await hasWaitingUpdate()
-
-      if (!updateReady) {
-        setUpdateStatus('latest')
-        setTimeout(() => setUpdateStatus(null), 3000)
-      } else {
-        // An update is ready. Surface it and clear the 'checking' status so the
-        // button re-enables — otherwise it stays disabled/greyed out and the
-        // user can't tap again to apply the update.
-        window.__pwaUpdateAvailable = true
-        setUpdateAvailable(true)
-        setUpdateStatus(null)
-      }
-    } catch {
-      setUpdateStatus('latest')
-      setTimeout(() => setUpdateStatus(null), 3000)
     }
   }
 
