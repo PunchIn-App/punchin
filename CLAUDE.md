@@ -247,6 +247,12 @@ The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump �
    ```
    The tag `vX.Y.Z` is the canonical marker for the release; `--notes` should mirror that version's `docs/CHANGELOG.md` section. Pass the **full** commit SHA (or a branch name) to `--target` — the API rejects abbreviated SHAs.
 
+   Publishing the release **auto-creates the `vX.Y.Z` milestone and assigns every merged PR that doesn't yet have one** (= everything merged since the last release), via `.github/workflows/milestone-on-release.yml`. Manual fallback if that workflow is unavailable: `gh api repos/<owner>/<repo>/milestones -f title=vX.Y.Z -f state=closed`, then assign PRs with `gh pr edit <n> --milestone vX.Y.Z`.
+
+### Project board automation
+
+`.github/workflows/project-automation.yml` keeps the [PunchIn project board](https://github.com/orgs/PunchIn-App/projects/3) populated as issues/PRs move: on open it auto-adds the item and sets **Labels** (from the conventional-commit type), **Priority** (bug/enhancement → P1, else P2), **Size** (from PR diff), and **Start**/**Target** (+3 days) dates; on close it sets **Completion Date**. It deliberately leaves **Status** to the project's built-in workflows (Item added / Item closed / Pull request merged) so it never conflicts with them or the built-in Auto-close rule. **Milestones** are handled at release time (above), not here. Both `project-automation.yml` and `milestone-on-release.yml` live in each repo the board tracks (punchin + punchin-email). Everything runs under the **`ADD_TO_PROJECT_PAT`** secret — the default `GITHUB_TOKEN` is kept read-only (issue #104), so the PAT must grant **Projects: read/write · Issues: read/write · Contents: read** on both repos (Projects for the board fields, Issues for labels + milestones).
+
 #### CHANGELOG entry format
 
 Follow [Keep a Changelog](https://keepachangelog.com/) — add a new section at the very top of `docs/CHANGELOG.md`:
