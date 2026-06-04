@@ -581,6 +581,7 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - Build output goes to `dist/` — Cloudflare Workers serves it as static assets via `wrangler.jsonc`; deploy with `npm run deploy`
 - `wrangler.jsonc` stays at the project root — Cloudflare's Git integration auto-detects it there and cannot be redirected without a Dashboard build-command override
 - The `compatibility_date` in `wrangler.jsonc` is pinned; update it intentionally, not automatically
+- `worker/oauth.js` wraps every static-asset response with a **Content-Security-Policy** and hardening headers (`X-Content-Type-Options`, `Referrer-Policy: no-referrer`, HSTS, `X-Frame-Options`). `script-src` is `'self'` (the built `index.html` has no inline scripts). **If you add a `fetch()` to a new external origin** (e.g. a new sync provider's API), add that origin to the CSP `connect-src` list in `worker/oauth.js`, or the request will be blocked in production. Likewise add new style/font/image origins to the matching directive.
 
 ---
 
