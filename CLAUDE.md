@@ -463,6 +463,16 @@ Legacy single-file gists (`punchin-data.json`) are detected by `findExistingPunc
 
 Parent views fetch data and pass it as props to child components. Components that need to write call Dexie methods directly.
 
+### `useLiveQuery` loading convention
+
+`useLiveQuery` returns `undefined` until its first query resolves. **Never render an empty / "zero" state derived from a result that may still be `undefined`** — guard on `=== undefined` first, or the empty state flashes before data arrives (issue #135). Pick whichever shape fits the view:
+
+- **Early loading guard** — `if (!entries || !jobs) return <…Loading…/>` (AnalyticsView)
+- **Render nothing** — `if (!entries) return null` for a sub-section (TimesheetsView's day/week sheets)
+- **Inline guard** — branch the specific bit of UI on `value === undefined` (TimerView's "N timers running" subtitle)
+
+The distinction that matters: `undefined` = still loading (render nothing/skeleton), `[]` / `0` = loaded and genuinely empty (render the empty state).
+
 ---
 
 ## Theming

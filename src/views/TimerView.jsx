@@ -34,9 +34,11 @@ export default function TimerView() {
           <div>
             <h1 className="font-display font-bold text-appText text-2xl leading-none">Active</h1>
             <p className="text-appTextMuted text-sm mt-0.5">
-              {active?.length
-                ? `${active.length} timer${active.length !== 1 ? 's' : ''} running`
-                : 'No active timers'}
+              {active === undefined
+                ? ' ' /* still loading — don't flash "No active timers" (issue #135) */
+                : active.length
+                  ? `${active.length} timer${active.length !== 1 ? 's' : ''} running`
+                  : 'No active timers'}
             </p>
           </div>
           <button

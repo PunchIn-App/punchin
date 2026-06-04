@@ -43,6 +43,15 @@ describe('TimerView — empty state', () => {
   })
 })
 
+describe('TimerView — loading state (issue #135)', () => {
+  it('does not flash "No active timers" or the empty state while live queries are still undefined', () => {
+    useLiveQuery.mockImplementation(() => undefined) // active/jobs/laborTypes/lastEntry all loading
+    render(<TimerView />)
+    expect(screen.queryByText('No active timers')).not.toBeInTheDocument()
+    expect(screen.queryByText('Nothing running')).not.toBeInTheDocument()
+  })
+})
+
 describe('TimerView — active timers', () => {
   it('shows "1 timer running" for a single active entry', () => {
     const active = [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null }]
