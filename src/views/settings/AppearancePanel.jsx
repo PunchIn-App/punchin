@@ -2,14 +2,7 @@ import { Monitor, Sun, Moon, Palette } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import ColorPicker from '../../components/ColorPicker'
 import { Panel, SettingsRow } from './components'
-
-const ACCENT_PRESETS = [
-  { name: 'Blue',   hex: '#1f6feb' },
-  { name: 'Amber',  hex: '#F59E0B' },
-  { name: 'Orange', hex: '#F97316' },
-  { name: 'Lime',   hex: '#84CC16' },
-  { name: 'Teal',   hex: '#2DD4BF' },
-]
+import { ACCENT_PRESETS } from '../../accentPresets'
 
 export default function AppearancePanel({ onBack }) {
   const { settings, updateSetting } = useSettings()

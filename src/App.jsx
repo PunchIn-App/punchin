@@ -15,6 +15,7 @@ import { useSettings } from './hooks/useSettings'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { useReminders } from './hooks/useReminders'
 import { updateFavicon } from './utils/favicon'
+import { applyInstallIcon } from './utils/installIcon'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
@@ -213,6 +214,7 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--accent-rgb', hexToRgb(accentColor))
     updateFavicon(accentColor)
+    applyInstallIcon(accentColor)
   }, [accentColor])
 
   useEffect(() => {

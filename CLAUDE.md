@@ -27,12 +27,13 @@ punchin/
 │       ├── icon-512-maskable.png # Manifest icon (512×512, purpose maskable) for Android adaptive icons
 │       └── apple-touch-icon.png  # iOS home-screen icon (180×180), linked from index.html
 ├── config/
-│   ├── vite.config.js      # Vite + Vitest + PWA config; root=app/, outDir=../dist, test.root=..
+│   ├── vite.config.js      # Vite + Vitest + PWA config; root=app/, outDir=../dist, test.root=..; PWA manifest imported from manifest.base.js; workbox globIgnores `icons/**` (issue #228)
+│   ├── manifest.base.js    # Canonical PWA manifest object, shared by vite.config.js and scripts/icons.mjs so the per-accent manifest copies never drift (issue #228)
 │   ├── postcss.config.js   # PostCSS pipeline (Tailwind + autoprefixer)
 │   └── tailwind.config.js  # Custom fonts (Noto Sans, Noto Sans Display, Noto Sans Mono) + CSS-variable-backed color tokens
 ├── scripts/
 │   ├── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
-│   ├── icons.mjs           # Generates app/public icon set (Clock mark on accent square) via sharp; run to regenerate brand icons
+│   ├── icons.mjs           # Generates the PWA install-icon sets (Clock mark on accent square) via sharp: the default (blue) root set + a per-accent "crayon box" under app/public/icons/<key>/ for every colour in src/iconPalette.js (issue #228). sharp is not a committed dep (`npm install --no-save sharp && node scripts/icons.mjs`)
 │   └── social-preview.py   # Regenerates docs/social-preview*.svg + .png (Noto wordmark/tagline as outlined paths via fontTools; PNG via sharp). Build-time only — no font binary committed
 ├── docs/
 │   ├── CHANGELOG.md        # Version history; imported at build time by ChangelogModal via ?raw import
@@ -63,6 +64,8 @@ punchin/
 │   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope — stays implicit; see the #128 comment for why), pushToDrive, pullFromDrive
 │   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (Auth Code + PKCE, AppFolder scope, issue #128) + exchangeOneDriveCode (client-side token exchange, token never in URL), pushToOneDrive, pullFromOneDrive
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
+│   ├── accentPresets.js    # Single source of truth for the accent presets (the AppearancePanel swatches) + accentIconKey(); shared by the settings UI, installIcon.js, and iconPalette.js (issue #228)
+│   ├── iconPalette.js      # The pre-rendered install-icon "crayon box": ~65 swatches (presets + an HSL grid) and nearestPaletteKey() to snap any accent to its set. Shared by scripts/icons.mjs (renders the sets) and installIcon.js (snaps at runtime) (issue #228)
 │   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131)
 │   ├── components/
 │   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell; shows update badge on Settings icon
@@ -97,7 +100,8 @@ punchin/
 │       ├── time.js             # Date/time helpers (format, range, sum)
 │       ├── backup.js           # exportBackup() (full JSON) + exportCsv() (completed entries) — data plumbing kept out of the settings view (issue #144)
 │       ├── issueUrl.js         # buildBugReportUrl + buildFeatureRequestUrl (GitHub new-issue links) + userAgent sniffing for the bug template (issue #146)
-│       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon)
+│       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon). drawFaviconDataUrl is reused by installIcon.js for the iOS apple-touch-icon
+│       ├── installIcon.js      # Points the install/home-screen icon at the chosen accent before install (issue #228): exact data-URL apple-touch-icon for iOS; <link rel="manifest"> swapped to the nearest src/iconPalette.js swatch for Android/desktop (their icon is baked from the manifest's icon URLs, so a custom colour can't be supplied client-side). Called from App.jsx's accent effect
 │       ├── notifications.js    # Browser Notification API wrappers: notificationsSupported, notificationPermission, requestNotificationPermission, showNotification (prefers the SW registration, falls back to the Notification constructor)
 │       ├── reminders.js        # Pure evaluateReminders({now, settings, activeEntries, jobs, state}) → {fire, state}; the testable reminder rules (long-running timer, idle, still-running, daily/weekly timesheet) + parseHHMM/dayKey helpers
 │       ├── transfer.js         # Device-to-device transfer codec (issue #77): encodeSnapshot/decodeSnapshot (gzip via CompressionStream + base64url, 'g'/'r' flag), buildShareUrl, parseImportCode, parseImportFromHash
@@ -135,6 +139,8 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `formatDecimalHours`/`formatDuration` + `roundEntry` (issue #208: favour-rounding the 8:07→8:00 / 8:20→8:30 example, half-hour, exact-boundary no-op, off, still-running, seconds-ceil), `getEntryDuration`, `formatTime`, `formatDate`, `getDayRange`, `getWeekRange`, `getWeekDays`, `isEntryInRange`, `sumDurations` |
 | `src/utils/pwa.test.js` | `getInstallPrompt`, `notifyUpdateAvailable`, `setPwaUpdateFn`, `applyUpdate`, `initPwaInstallPrompt`, `hasWaitingUpdate` (reg.waiting detection) |
 | `src/utils/favicon.test.js` | `drawFaviconDataUrl` (accent color, null-context fallback), `updateFavicon` (link creation, static-link replacement, idempotent updates) |
+| `src/iconPalette.test.js` | Install-icon palette (issue #228): every preset is an exact swatch, `nearestPaletteKey` snaps presets to themselves / near colours close / always returns a generated key, `paletteKey` normalisation, palette density |
+| `src/utils/installIcon.test.js` | `applyInstallIcon` (issue #228): swaps `<link rel="manifest">` to the nearest palette swatch (preset + custom), sets an exact data-URL `apple-touch-icon`, reuses the existing manifest link rather than duplicating |
 | `src/utils/notifications.test.js` | `notificationsSupported`, `notificationPermission`, `requestNotificationPermission`, `showNotification` (permission gate, SW-registration path, constructor fallback) |
 | `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `dayAllowed`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules, day-of-week gating + back-compat when day arrays absent) |
 | `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |
