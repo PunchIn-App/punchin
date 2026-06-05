@@ -183,7 +183,11 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
 | `src/views/TimesheetsView.test.jsx` | Daily/weekly tabs, period nav, search/filter, CSV/print, edit/delete |
 | `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks (incl. GitHub username fetch + Settings navigation, issue #83), first-run install nudge gating (mobile-only, ios-other mode, desktop suppression), back-button history navigation (seed/push/popstate, issue #65), transfer-link import prompt (confirm/cancel/corrupt, issue #77) |
+| `src/App.integration.test.jsx` | Integration (issue #170): mounts the REAL App over real views + real Dexie (fake-indexeddb) — renders the default Timer view, then navigates the bottom nav to the real Jobs view reading seeded data; catches App↔view prop-contract drift the fully-mocked `App.test.jsx` can't |
 | `src/sync/config.test.js` | `SYNC_CONFIG` shape and env-var fallbacks |
+| `src/sync/oauthState.test.js` | OAuth CSRF nonce (issue #125): `createOAuthState` (32-char hex, stored, unique per call), `consumeOAuthState` (one-time use, clears, fails closed on mismatched/empty/missing) |
+| `src/sync/pkce.test.js` | Auth Code + PKCE helpers (issue #128): `createPkceChallenge` (stores verifier, returns base64url S256 challenge ≠ verifier), `consumePkceVerifier` (one-time read, null when none stored) |
+| `src/sync/tokenStore.test.js` | Encrypted at-rest sync token (issue #126): `setSyncToken`/`getSyncToken` round-trip, no plaintext in `secrets` + non-extractable key, `clearSyncToken`, null when empty, lazy migration of a legacy plaintext `settings.syncToken` (removes the plaintext) |
 | `src/sync/providers/github.test.js` | `buildGitHubOAuthUrl`, `fetchGitHubUser`, `findExistingPunchInGist` (pagination, marker file, device prefix, legacy file), `getDeviceFilename`, `createGist` (marker + device file), `fetchAllDeviceData` (multi-device, truncated, legacy, malformed), `pushDeviceData`, `deleteDeviceFile`, `updateGist`, `fetchGist` |
 | `src/sync/providers/google.test.js` | `buildGoogleOAuthUrl`, `pushToDrive` (create + update path), `pullFromDrive` |
 | `src/sync/providers/onedrive.test.js` | `buildOneDriveOAuthUrl`, `pushToOneDrive`, `pullFromOneDrive` (404 → null) |

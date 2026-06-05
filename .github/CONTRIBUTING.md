@@ -105,7 +105,7 @@ Also browser-side implicit OAuth. Register an app at <https://portal.azure.com> 
 ## Workflow
 
 1. Fork the repo and create a branch from `main`
-2. Make your changes — see [`CLAUDE.md`](CLAUDE.md) for full architecture conventions
+2. Make your changes — see [`CLAUDE.md`](../CLAUDE.md) for full architecture conventions
 3. Test manually at mobile width (≤ 412 px) and desktop width
 4. Follow the **versioning**, **documentation**, and **testing** requirements below
 5. Open a pull request with a clear description and your CLA sign-off
@@ -182,7 +182,7 @@ Every PR that changes code must update the relevant documentation in the **same 
 
 **Do not regenerate** for: logic-only changes, hook/utility changes, DB schema changes with no visual effect, test additions, CI changes, or documentation-only updates.
 
-See the Screenshots section of [`CLAUDE.md`](CLAUDE.md) for the Playwright regeneration script.
+See the Screenshots section of [`CLAUDE.md`](../CLAUDE.md) for the Playwright regeneration script.
 
 ---
 
@@ -218,14 +218,14 @@ Rules:
 ## Testing
 
 - Run `npm run test:run` before opening a PR
-- If you add new behaviour to a file listed under "Known gaps" in `CLAUDE.md`, add a test file alongside it
+- When you add new behaviour to any source file, add a test alongside it (see the current test coverage table in [`CLAUDE.md`](../CLAUDE.md))
 - Do not remove or weaken existing tests
 
 ---
 
 ## Code Conventions
 
-The full conventions are in [`CLAUDE.md`](CLAUDE.md). Key rules:
+The full conventions are in [`CLAUDE.md`](../CLAUDE.md). Key rules:
 
 - **No router** — navigation is tab-based state in `App.jsx`; this is intentional for PWA standalone mode
 - **No custom backend** — keep all data local. Optional cloud sync exists via OAuth + provider-hosted storage (GitHub Gist / Google Drive / OneDrive); adding a **new** sync provider requires explicit agreement on the OAuth flow and its own Cloudflare Worker secret (see [`CLAUDE.md`](../CLAUDE.md) → "What NOT to Do" and the Configuring Sync section above)
