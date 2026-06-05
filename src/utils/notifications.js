@@ -1,6 +1,8 @@
 // Thin wrappers over the browser Notification API. No backend / Web Push is
-// involved — these fire *local* notifications, which only deliver reliably
-// while the app is open or installed and running in the background (issue #54).
+// involved — these fire *local* notifications, which only deliver while the app
+// is open (or briefly after it's been used). A fully closed app can't be woken
+// to fire one at an exact time; the reminder catches up when it's reopened
+// (issues #54, #112).
 
 export function notificationsSupported() {
   return typeof window !== 'undefined' && 'Notification' in window

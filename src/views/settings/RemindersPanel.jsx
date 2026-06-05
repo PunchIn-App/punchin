@@ -53,7 +53,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
             <SettingsRow
               icon={Bell}
               title="Reminders"
-              subtitle="Alerts fire while PunchIn is open or installed — keep it on your Home Screen for the most reliable nudges"
+              subtitle="Checked on your device while PunchIn is open, and caught up when you reopen it"
               right={
                 <Toggle
                   ariaLabel="Enable reminders"
@@ -74,6 +74,19 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
 
             {remindersOn && (
               <>
+                {/* Be honest about the delivery model (issue #112): these are
+                    local notifications with no server, so a fully closed app
+                    can't be woken to alert at an exact time. They fire while
+                    PunchIn is open and catch up the next time it's opened. */}
+                <div className="px-4 py-3 bg-appAccent/5">
+                  <p className="text-xs text-appTextMuted">
+                    PunchIn has no server, so reminders are checked on your device while the app is
+                    open and catch up the next time you open it. A fully closed app — overnight, say —
+                    can't be woken to alert you at an exact time, so keep PunchIn on your Home Screen
+                    and open it daily for the most reliable nudges.
+                  </p>
+                </div>
+
                 <ReminderRow
                   icon={Hourglass}
                   title="Long-running timer"
