@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.18.0] — 2026-06-04
+
+A small feature + fixes release from the post-assessment follow-up issues.
+
+### Added
+- Timesheets — **Decimal hours** (Settings → General): show durations as `1.50 h` instead of `1h 30m`, for clients who read time as decimals. ([#208](https://github.com/PunchIn-App/punchin/issues/208))
+- Timesheets — **Round billed time** (Settings → General): round each entry in your favour — start floored, end ceiled — to the nearest quarter or half hour, so e.g. 8:07–8:20 bills as 8:00–8:30. Applies to the Timesheets totals and rows, their CSV + print exports, and the Invoice generator. Off by default. ([#208](https://github.com/PunchIn-App/punchin/issues/208))
+
+### Fixed
+- Reminders — the long-running-timer **"Notify after N minutes" field can now be cleared and retyped.** It previously snapped back to 60 on every keystroke, so the number couldn't be changed; clearing it (or entering 0) now simply turns that reminder off. ([#111](https://github.com/PunchIn-App/punchin/issues/111))
+
+### Changed
+- Reminders — clearer, honest wording about delivery: reminders are checked on your device while PunchIn is open and **catch up when you reopen it**; a fully closed app can't alert you at an exact time. The previous copy implied an installed-but-closed app would still notify. ([#112](https://github.com/PunchIn-App/punchin/issues/112))
+
+---
+
 ## [0.17.0] — 2026-06-04
 
 A maintenance release from a full internal code assessment ([#172](https://github.com/PunchIn-App/punchin/issues/172)): cross-device sync now propagates edits and deletions (not just new entries), a set of security improvements, and a broad sweep of correctness, accessibility, and performance fixes. No new features.
