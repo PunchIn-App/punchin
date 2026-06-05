@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.20.3] — 2026-06-05
+
+### Changed
+- Reminders — the long-running-timer duration wheel now **carries between the hours and minutes in real time**: the hour rolls over the moment you spin the minutes past 55 (or back below 00) mid-spin, instead of waiting until you let go. ([#111](https://github.com/PunchIn-App/punchin/issues/111))
+
+---
+
 ## [0.20.2] — 2026-06-05
 
 ### Changed

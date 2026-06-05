@@ -17,7 +17,12 @@ const setup = (minutes = 60) => {
   }
 }
 
-describe('LongRunningMinutesInput (#111 — 24h wheel, minutes carry into hours)', () => {
+// jsdom has no layout but does store scrollTop. The minutes wheel renders its 12
+// values as REPEAT(5) stacked copies of 30px rows, centred on the middle copy
+// (PAD=1), so the scrollTop representing `steps` rows away from a centred index is:
+const minScrollTop = (baseIdx, steps) => (2 * 12 + baseIdx + steps - 1) * 30
+
+describe('LongRunningMinutesInput (#111 — 24h wheel, live minutes carry into hours)', () => {
   it('splits the stored minutes across two spinbutton wheels', () => {
     const { hours, mins } = setup(90) // 1h 30m
     expect(hours).toHaveAttribute('role', 'spinbutton')
@@ -67,6 +72,23 @@ describe('LongRunningMinutesInput (#111 — 24h wheel, minutes carry into hours)
     const { hours, onChange } = setup(23 * 60 + 30) // 23h 30m
     fireEvent.keyDown(hours, { key: 'ArrowDown' }) // 23 → 0
     expect(onChange).toHaveBeenCalledWith(30) // 0h 30m
+  })
+
+  it('flips the hour live while the minutes wheel is mid-spin (before release)', () => {
+    const { mins, hours, onChange } = setup(115) // 1h 55m; 55 is minutes index 11
+    // Spin minutes up one row (55 → 00) without releasing — no settle yet.
+    mins.scrollTop = minScrollTop(11, 1)
+    fireEvent.scroll(mins)
+    expect(hours).toHaveAttribute('aria-valuenow', '2') // hour carried over → 2h
+    expect(onChange).not.toHaveBeenCalled() // nothing committed until the spin settles
+  })
+
+  it('rolls the hour back live when the minutes wheel spins below 00 (before release)', () => {
+    const { mins, hours, onChange } = setup(120) // 2h 00m; 00 is minutes index 0
+    mins.scrollTop = minScrollTop(0, -1) // spin down one row (00 → 55)
+    fireEvent.scroll(mins)
+    expect(hours).toHaveAttribute('aria-valuenow', '1') // hour borrowed → 1h
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('turns the reminder off when the wheels reach 0h 0m', () => {
