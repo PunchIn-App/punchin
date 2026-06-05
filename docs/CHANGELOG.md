@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.19.0] — 2026-06-05
+
+### Added
+- Appearance — the **home-screen icon now matches your chosen accent**. Pick a colour, install, and the installed icon is that colour: the preset colours and any custom colour are rendered to their exact shade, on iOS, Android, and desktop. (The icon is set at install time only — an already-installed icon can't be changed; that's an OS limitation.) ([#228](https://github.com/PunchIn-App/punchin/issues/228))
+
+### Changed
+- Reminders — the long-running-timer **"Notify after" threshold is now an hours + minutes picker** instead of a free-text box, so you pick the duration instead of typing it. ([#111](https://github.com/PunchIn-App/punchin/issues/111))
+
+### Internal
+- CI — the milestone-on-release automation now bounds its sweep to "since the previous release," so a one-time un-milestoned backlog can't all pile into one milestone; added a one-shot workflow to backfill project-board dates. (internal)
+
+---
+
 ## [0.18.0] — 2026-06-04
 
 A small feature + fixes release from the post-assessment follow-up issues.
