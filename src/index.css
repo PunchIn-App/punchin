@@ -78,13 +78,17 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Scroll-snap "wheel" column for the reminder duration picker (issue #111). */
+  /* Scroll-snap "wheel" column for the reminder duration picker (issue #111).
+     The mask fades the top/bottom rows for the wheel look; the selection is the
+     centre row, framed by the band overlay in the component. */
   .wheel-col {
     overflow-y: auto;
     scroll-snap-type: y mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none; /* Firefox */
     text-align: center;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 33%, #000 67%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, #000 33%, #000 67%, transparent);
   }
   .wheel-col::-webkit-scrollbar { display: none; }
 }

@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.20.1] — 2026-06-05
+
+### Changed
+- Reminders — the long-running-timer duration wheel is now more compact (one row above/below the selection instead of two) and **wraps around** — spin past 55 minutes or 23 hours and it rolls over to the start (arrow keys wrap too). ([#111](https://github.com/PunchIn-App/punchin/issues/111))
+
+---
+
 ## [0.20.0] — 2026-06-05
 
 ### Changed

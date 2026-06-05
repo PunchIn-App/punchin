@@ -3,7 +3,7 @@ import LongRunningMinutesInput from './LongRunningMinutesInput'
 
 // Focused unit test for the long-running threshold wheel picker (issue #111).
 // jsdom has no layout/scroll, so this drives the ARIA spinbutton keyboard path
-// (the scroll-snap behaviour is exercised in a real browser, not here).
+// (the scroll-snap + wrap-on-settle behaviour is exercised in a real browser).
 
 const setup = (minutes = 60) => {
   const onChange = vi.fn()
@@ -17,7 +17,7 @@ const setup = (minutes = 60) => {
   }
 }
 
-describe('LongRunningMinutesInput (#111 — 24h wheel picker)', () => {
+describe('LongRunningMinutesInput (#111 — 24h wrap-around wheel)', () => {
   it('splits the stored minutes across two spinbutton wheels', () => {
     const { hours, mins } = setup(90) // 1h 30m
     expect(hours).toHaveAttribute('role', 'spinbutton')
@@ -45,22 +45,28 @@ describe('LongRunningMinutesInput (#111 — 24h wheel picker)', () => {
     expect(onChange).toHaveBeenCalledWith(60) // 1h00
   })
 
-  it('steps the hours by 1 with the arrow keys', () => {
+  it('steps the hours by 1 (ArrowDown)', () => {
     const { hours, onChange } = setup(30) // h0 m30
     fireEvent.keyDown(hours, { key: 'ArrowDown' })
     expect(onChange).toHaveBeenCalledWith(90) // 1h30
+  })
+
+  it('wraps the minutes wheel past 55 back to 00', () => {
+    const { mins, onChange } = setup(115) // 1h 55m
+    fireEvent.keyDown(mins, { key: 'ArrowDown' }) // 55 → 00
+    expect(onChange).toHaveBeenCalledWith(60) // 1h 00m
+  })
+
+  it('wraps the hours wheel past 23 back to 0', () => {
+    const { hours, onChange } = setup(23 * 60 + 30) // 23h 30m
+    fireEvent.keyDown(hours, { key: 'ArrowDown' }) // 23 → 0
+    expect(onChange).toHaveBeenCalledWith(30) // 0h 30m
   })
 
   it('turns the reminder off when the wheels reach 0h 0m', () => {
     const { mins, onChange, onTurnOff } = setup(5) // h0 m05
     fireEvent.keyDown(mins, { key: 'ArrowUp' }) // → 0h 0m
     expect(onTurnOff).toHaveBeenCalledTimes(1)
-    expect(onChange).not.toHaveBeenCalled()
-  })
-
-  it('clamps at the grid ends (no overflow past 23h / 55m)', () => {
-    const { hours, onChange } = setup(23 * 60 + 55) // 23h55m (max)
-    fireEvent.keyDown(hours, { key: 'ArrowDown' }) // already at max hour
     expect(onChange).not.toHaveBeenCalled()
   })
 })

@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.20.0
+**Version:** 0.20.1
 
 ---
 
@@ -88,7 +88,7 @@ punchin/
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
 │   │   ├── SettingsView.jsx    # Thin router for the iOS-style drill-in Settings (issue #144): CategoryRow root list → per-panel components under views/settings/; device Back / re-tapping the Settings tab returns to root. Owns the routing + the two signals the root badges also need (notifPerm, usePwaUpdate) and passes them down
-│   │   └── settings/           # Per-panel components (issue #144): components.jsx (Toggle/SettingsRow/ReminderRow/WeekdayPicker/CategoryRow/Panel/PanelGroup) + GeneralPanel/AppearancePanel/RemindersPanel/InstallPanel/DataSyncPanel/AboutPanel + LongRunningMinutesInput (the long-running-timer threshold control — a custom **24h scroll-wheel**: two scroll-snap "wheels" (hours 0–23, minutes 0–55 on a 5-min grid), each an ARIA spinbutton for keyboard/SR use. Built custom because `<input type="time">`'s 12h/24h display is OS-locale-owned and can't be forced — AM/PM is meaningless on a *duration*. Stores h*60+m minutes, snaps off-grid values, switches the reminder off at 0h 0m. Wheel CSS = `.wheel-col` in `index.css`. Issue #111). Panels self-serve settings/platform/install via hooks rather than long prop lists (issue #148)
+│   │   └── settings/           # Per-panel components (issue #144): components.jsx (Toggle/SettingsRow/ReminderRow/WeekdayPicker/CategoryRow/Panel/PanelGroup) + GeneralPanel/AppearancePanel/RemindersPanel/InstallPanel/DataSyncPanel/AboutPanel + LongRunningMinutesInput (the long-running-timer threshold control — a custom **24h wrap-around scroll-wheel**: two 3-row scroll-snap "wheels" (hours 0–23, minutes 0–55 on a 5-min grid), each an ARIA spinbutton for keyboard/SR use. Built custom because `<input type="time">`'s 12h/24h display is OS-locale-owned and can't be forced — AM/PM is meaningless on a *duration*. **Wraps** via REPEAT stacked copies recentred on scroll-settle (and modular arrow keys). Stores h*60+m minutes, snaps off-grid values, switches the reminder off at 0h 0m. Wheel CSS (`.wheel-col`, with a fade mask) in `index.css`. Issue #111). Panels self-serve settings/platform/install via hooks rather than long prop lists (issue #148)
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook; merges live rows over DEFAULT_SETTINGS so consumers read a complete typed object (issue #134)
 │   │   ├── usePwaUpdate.js         # PWA "update available" coordination (issue #149): updateAvailable/updateStatus/checkForUpdates across window flag + SW reg.waiting + pwa:update-ready event
@@ -177,7 +177,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/views/SettingsView.syncUnconfigured.test.jsx` | Sync section with empty client IDs: friendly "not set up" message, no env-var jargon, no provider buttons (issue #59) |
 | `src/views/SettingsView.haptics.test.jsx` | `hapticFeedback` toggle shown on iPhone/Android, hidden on iPad (no vibration motor) and web, toggles the setting (issue #65) |
 | `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles, per-reminder `WeekdayPicker` (renders, toggling a day, clearing the last day turns the reminder off + restores all days) |
-| `src/views/settings/LongRunningMinutesInput.test.jsx` | Long-running threshold 24h wheel picker (issue #111): splits the stored minutes across two ARIA spinbutton wheels, steps hours by 1 / minutes by 5 via arrow keys, snaps an off-grid value, caps minutes at 55, turns the reminder off at 0h 0m, clamps at the grid ends |
+| `src/views/settings/LongRunningMinutesInput.test.jsx` | Long-running threshold 24h wrap-around wheel (issue #111): splits the stored minutes across two ARIA spinbutton wheels, steps hours by 1 / minutes by 5 via arrow keys, snaps an off-grid value, caps minutes at 55, wraps the minutes (55→00) and hours (23→0) wheels, turns the reminder off at 0h 0m |
 | `src/views/settings/RemindersPanel.test.jsx` | Reminders panel local-delivery messaging (issue #112): explains reminders are local and a fully closed app can't alert at an exact time, no longer implies installed-but-closed delivery, hides the note until reminders are enabled |
 | `src/views/settings/GeneralPanel.test.jsx` | Time display & billing controls (issue #208): toggles decimal hours, reflects the current state, sets the rounding increment from the select, defaults to Off |
 | `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
