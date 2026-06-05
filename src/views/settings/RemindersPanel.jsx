@@ -94,16 +94,15 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                   enabled={settings.remindLongRunning !== false}
                   onToggle={v => updateSetting('remindLongRunning', v)}
                 >
-                  <label className="flex items-center gap-2 text-xs text-appTextMuted">
-                    Notify after
+                  <div className="flex items-center gap-2 text-xs text-appTextMuted">
+                    <span>Notify after</span>
                     <LongRunningMinutesInput
                       minutes={settings.remindLongRunningMinutes ?? 60}
                       onChange={v => updateSetting('remindLongRunningMinutes', v)}
                       onTurnOff={() => updateSetting('remindLongRunning', false)}
-                      className={`${reminderInputClass} w-16`}
+                      className={reminderInputClass}
                     />
-                    minutes
-                  </label>
+                  </div>
                 </ReminderRow>
 
                 <ReminderRow

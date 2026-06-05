@@ -95,14 +95,17 @@ describe('SettingsView — Reminders section (#54)', () => {
     expect(screen.getByText('Weekly timesheet')).toBeInTheDocument()
   })
 
-  it('updates the long-running threshold from the minutes input', () => {
+  it('updates the long-running threshold from the duration picker (#111)', () => {
     n.perm = 'granted'
     mockSettings = { remindersEnabled: true, remindLongRunning: true, remindLongRunningMinutes: 60 }
     render(<SettingsView />)
     expandReminders()
-    const input = screen.getByLabelText(/minutes before a long-running timer reminder/i)
-    fireEvent.change(input, { target: { value: '30' } })
-    expect(mockUpdateSetting).toHaveBeenCalledWith('remindLongRunningMinutes', 30)
+    // 60 min renders as hours=1, minutes=0; picking 30 minutes => 1h 30m = 90.
+    fireEvent.change(screen.getByLabelText(/minutes before a long-running timer reminder/i), { target: { value: '30' } })
+    expect(mockUpdateSetting).toHaveBeenCalledWith('remindLongRunningMinutes', 90)
+    // Picking 2 hours (minutes still 0 from the static mock) => 120.
+    fireEvent.change(screen.getByLabelText(/hours before a long-running timer reminder/i), { target: { value: '2' } })
+    expect(mockUpdateSetting).toHaveBeenCalledWith('remindLongRunningMinutes', 120)
   })
 
   it('toggles an individual reminder off', () => {

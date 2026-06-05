@@ -1,56 +1,54 @@
-import { useEffect, useRef, useState } from 'react'
-
-// The long-running-timer threshold is a free-text number field. While the user
-// is editing we keep their raw keystrokes — including a momentarily empty field
-// — in local state instead of coercing on every change. The old
-// `Number(value) || 60` snapped an emptied field straight back to 60, so it was
-// impossible to backspace it clear and retype (issue #111).
+// Duration picker for the long-running-timer threshold (issue #111).
 //
-// A clean, in-range value commits live (preserving the prior save-as-you-type
-// behaviour); on blur an empty or zero value reads as "I don't want this
-// reminder" and switches it off via `onTurnOff` — mirroring how clearing the
-// last weekday turns a time-of-day reminder off. An over-max value is clamped to
-// 1440 on blur.
+// The reporter asked for a *picker*, not a free-text box. We use two native
+// <select>s (hours + minutes) rather than <input type="time"> on purpose:
+// type="time" shows AM/PM in 12-hour locales — meaningless for a *duration* and
+// not reliably suppressible across browsers/OSes. On mobile each <select> opens
+// the native wheel/spinner, giving the same picker feel as the time-of-day
+// fields without the AM/PM nonsense. The stored value stays a minute count
+// (h*60 + m). Picking 0h 0m switches the reminder off, matching the original
+// "0 = off" request.
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
+const MINUTES = Array.from({ length: 60 }, (_, i) => i); // 0..59
+const MAX_MINUTES = 23 * 60 + 59;
+
 export default function LongRunningMinutesInput({ minutes, onChange, onTurnOff, className = '' }) {
-  const [draft, setDraft] = useState(String(minutes))
-  const editing = useRef(false)
+  const total = Number.isFinite(minutes)
+    ? Math.max(0, Math.min(MAX_MINUTES, Math.round(minutes)))
+    : 60;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
 
-  // Reflect external changes (re-enable, cloud sync) only when the field isn't
-  // being edited, so a live update never yanks text out from under the user.
-  useEffect(() => {
-    if (!editing.current) setDraft(String(minutes))
-  }, [minutes])
-
-  const commit = (raw) => {
-    const n = parseInt(raw, 10)
-    if (!raw.trim() || !Number.isFinite(n) || n <= 0) {
-      onTurnOff()
-      return
-    }
-    const clamped = Math.min(1440, Math.max(1, n))
-    onChange(clamped)
-    setDraft(String(clamped))
-  }
+  const commit = (nh, nm) => {
+    const t = nh * 60 + nm;
+    if (t <= 0) onTurnOff();
+    else onChange(t);
+  };
 
   return (
-    <input
-      type="number"
-      inputMode="numeric"
-      min="1"
-      max="1440"
-      value={draft}
-      onFocus={() => { editing.current = true }}
-      onChange={e => {
-        const raw = e.target.value
-        setDraft(raw)
-        // Commit a clean, in-range value as it's typed; empty / 0 / out-of-range
-        // are deferred to blur so intermediate keystrokes survive.
-        const n = parseInt(raw, 10)
-        if (Number.isFinite(n) && n >= 1 && n <= 1440) onChange(n)
-      }}
-      onBlur={e => { editing.current = false; commit(e.target.value) }}
-      aria-label="Minutes before a long-running timer reminder"
-      className={className}
-    />
-  )
+    <span className="inline-flex items-center gap-1">
+      <select
+        aria-label="Hours before a long-running timer reminder"
+        value={h}
+        onChange={(e) => commit(Number(e.target.value), m)}
+        className={className}
+      >
+        {HOURS.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
+      <span aria-hidden="true">h</span>
+      <select
+        aria-label="Minutes before a long-running timer reminder"
+        value={m}
+        onChange={(e) => commit(h, Number(e.target.value))}
+        className={className}
+      >
+        {MINUTES.map((o) => (
+          <option key={o} value={o}>{String(o).padStart(2, '0')}</option>
+        ))}
+      </select>
+      <span aria-hidden="true">m</span>
+    </span>
+  );
 }
