@@ -83,7 +83,7 @@ punchin/
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
 │   │   ├── SettingsView.jsx    # Thin router for the iOS-style drill-in Settings (issue #144): CategoryRow root list → per-panel components under views/settings/; device Back / re-tapping the Settings tab returns to root. Owns the routing + the two signals the root badges also need (notifPerm, usePwaUpdate) and passes them down
-│   │   └── settings/           # Per-panel components (issue #144): components.jsx (Toggle/SettingsRow/ReminderRow/WeekdayPicker/CategoryRow/Panel/PanelGroup) + GeneralPanel/AppearancePanel/RemindersPanel/InstallPanel/DataSyncPanel/AboutPanel. Panels self-serve settings/platform/install via hooks rather than long prop lists (issue #148)
+│   │   └── settings/           # Per-panel components (issue #144): components.jsx (Toggle/SettingsRow/ReminderRow/WeekdayPicker/CategoryRow/Panel/PanelGroup) + GeneralPanel/AppearancePanel/RemindersPanel/InstallPanel/DataSyncPanel/AboutPanel + LongRunningMinutesInput (the long-running-timer threshold field — a local-draft number input that can be cleared/retyped and switches the reminder off when blurred empty/zero, issue #111). Panels self-serve settings/platform/install via hooks rather than long prop lists (issue #148)
 │   ├── hooks/
 │   │   ├── useSettings.js          # Reactive Dexie KV settings hook; merges live rows over DEFAULT_SETTINGS so consumers read a complete typed object (issue #134)
 │   │   ├── usePwaUpdate.js         # PWA "update available" coordination (issue #149): updateAvailable/updateStatus/checkForUpdates across window flag + SW reg.waiting + pwa:update-ready event

@@ -2,6 +2,7 @@ import { Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck } from 'lucid
 import { useSettings } from '../../hooks/useSettings'
 import { notificationsSupported, requestNotificationPermission } from '../../utils/notifications'
 import { Panel, SettingsRow, ReminderRow, WeekdayPicker, Toggle, WEEKDAYS, ALL_DAYS } from './components'
+import LongRunningMinutesInput from './LongRunningMinutesInput'
 
 const reminderInputClass = 'bg-appBg border border-appBorder text-appText rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-appAccent/50'
 
@@ -82,13 +83,10 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                 >
                   <label className="flex items-center gap-2 text-xs text-appTextMuted">
                     Notify after
-                    <input
-                      type="number"
-                      min="1"
-                      max="1440"
-                      value={settings.remindLongRunningMinutes ?? 60}
-                      onChange={e => updateSetting('remindLongRunningMinutes', Math.min(1440, Math.max(1, Number(e.target.value) || 60)))}
-                      aria-label="Minutes before a long-running timer reminder"
+                    <LongRunningMinutesInput
+                      minutes={settings.remindLongRunningMinutes ?? 60}
+                      onChange={v => updateSetting('remindLongRunningMinutes', v)}
+                      onTurnOff={() => updateSetting('remindLongRunning', false)}
                       className={`${reminderInputClass} w-16`}
                     />
                     minutes
