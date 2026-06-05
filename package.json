@@ -14,6 +14,7 @@
     "coverage": "vitest run --coverage --config config/vite.config.js"
   },
   "dependencies": {
+    "@resvg/resvg-wasm": "^2.6.2",
     "date-fns": "^4.4.0",
     "dexie": "^4.4.3",
     "dexie-react-hooks": "^4.4.0",
@@ -25,9 +26,9 @@
     "recharts": "^3.8.1"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@tailwindcss/postcss": "^4.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitest/coverage-v8": "^4.1.8",

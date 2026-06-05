@@ -1,3 +1,7 @@
+import { renderIconPng } from './iconRender.js'
+import { nearestPaletteKey } from '../src/iconPalette.js'
+import { manifest } from '../config/manifest.base.js'
+
 // Defense-in-depth response headers for the app shell (issue #129). The CSP in
 // particular blunts XSS / a compromised dependency trying to exfiltrate the
 // sync tokens that live in same-origin IndexedDB. Origins are the exact set the
@@ -36,9 +40,62 @@ export function withSecurityHeaders(res) {
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
 }
 
+// On-demand accent install icons (issue #228). For a custom accent the app points
+// <link rel="manifest"> at /icons/i/<hex>/manifest.webmanifest, whose icon URLs are
+// rendered here in the exact colour. A render failure falls back to the nearest
+// pre-rendered static palette swatch, so the icon — and, since this is the same
+// worker, asset serving — can never break.
+const ACCENT_ICON_RE =
+  /^\/icons\/i\/([0-9a-f]{6})\/(icon-192\.png|icon-512\.png|icon-512-maskable\.png|manifest\.webmanifest)$/i
+
+// Static-swatch path a failed render falls back to (the nearest pre-rendered
+// palette colour). Exported for testing.
+export function nearestSwatchPath(hex, file) {
+  return `/icons/${nearestPaletteKey('#' + hex)}/${file}`
+}
+
+async function handleAccentIcon(url) {
+  const m = ACCENT_ICON_RE.exec(url.pathname)
+  if (!m) return null
+  const hex = m[1].toLowerCase()
+  const file = m[2].toLowerCase()
+
+  if (file === 'manifest.webmanifest') {
+    // The manifest's relative icon srcs resolve to this folder's render routes.
+    return new Response(JSON.stringify(manifest), {
+      headers: {
+        'content-type': 'application/manifest+json; charset=utf-8',
+        'cache-control': 'public, max-age=86400',
+      },
+    })
+  }
+
+  const size = file.startsWith('icon-192') ? 192 : 512
+  const maskable = file.includes('maskable')
+  try {
+    const png = await renderIconPng(hex, size, { maskable })
+    return new Response(png, {
+      headers: {
+        // hex + size fully determine the image — cache hard at the edge.
+        'content-type': 'image/png',
+        'cache-control': 'public, max-age=31536000, immutable',
+      },
+    })
+  } catch {
+    // Never let a render failure break the icon: 302 to the nearest static swatch.
+    return new Response(null, {
+      status: 302,
+      headers: { location: `${url.origin}${nearestSwatchPath(hex, file)}` },
+    })
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
+
+    const icon = await handleAccentIcon(url)
+    if (icon) return withSecurityHeaders(icon)
 
     if (url.pathname !== '/oauth/github/callback') {
       return withSecurityHeaders(await env.ASSETS.fetch(request))

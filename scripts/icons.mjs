@@ -23,34 +23,12 @@ import { mkdir, rm, writeFile } from 'fs/promises'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 import { ICON_PALETTE, paletteKey } from '../src/iconPalette.js'
+import { iconSvg } from '../src/iconSvg.js'
 import { manifest } from '../config/manifest.base.js'
 
-const DARK = '#0F1117'
 const DEFAULT_ACCENT = '#1f6feb'
 const publicDir = fileURLToPath(new URL('../app/public/', import.meta.url))
 const iconsDir = publicDir + 'icons/'
-
-// A lucide "clock" glyph (24×24 viewBox: circle + two hands) centered and scaled
-// into `size` on a rounded `accent` square. `pad` keeps the canvas empty around
-// the square (maskable safe zone); `radius` is the corner radius fraction.
-function iconSvg(size, accent, { pad = 0, radius = 0.22 } = {}) {
-  const inset = size * pad
-  const side = size - inset * 2
-  const x = inset
-  const r = side * radius
-  const glyph = side * 0.58
-  const gx = x + (side - glyph) / 2
-  const stroke = glyph / 12
-  const scale = glyph / 24
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <rect x="${x}" y="${x}" width="${side}" height="${side}" rx="${r}" ry="${r}" fill="${accent}"/>
-  <g transform="translate(${gx} ${x + (side - glyph) / 2}) scale(${scale})" fill="none" stroke="${DARK}" stroke-width="${stroke / scale}" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <polyline points="12 6 12 12 16 14"/>
-  </g>
-</svg>`
-}
 
 async function render(dir, name, size, accent, opts) {
   const svg = Buffer.from(iconSvg(size, accent, opts))

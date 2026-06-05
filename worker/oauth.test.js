@@ -1,4 +1,8 @@
-import worker, { withSecurityHeaders } from './oauth.js'
+import worker, { withSecurityHeaders, nearestSwatchPath } from './oauth.js'
+import { renderIconPng } from './iconRender.js'
+
+// Mock the WASM renderer so the worker tests never load resvg's wasm under vitest.
+vi.mock('./iconRender.js', () => ({ renderIconPng: vi.fn() }))
 
 describe('worker security headers (issue #129)', () => {
   it('withSecurityHeaders adds CSP + hardening headers and preserves status/body/headers', async () => {
@@ -95,5 +99,51 @@ describe('worker GitHub OAuth callback — edge cases (issue #165)', () => {
       { GITHUB_CLIENT_ID: 'id', GITHUB_CLIENT_SECRET: 'secret' },
     )
     expect(res.headers.get('location')).toBe('https://fallback.example/#sync_error=missing_code')
+  })
+})
+
+describe('accent install icons (issue #228)', () => {
+  beforeEach(() => vi.mocked(renderIconPng).mockReset())
+
+  const fetchIcon = (path, env = {}) => worker.fetch({ url: `https://app.example${path}` }, env)
+
+  it('serves a dynamic manifest without rendering', async () => {
+    const res = await fetchIcon('/icons/i/7c3aed/manifest.webmanifest')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toMatch(/application\/manifest\+json/)
+    expect(res.headers.get('Content-Security-Policy')).toBeTruthy()
+    const body = JSON.parse(await res.text())
+    expect(body.icons.map((i) => i.src)).toContain('icon-512.png')
+    expect(renderIconPng).not.toHaveBeenCalled()
+  })
+
+  it('renders the exact-colour PNG for an icon request', async () => {
+    vi.mocked(renderIconPng).mockResolvedValue(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))
+    const res = await fetchIcon('/icons/i/7c3aed/icon-512.png')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/png')
+    expect(res.headers.get('cache-control')).toMatch(/immutable/)
+    expect(renderIconPng).toHaveBeenCalledWith('7c3aed', 512, { maskable: false })
+  })
+
+  it('renders the maskable variant and the 192 size', async () => {
+    vi.mocked(renderIconPng).mockResolvedValue(new Uint8Array([1]))
+    await fetchIcon('/icons/i/7c3aed/icon-512-maskable.png')
+    expect(renderIconPng).toHaveBeenCalledWith('7c3aed', 512, { maskable: true })
+    await fetchIcon('/icons/i/7c3aed/icon-192.png')
+    expect(renderIconPng).toHaveBeenCalledWith('7c3aed', 192, { maskable: false })
+  })
+
+  it('computes a nearest-static-swatch fallback path (used on render failure)', () => {
+    // The catch in handleAccentIcon 302s to this path so a render failure can
+    // never break the icon (or, since it's the same worker, asset serving).
+    expect(nearestSwatchPath('7c3aed', 'icon-512.png')).toMatch(/^\/icons\/[0-9a-f]{6}\/icon-512\.png$/)
+    expect(nearestSwatchPath('1f6feb', 'icon-192.png')).toBe('/icons/1f6feb/icon-192.png')
+  })
+
+  it('passes non-icon paths through to ASSETS', async () => {
+    const env = { ASSETS: { fetch: vi.fn().mockResolvedValue(new Response('app', { status: 200 })) } }
+    await fetchIcon('/icons/i/zzz/icon-512.png', env) // invalid hex → not our route
+    expect(env.ASSETS.fetch).toHaveBeenCalled()
   })
 })

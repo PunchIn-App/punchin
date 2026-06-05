@@ -18,7 +18,8 @@ punchin/
 ├── wrangler.jsonc          # Cloudflare Workers deployment; deploy via `npm run deploy`; routes OAuth requests to worker/oauth.js and static assets via ASSETS binding
 ├── .env.example            # Documents all VITE_* OAuth env vars with setup instructions for each provider
 ├── worker/
-│   └── oauth.js            # Cloudflare Worker: handles GitHub OAuth code→token exchange; redirects to app with token in URL fragment; falls through to static assets for all other routes
+│   ├── oauth.js            # Cloudflare Worker: handles GitHub OAuth code→token exchange; renders on-demand exact-colour accent install icons at /icons/i/<hex>/* (issue #228, falls back to the nearest static palette swatch on render failure); falls through to static assets for all other routes. Wraps every response with CSP/hardening headers
+│   └── iconRender.js       # SVG→PNG render of the brand mark via the @resvg/resvg-wasm WASM renderer (Cloudflare Workers can't use sharp/canvas); used by oauth.js for /icons/i/<hex>/* (issue #228). Isolated so the worker tests can mock it without loading the wasm
 ├── app/
 │   ├── index.html          # App shell (viewport, fonts, theme color, apple-touch-icon link); Vite root is app/
 │   └── public/             # Static assets copied verbatim to dist/ root; holds the PWA/home-screen icons
@@ -65,7 +66,8 @@ punchin/
 │   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (Auth Code + PKCE, AppFolder scope, issue #128) + exchangeOneDriveCode (client-side token exchange, token never in URL), pushToOneDrive, pullFromOneDrive
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
 │   ├── accentPresets.js    # Single source of truth for the accent presets (the AppearancePanel swatches) + accentIconKey(); shared by the settings UI, installIcon.js, and iconPalette.js (issue #228)
-│   ├── iconPalette.js      # The pre-rendered install-icon "crayon box": ~65 swatches (presets + an HSL grid) and nearestPaletteKey() to snap any accent to its set. Shared by scripts/icons.mjs (renders the sets) and installIcon.js (snaps at runtime) (issue #228)
+│   ├── iconSvg.js          # The brand mark as an SVG string (Clock on a rounded accent square). Single source of truth for the mark, shared by scripts/icons.mjs (build) and worker/iconRender.js (on-demand render) (issue #228)
+│   ├── iconPalette.js      # The pre-rendered install-icon "crayon box": ~65 swatches (presets + an HSL grid) and nearestPaletteKey(). Shared by scripts/icons.mjs (renders the sets) and worker/oauth.js (nearest-swatch fallback when the on-demand render fails) (issue #228)
 │   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131)
 │   ├── components/
 │   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell; shows update badge on Settings icon
@@ -101,7 +103,7 @@ punchin/
 │       ├── backup.js           # exportBackup() (full JSON) + exportCsv() (completed entries) — data plumbing kept out of the settings view (issue #144)
 │       ├── issueUrl.js         # buildBugReportUrl + buildFeatureRequestUrl (GitHub new-issue links) + userAgent sniffing for the bug template (issue #146)
 │       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon). drawFaviconDataUrl is reused by installIcon.js for the iOS apple-touch-icon
-│       ├── installIcon.js      # Points the install/home-screen icon at the chosen accent before install (issue #228): exact data-URL apple-touch-icon for iOS; <link rel="manifest"> swapped to the nearest src/iconPalette.js swatch for Android/desktop (their icon is baked from the manifest's icon URLs, so a custom colour can't be supplied client-side). Called from App.jsx's accent effect
+│       ├── installIcon.js      # Points the install/home-screen icon at the chosen accent before install (issue #228): exact data-URL apple-touch-icon for iOS; <link rel="manifest"> pointed at a preset's pre-rendered static set (/icons/<key>/) or, for a custom colour, the worker's exact on-demand render (/icons/i/<hex>/). Called from App.jsx's accent effect
 │       ├── notifications.js    # Browser Notification API wrappers: notificationsSupported, notificationPermission, requestNotificationPermission, showNotification (prefers the SW registration, falls back to the Notification constructor)
 │       ├── reminders.js        # Pure evaluateReminders({now, settings, activeEntries, jobs, state}) → {fire, state}; the testable reminder rules (long-running timer, idle, still-running, daily/weekly timesheet) + parseHHMM/dayKey helpers
 │       ├── transfer.js         # Device-to-device transfer codec (issue #77): encodeSnapshot/decodeSnapshot (gzip via CompressionStream + base64url, 'g'/'r' flag), buildShareUrl, parseImportCode, parseImportFromHash
@@ -140,7 +142,8 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/utils/pwa.test.js` | `getInstallPrompt`, `notifyUpdateAvailable`, `setPwaUpdateFn`, `applyUpdate`, `initPwaInstallPrompt`, `hasWaitingUpdate` (reg.waiting detection) |
 | `src/utils/favicon.test.js` | `drawFaviconDataUrl` (accent color, null-context fallback), `updateFavicon` (link creation, static-link replacement, idempotent updates) |
 | `src/iconPalette.test.js` | Install-icon palette (issue #228): every preset is an exact swatch, `nearestPaletteKey` snaps presets to themselves / near colours close / always returns a generated key, `paletteKey` normalisation, palette density |
-| `src/utils/installIcon.test.js` | `applyInstallIcon` (issue #228): swaps `<link rel="manifest">` to the nearest palette swatch (preset + custom), sets an exact data-URL `apple-touch-icon`, reuses the existing manifest link rather than duplicating |
+| `src/utils/installIcon.test.js` | `applyInstallIcon` (issue #228): points `<link rel="manifest">` at a preset's static set or the worker exact-render route for a custom colour, sets an exact data-URL `apple-touch-icon`, reuses the existing manifest link rather than duplicating |
+| `worker/oauth.test.js` | Security headers + GitHub OAuth exchange paths; accent-icon routes (issue #228): dynamic manifest (no render), exact-colour PNG render (size + maskable), `nearestSwatchPath` fallback, invalid-hex pass-through to ASSETS |
 | `src/utils/notifications.test.js` | `notificationsSupported`, `notificationPermission`, `requestNotificationPermission`, `showNotification` (permission gate, SW-registration path, constructor fallback) |
 | `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `dayAllowed`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules, day-of-week gating + back-compat when day arrays absent) |
 | `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |

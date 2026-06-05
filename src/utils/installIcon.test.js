@@ -10,14 +10,14 @@ const link = (rel) => document.head.querySelector(`link[rel="${rel}"]`)
 describe('applyInstallIcon (#228)', () => {
   beforeEach(() => { document.head.innerHTML = '' })
 
-  it('points the manifest at the matching palette swatch for a preset', () => {
+  it('points the manifest at the pre-rendered static set for a preset', () => {
     applyInstallIcon('#1f6feb')
     expect(link('manifest').getAttribute('href')).toBe('/icons/1f6feb/manifest.webmanifest')
   })
 
-  it('snaps a custom colour to a palette swatch manifest', () => {
+  it('points a custom colour at the worker exact-render route', () => {
     applyInstallIcon('#7C3AED')
-    expect(link('manifest').getAttribute('href')).toMatch(/^\/icons\/[0-9a-f]{6}\/manifest\.webmanifest$/)
+    expect(link('manifest').getAttribute('href')).toBe('/icons/i/7c3aed/manifest.webmanifest')
   })
 
   it('sets an exact-colour apple-touch-icon for iOS', () => {
