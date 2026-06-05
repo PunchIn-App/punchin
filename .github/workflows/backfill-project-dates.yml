@@ -1,0 +1,295 @@
+# One-shot backfill of project board dates for the PunchIn project board (user project #3).
+#
+# This complements .github/workflows/project-automation.yml, which only dates NEW
+# items as they open/close. This workflow walks EVERY existing item on the board and
+# fills in any empty "Start date" / "Target date" / "Completion Date" fields using the
+# item's content (PR/Issue) timestamps, with the same dating semantics the live
+# automation uses:
+#   - Start date       = the day it opened          (content.createdAt)
+#   - Target date      = open day + 3 days           (createdAt + 3, computed in UTC)
+#   - Completion Date  = the day it closed/merged    (mergedAt || closedAt), closed items only
+#
+# It is IDEMPOTENT by construction: it only ever fills fields that are currently empty,
+# so re-running never clobbers correctly-dated recent items. Note that already-populated
+# fields are ALWAYS left untouched -- including a stale Completion Date on an item that
+# was later reopened. That is by design (the "never clobber" guarantee); reconciling such
+# fields would require a separate, non-idempotent workflow.
+#
+# Trigger it manually with dry_run=true first to see exactly what it WOULD set, then
+# re-run with dry_run=false to apply. Runs under ADD_TO_PROJECT_PAT (the same PAT the
+# live automation uses); the default GITHUB_TOKEN is kept with no permissions.
+name: Backfill project dates
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Log what would be set without making any changes."
+        type: boolean
+        required: false
+        default: true
+      limit:
+        description: "Max items to process (PRs/Issues). 0 = no limit."
+        type: number
+        required: false
+        default: 0
+
+permissions: {}
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          PROJECT_OWNER: PunchIn-App
+          PROJECT_NUMBER: "3"
+          DRY_RUN: ${{ inputs.dry_run }}
+          LIMIT: ${{ inputs.limit }}
+        with:
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          script: |
+            const owner = process.env.PROJECT_OWNER;
+            const number = Number(process.env.PROJECT_NUMBER);
+            // workflow_dispatch boolean inputs arrive as the string "true"/"false".
+            const dryRun = String(process.env.DRY_RUN) === 'true';
+            const limit = Number(process.env.LIMIT || '0') || 0; // 0 = no limit
+
+            // The three date fields the live automation manages, by EXACT name.
+            // These constants are the SINGLE source of truth for the field names: they
+            // are used both for the metadata->id lookup (writes) and to build the
+            // fieldValueByName aliases in ITEMS_QUERY (reads), so the two can't drift.
+            const DATE_FIELDS = {
+              start: 'Start date',
+              target: 'Target date',
+              completion: 'Completion Date',
+            };
+
+            // --- Resolve the project + its field metadata (same query as project-automation.yml). ---
+            const meta = await github.graphql(`query($o:String!,$n:Int!){ user(login:$o){ projectV2(number:$n){ id
+              fields(first:50){ nodes{
+                ... on ProjectV2FieldCommon{ id name }
+                ... on ProjectV2SingleSelectField{ id name options{ id name } } } } } } }`, { o: owner, n: number });
+
+            const proj = meta.user && meta.user.projectV2;
+            if (!proj) {
+              core.setFailed(`Could not resolve projectV2 #${number} for user "${owner}".`);
+              return;
+            }
+
+            // Build a name -> field id map, then resolve the three date-field ids by name.
+            const F = {};
+            for (const f of proj.fields.nodes) { if (f && f.name) F[f.name] = f.id; }
+
+            const fieldId = {
+              start: F[DATE_FIELDS.start],
+              target: F[DATE_FIELDS.target],
+              completion: F[DATE_FIELDS.completion],
+            };
+
+            // Fail loudly if any of the three date fields is missing.
+            const missing = Object.entries(DATE_FIELDS)
+              .filter(([k]) => !fieldId[k])
+              .map(([, name]) => `"${name}"`);
+            if (missing.length) {
+              core.setFailed(`Missing required date field(s) on the project: ${missing.join(', ')}. ` +
+                `Found fields: ${Object.keys(F).map(n => `"${n}"`).join(', ')}`);
+              return;
+            }
+
+            // --- Helpers ---
+            // Date mutation: identical shape to project-automation.yml ($d is a Date! = "YYYY-MM-DD").
+            const setDate = (itemId, fid, d) => github.graphql(
+              `mutation($p:ID!,$i:ID!,$f:ID!,$d:Date!){ updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{date:$d}}){ projectV2Item{ id } } }`,
+              { p: proj.id, i: itemId, f: fid, d });
+
+            const ymd = (iso) => iso ? new Date(iso).toISOString().slice(0, 10) : null;
+            const plus3 = (iso) => {
+              const dt = new Date(iso);
+              dt.setUTCDate(dt.getUTCDate() + 3); // compute the +3 in UTC
+              return dt.toISOString().slice(0, 10);
+            };
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+            // Read-side resilience: retry a GraphQL read a few times with backoff so a
+            // single transient error (e.g. secondary rate limit) on one page doesn't
+            // discard a long run. The caller still handles a final failure gracefully.
+            const graphqlWithRetry = async (query, vars, { attempts = 4, baseDelay = 750 } = {}) => {
+              let lastErr;
+              for (let attempt = 1; attempt <= attempts; attempt++) {
+                try {
+                  return await github.graphql(query, vars);
+                } catch (e) {
+                  lastErr = e;
+                  if (attempt < attempts) {
+                    const wait = baseDelay * attempt;
+                    core.warning(`Page fetch failed (attempt ${attempt}/${attempts}): ${e.message}. Retrying in ${wait}ms...`);
+                    await sleep(wait);
+                  }
+                }
+              }
+              throw lastErr;
+            };
+
+            // --- Paginate ALL items on the project. ---
+            // The three fieldValueByName(name:) literals are derived from DATE_FIELDS so the
+            // read-side names can never drift from the write-side ids resolved above.
+            const ITEMS_QUERY = `query($p:ID!,$cursor:String){ node(id:$p){ ... on ProjectV2{ items(first:100, after:$cursor){
+              pageInfo{ hasNextPage endCursor }
+              nodes{
+                id
+                content{
+                  __typename
+                  ... on PullRequest{ number createdAt closedAt mergedAt state }
+                  ... on Issue{ number createdAt closedAt state }
+                  ... on DraftIssue{ title }
+                }
+                startVal:  fieldValueByName(name:${JSON.stringify(DATE_FIELDS.start)}){ ... on ProjectV2ItemFieldDateValue{ date } }
+                targetVal: fieldValueByName(name:${JSON.stringify(DATE_FIELDS.target)}){ ... on ProjectV2ItemFieldDateValue{ date } }
+                compVal:   fieldValueByName(name:${JSON.stringify(DATE_FIELDS.completion)}){ ... on ProjectV2ItemFieldDateValue{ date } }
+              } } } } }`;
+
+            const stats = {
+              scanned: 0,        // total project items walked
+              prs: 0,            // PR items considered
+              issues: 0,         // Issue items considered
+              skippedDraft: 0,   // DraftIssue items skipped
+              skippedNull: 0,    // items with null content skipped
+              startSet: 0,
+              targetSet: 0,
+              completionSet: 0,
+              errors: 0,
+              pageRetries: 0,    // transient read errors that were retried
+            };
+            const actions = []; // for the dry-run / summary log
+
+            let cursor = null;
+            let processed = 0;    // items (PR/Issue) actually considered, capped by `limit`
+            let reachedLimit = false;
+            let firstPage = true;
+            let pagesFetched = 0;
+            let abortedReads = false;
+
+            outer:
+            while (true) {
+              // Throttle the read side gently between pages (skip before the first page).
+              if (!firstPage) await sleep(150);
+              firstPage = false;
+
+              let page;
+              try {
+                page = await graphqlWithRetry(ITEMS_QUERY, { p: proj.id, cursor });
+              } catch (e) {
+                // A transient read error survived all retries. Don't discard the
+                // already-applied (idempotent) progress -- stop walking and report it.
+                // A re-run resumes safely because of the only-fill-empty contract.
+                abortedReads = true;
+                core.warning(`Aborting pagination after ${pagesFetched} page(s) due to a read error: ${e.message}. ` +
+                  `Already-applied changes are correct and idempotent; re-run to continue.`);
+                break;
+              }
+              pagesFetched++;
+
+              const conn = page.node && page.node.items;
+              if (!conn) break;
+
+              for (const item of conn.nodes) {
+                stats.scanned++;
+                const content = item && item.content;
+
+                // Skip DraftIssue / null content — nothing to date from.
+                if (!content) { stats.skippedNull++; continue; }
+                if (content.__typename === 'DraftIssue') { stats.skippedDraft++; continue; }
+                if (content.__typename !== 'PullRequest' && content.__typename !== 'Issue') {
+                  stats.skippedNull++;
+                  continue;
+                }
+
+                // Respect the limit on *processed* (PR/Issue) items.
+                if (limit > 0 && processed >= limit) { reachedLimit = true; break outer; }
+                processed++;
+
+                const isPR = content.__typename === 'PullRequest';
+                if (isPR) stats.prs++; else stats.issues++;
+
+                const ref = `${isPR ? 'PR' : 'Issue'} #${content.number}`;
+                const created = content.createdAt;
+                const closedish = (isPR ? content.mergedAt : null) || content.closedAt;
+
+                // Determine which empty fields we should fill.
+                const toSet = [];
+                if (created && !(item.startVal && item.startVal.date)) {
+                  toSet.push({ key: 'start', fid: fieldId.start, name: DATE_FIELDS.start, date: ymd(created) });
+                }
+                if (created && !(item.targetVal && item.targetVal.date)) {
+                  toSet.push({ key: 'target', fid: fieldId.target, name: DATE_FIELDS.target, date: plus3(created) });
+                }
+                // Completion only when the item is actually closed/merged AND the field is empty.
+                if (closedish && !(item.compVal && item.compVal.date)) {
+                  toSet.push({ key: 'completion', fid: fieldId.completion, name: DATE_FIELDS.completion, date: ymd(closedish) });
+                }
+
+                if (!toSet.length) continue;
+
+                for (const s of toSet) {
+                  if (dryRun) {
+                    actions.push(`[dry-run] ${ref}: would set ${s.name} = ${s.date}`);
+                    core.info(`[dry-run] ${ref}: would set ${s.name} = ${s.date}`);
+                    if (s.key === 'start') stats.startSet++;
+                    else if (s.key === 'target') stats.targetSet++;
+                    else stats.completionSet++;
+                    continue;
+                  }
+                  try {
+                    await setDate(item.id, s.fid, s.date);
+                    actions.push(`${ref}: set ${s.name} = ${s.date}`);
+                    core.info(`${ref}: set ${s.name} = ${s.date}`);
+                    if (s.key === 'start') stats.startSet++;
+                    else if (s.key === 'target') stats.targetSet++;
+                    else stats.completionSet++;
+                  } catch (e) {
+                    stats.errors++;
+                    core.warning(`${ref}: failed to set ${s.name} = ${s.date}: ${e.message}`);
+                  }
+                  // Throttle gently between mutations.
+                  await sleep(120);
+                }
+              }
+
+              if (!conn.pageInfo.hasNextPage) break;
+              cursor = conn.pageInfo.endCursor;
+            }
+
+            // --- Summary ---
+            core.info('');
+            core.info(`Backfill complete (${dryRun ? 'DRY RUN — no changes made' : 'changes applied'}).`);
+            core.info(`Items scanned: ${stats.scanned} | PRs: ${stats.prs} | Issues: ${stats.issues} | ` +
+              `Draft skipped: ${stats.skippedDraft} | null-content skipped: ${stats.skippedNull}`);
+            core.info(`Dates ${dryRun ? 'that would be set' : 'set'} — Start: ${stats.startSet}, ` +
+              `Target: ${stats.targetSet}, Completion: ${stats.completionSet} | errors: ${stats.errors}`);
+            core.info('Note: already-populated fields are left untouched by design — including a stale ' +
+              'Completion Date on a reopened item (the fill-only "never clobber" guarantee).');
+            if (reachedLimit) core.info(`Stopped early after hitting the limit of ${limit} processed item(s).`);
+            if (abortedReads) core.warning('Pagination was aborted early by a read error — re-run to process the rest (idempotent).');
+
+            await core.summary
+              .addHeading(`Backfill project dates ${dryRun ? '(dry run)' : ''}`.trim())
+              .addRaw(dryRun
+                ? 'Dry run — no mutations were performed. Values below are what **would** be set.'
+                : 'Changes applied.')
+              .addTable([
+                [{ data: 'Metric', header: true }, { data: 'Count', header: true }],
+                ['Items scanned', String(stats.scanned)],
+                ['PRs considered', String(stats.prs)],
+                ['Issues considered', String(stats.issues)],
+                ['DraftIssue skipped', String(stats.skippedDraft)],
+                ['Null/other content skipped', String(stats.skippedNull)],
+                [`${DATE_FIELDS.start} ${dryRun ? 'would be set' : 'set'}`, String(stats.startSet)],
+                [`${DATE_FIELDS.target} ${dryRun ? 'would be set' : 'set'}`, String(stats.targetSet)],
+                [`${DATE_FIELDS.completion} ${dryRun ? 'would be set' : 'set'}`, String(stats.completionSet)],
+                ['Errors', String(stats.errors)],
+              ])
+              .addRaw(limit > 0 ? `\nLimit: ${limit} item(s)${reachedLimit ? ' (reached)' : ''}.` : '')
+              .addRaw(abortedReads ? '\n**Note:** pagination was aborted early by a read error — re-run to process the rest (idempotent, only-fill-empty).' : '')
+              .addRaw('\n_Already-populated fields (including stale Completion Dates on reopened items) are left untouched by design._')
+              .write();
