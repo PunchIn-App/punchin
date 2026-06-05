@@ -149,6 +149,12 @@ export const DEFAULT_SETTINGS = {
   theme: 'auto',
   accentColor: '#1f6feb',
   hapticFeedback: true,
+  // Time display & billing (issue #208). decimalHours shows durations as decimal
+  // hours ("1.50 h") instead of "1h 30m" in timesheets. roundingMinutes rounds
+  // each billable entry in the user's favour (start down, end up) for timesheets
+  // and invoices: 0 = off, 15 = nearest quarter hour, 30 = nearest half hour.
+  decimalHours: false,
+  roundingMinutes: 0,
   // Reminder notifications (issue #54) — all off by default; the master toggle
   // requests notification permission when first enabled.
   remindersEnabled: false,

@@ -5,7 +5,7 @@ import { format, addDays, subDays, addWeeks, subWeeks } from 'date-fns'
 import { db, deleteEntry } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import {
-  formatDurationHM, formatTime,
+  formatDuration, formatTime, roundEntry,
   getDayRange, getWeekRange, getWeekDays,
   entryOverlapsRange, getEntryDurationInRange, sumDurationsInRange,
 } from '../utils/time'
@@ -22,6 +22,9 @@ import ConfirmModal from '../components/ConfirmModal'
 const OVERNIGHT_LOOKBACK_MS = 24 * 60 * 60 * 1000
 
 function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
+  const { settings } = useSettings()
+  const rm = settings.roundingMinutes     // billable rounding increment (issue #208)
+  const decimal = !!settings.decimalHours
   const { start, end } = getDayRange(date)
   const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
   const entries = useLiveQuery(
@@ -71,7 +74,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
       {/* Summary bar */}
       <div className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
         <span className="text-sm text-appTextMuted">Total</span>
-        <span className="font-mono font-semibold text-appText text-lg">{formatDurationHM(sumDurationsInRange(filteredEntries, start, end))}</span>
+        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(sumDurationsInRange(filteredEntries.map(e => roundEntry(e, rm)), start, end), decimal)}</span>
       </div>
 
       {filteredEntries.length === 0 ? (
@@ -85,7 +88,8 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
           const lt  = getLT(entry.laborTypeId)
           // Clip to the day so an overnight entry shows only the portion worked
           // today, keeping the card durations summing to the day Total (#136).
-          const dur = getEntryDurationInRange(entry, start, end)
+          // Round for billing first (issue #208) so cards agree with the Total.
+          const dur = getEntryDurationInRange(roundEntry(entry, rm), start, end)
           return (
             <div key={entry.id} className="rounded-xl border border-appBorder bg-appCard p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
@@ -99,7 +103,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
                   )}
                 </div>
                 <div className="text-right flex-shrink-0 flex flex-col items-end">
-                  <p className="font-mono text-appText font-semibold text-sm">{formatDurationHM(dur)}</p>
+                  <p className="font-mono text-appText font-semibold text-sm">{formatDuration(dur, decimal)}</p>
                   <p className="text-appTextDarker text-xs mt-0.5">
                     {formatTime(entry.punchIn)} → {entry.punchOut ? formatTime(entry.punchOut) : 'running'}
                   </p>
@@ -125,6 +129,8 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
 function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { settings } = useSettings()
   const wsMon = settings.weekStartsMonday // complete via DEFAULT_SETTINGS merge (issue #134)
+  const rm = settings.roundingMinutes     // billable rounding increment (issue #208)
+  const decimal = !!settings.decimalHours
   const { start, end } = getWeekRange(date, wsMon)
   const days = getWeekDays(date, wsMon)
   const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
@@ -167,17 +173,19 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   }, [allEntries, start.getTime(), searchQuery, filterJobId, filterLaborTypeId, jobMap, ltMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Week total + per-job breakdown, derived once from the filtered set (#138).
+  // Each entry is rounded for billing (issue #208) before clipping to the week.
   const { total, jobTotals } = useMemo(() => {
     if (!filteredEntries) return { total: 0, jobTotals: {} }
+    const rounded = filteredEntries.map(e => roundEntry(e, rm))
     return {
-      total: sumDurationsInRange(filteredEntries, start, end),
-      jobTotals: filteredEntries.reduce((acc, e) => {
+      total: sumDurationsInRange(rounded, start, end),
+      jobTotals: rounded.reduce((acc, e) => {
         if (!e.punchOut) return acc // running timers excluded from totals (#137)
         acc[e.jobId] = (acc[e.jobId] || 0) + getEntryDurationInRange(e, start, end) // clip to week (#136)
         return acc
       }, {}),
     }
-  }, [filteredEntries, start.getTime(), end.getTime()])
+  }, [filteredEntries, start.getTime(), end.getTime(), rm])
 
   // Bucket entries into the seven days once, instead of re-filtering the whole
   // week per day on every render (the O(7×entries) pass the finding flags) (#138).
@@ -190,9 +198,10 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
       // it touches; totals clip each entry to the day it's shown under and skip
       // running timers, so the rows sum to dayTotal (#136, #137).
       const dayEntries = filteredEntries.filter(e => entryOverlapsRange(e, ds, de))
-      return { day, ds, de, dayEntries, dayTotal: sumDurationsInRange(dayEntries, ds, de) }
+      const dayTotal = sumDurationsInRange(dayEntries.map(e => roundEntry(e, rm)), ds, de)
+      return { day, ds, de, dayEntries, dayTotal }
     })
-  }, [filteredEntries, start.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filteredEntries, start.getTime(), rm]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!filteredEntries) return null
 
@@ -201,7 +210,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
       {/* Week total */}
       <div className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
         <span className="text-sm text-appTextMuted">Week total</span>
-        <span className="font-mono font-semibold text-appText text-lg">{formatDurationHM(total)}</span>
+        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(total, decimal)}</span>
       </div>
 
       {/* Job breakdown */}
@@ -214,7 +223,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
               <div key={jid} className="px-4 py-3">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-sm text-appText font-medium">{job?.name || '—'}</span>
-                  <span className="font-mono text-sm text-appTextMuted">{formatDurationHM(ms)}</span>
+                  <span className="font-mono text-sm text-appTextMuted">{formatDuration(ms, decimal)}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-appBg">
                   <div className="h-full rounded-full bg-appAccent transition-all" style={{ width: `${pct}%` }} />
@@ -240,7 +249,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                 </span>
               </div>
               <span className="font-mono text-sm text-appText">
-                {dayEntries.length > 0 ? formatDurationHM(dayTotal) : '—'}
+                {dayEntries.length > 0 ? formatDuration(dayTotal, decimal) : '—'}
               </span>
             </div>
             {dayEntries.length > 0 && (
@@ -255,7 +264,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="font-mono text-appTextDarker">{formatDurationHM(getEntryDurationInRange(e, ds, de))}</span>
+                        <span className="font-mono text-appTextDarker">{formatDuration(getEntryDurationInRange(roundEntry(e, rm), ds, de), decimal)}</span>
                         <div className="flex items-center gap-1">
                           <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${getJob(e.jobId)?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
@@ -282,6 +291,7 @@ export default function TimesheetsView() {
   const [currentDate, setDate] = useState(new Date())
   const { settings }          = useSettings()
   const wsMon                  = settings.weekStartsMonday // DEFAULT_SETTINGS merge (issue #134)
+  const rm                     = settings.roundingMinutes  // billable rounding for exports (issue #208)
 
   // Modals state
   const [editingEntry, setEditingEntry]   = useState(null)
@@ -341,8 +351,11 @@ export default function TimesheetsView() {
     }
 
     const rows = [['Date', 'Job', 'Client', 'Labor Type', 'Start', 'End', 'Duration (h)', 'Notes']]
-    for (const e of entries) {
-      if (!e.punchOut) continue
+    for (const raw of entries) {
+      if (!raw.punchOut) continue
+      // Round in the user's favour so the exported Start/End/Duration agree with
+      // what's billed on screen (issue #208).
+      const e = roundEntry(raw, rm)
       const job = jobs?.find(j => j.id === e.jobId)
       const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
       const dur = (new Date(e.punchOut) - new Date(e.punchIn)) / 3600000
@@ -354,7 +367,7 @@ export default function TimesheetsView() {
         format(new Date(e.punchIn), 'HH:mm'),
         format(new Date(e.punchOut), 'HH:mm'),
         dur.toFixed(2),
-        e.notes || '',
+        raw.notes || '',
       ])
     }
 
@@ -379,7 +392,9 @@ export default function TimesheetsView() {
       titleStr = `Week of ${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
     }
 
-    const completed = entries.filter(e => !!e.punchOut)
+    // Round each entry in the user's favour first so the printed times, per-row
+    // hours, and total all reflect what's billed (issue #208).
+    const completed = entries.filter(e => !!e.punchOut).map(e => roundEntry(e, rm))
     const totalMs = completed.reduce((s, e) => s + (new Date(e.punchOut) - new Date(e.punchIn)), 0)
     const totalHrs = (totalMs / 3600000).toFixed(2)
 

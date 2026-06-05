@@ -26,6 +26,59 @@ export function formatDurationHM(ms) {
   return `${h}h ${m}m`
 }
 
+/**
+ * Decimal-hours string for billing display, e.g. 5_400_000 → "1.50 h" (issue
+ * #208). Two decimals match the invoice/CSV convention.
+ * @param {number} ms @returns {string}
+ */
+export function formatDecimalHours(ms) {
+  return `${(Math.abs(ms) / 3600000).toFixed(2)} h`
+}
+
+/**
+ * A duration in the user's chosen display format: decimal hours ("1.50 h") when
+ * `decimal` is set, otherwise the compact "Xh Ym" form (issue #208).
+ * @param {number} ms @param {boolean} [decimal] @returns {string}
+ */
+export function formatDuration(ms, decimal) {
+  return decimal ? formatDecimalHours(ms) : formatDurationHM(ms)
+}
+
+// Round a Date to a local clock increment (in minutes). `dir` is 'floor' or
+// 'ceil'. Works in local minutes-of-day (with fractional seconds) so 15/30-min
+// increments land on the wall-clock :00/:15/:30/:45 boundaries the user expects,
+// independent of time zone, and `setMinutes` handles the hour/day rollover.
+function roundLocalTime(date, increment, dir) {
+  const d = new Date(date)
+  const minutesOfDay =
+    d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60 + d.getMilliseconds() / 60000
+  const rounded =
+    dir === 'ceil'
+      ? Math.ceil(minutesOfDay / increment) * increment
+      : Math.floor(minutesOfDay / increment) * increment
+  d.setHours(0, 0, 0, 0)
+  d.setMinutes(rounded)
+  return d
+}
+
+/**
+ * Round a completed entry's worked interval "in the user's favour" for billing
+ * (issue #208): floor punchIn down and ceil punchOut up to `roundingMinutes`, so
+ * e.g. an 8:07 → 8:20 entry billed to the quarter hour becomes 8:00 → 8:30. A
+ * `roundingMinutes` of 0 (off) or a still-running entry is returned unchanged.
+ * Returns a shallow copy with adjusted punchIn/punchOut, so every duration/clip
+ * helper above works on it without change.
+ * @param {Entry} entry @param {number} [roundingMinutes] @returns {Entry}
+ */
+export function roundEntry(entry, roundingMinutes) {
+  if (!roundingMinutes || !entry.punchOut) return entry
+  return {
+    ...entry,
+    punchIn:  roundLocalTime(entry.punchIn,  roundingMinutes, 'floor'),
+    punchOut: roundLocalTime(entry.punchOut, roundingMinutes, 'ceil'),
+  }
+}
+
 /** @param {Entry} entry @returns {number} milliseconds */
 export function getEntryDuration(entry) {
   const end = entry.punchOut ? new Date(entry.punchOut) : new Date()

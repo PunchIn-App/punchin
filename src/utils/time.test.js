@@ -1,6 +1,9 @@
 import {
   formatElapsed,
   formatDurationHM,
+  formatDecimalHours,
+  formatDuration,
+  roundEntry,
   getEntryDuration,
   formatTime,
   formatDate,
@@ -429,5 +432,73 @@ describe('sumDurationsInRange', () => {
       { punchIn: new Date(2024, 0, 15, 23, 0), punchOut: new Date(2024, 0, 16, 1, 0) }, // 2h, 1h in-window
     ]
     expect(sumDurationsInRange(entries, start, end)).toBe(3_600_000 - 1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatDecimalHours / formatDuration (issue #208)
+// ---------------------------------------------------------------------------
+describe('formatDecimalHours', () => {
+  it('formats 90 minutes as 1.50 h', () => {
+    expect(formatDecimalHours(90 * 60_000)).toBe('1.50 h')
+  })
+  it('formats a quarter hour as 0.25 h', () => {
+    expect(formatDecimalHours(15 * 60_000)).toBe('0.25 h')
+  })
+  it('formats zero as 0.00 h', () => {
+    expect(formatDecimalHours(0)).toBe('0.00 h')
+  })
+})
+
+describe('formatDuration', () => {
+  it('uses the compact h/m form by default', () => {
+    expect(formatDuration(90 * 60_000)).toBe('1h 30m')
+    expect(formatDuration(90 * 60_000, false)).toBe('1h 30m')
+  })
+  it('uses decimal hours when asked', () => {
+    expect(formatDuration(90 * 60_000, true)).toBe('1.50 h')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// roundEntry (issue #208)
+// ---------------------------------------------------------------------------
+describe('roundEntry', () => {
+  it('rounds in the user’s favour: 8:07→8:20 becomes 8:00→8:30 at a quarter hour', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: new Date(2024, 0, 15, 8, 20) }
+    const r = roundEntry(e, 15)
+    expect(r.punchIn).toEqual(new Date(2024, 0, 15, 8, 0))
+    expect(r.punchOut).toEqual(new Date(2024, 0, 15, 8, 30))
+    expect(getEntryDuration(r)).toBe(30 * 60_000)
+  })
+
+  it('rounds to the half hour: 9:05→9:50 becomes 9:00→10:00', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 9, 5), punchOut: new Date(2024, 0, 15, 9, 50) }
+    const r = roundEntry(e, 30)
+    expect(r.punchIn).toEqual(new Date(2024, 0, 15, 9, 0))
+    expect(r.punchOut).toEqual(new Date(2024, 0, 15, 10, 0))
+  })
+
+  it('leaves exact-boundary times unchanged (8:00→8:30 stays 8:00→8:30)', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 8, 0), punchOut: new Date(2024, 0, 15, 8, 30) }
+    const r = roundEntry(e, 15)
+    expect(r.punchIn).toEqual(e.punchIn)
+    expect(r.punchOut).toEqual(e.punchOut)
+  })
+
+  it('is a no-op when rounding is off (0)', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: new Date(2024, 0, 15, 8, 20) }
+    expect(roundEntry(e, 0)).toBe(e)
+  })
+
+  it('leaves a still-running entry untouched (no punchOut to bill yet)', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: null }
+    expect(roundEntry(e, 15)).toBe(e)
+  })
+
+  it('ceils a punch-out with leftover seconds up to the next increment', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 8, 0, 0), punchOut: new Date(2024, 0, 15, 8, 30, 1) }
+    const r = roundEntry(e, 15)
+    expect(r.punchOut).toEqual(new Date(2024, 0, 15, 8, 45))
   })
 })

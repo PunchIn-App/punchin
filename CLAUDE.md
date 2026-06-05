@@ -132,14 +132,14 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 
 | File | What's tested |
 |------|---------------|
-| `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `getEntryDuration`, `formatTime`, `formatDate`, `getDayRange`, `getWeekRange`, `getWeekDays`, `isEntryInRange`, `sumDurations` |
+| `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `formatDecimalHours`/`formatDuration` + `roundEntry` (issue #208: favour-rounding the 8:07→8:00 / 8:20→8:30 example, half-hour, exact-boundary no-op, off, still-running, seconds-ceil), `getEntryDuration`, `formatTime`, `formatDate`, `getDayRange`, `getWeekRange`, `getWeekDays`, `isEntryInRange`, `sumDurations` |
 | `src/utils/pwa.test.js` | `getInstallPrompt`, `notifyUpdateAvailable`, `setPwaUpdateFn`, `applyUpdate`, `initPwaInstallPrompt`, `hasWaitingUpdate` (reg.waiting detection) |
 | `src/utils/favicon.test.js` | `drawFaviconDataUrl` (accent color, null-context fallback), `updateFavicon` (link creation, static-link replacement, idempotent updates) |
 | `src/utils/notifications.test.js` | `notificationsSupported`, `notificationPermission`, `requestNotificationPermission`, `showNotification` (permission gate, SW-registration path, constructor fallback) |
 | `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `dayAllowed`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules, day-of-week gating + back-compat when day arrays absent) |
 | `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |
 | `src/utils/deviceId.test.js` | `getDeviceId` — generates 8-char hex, persists across calls, falls back to `'default'` when localStorage is unavailable |
-| `src/db.test.js` | Schema validation, default settings seed (27 keys incl. the sync keys seeded as null and the per-reminder weekday defaults = all 7 days; matches `DEFAULT_SETTINGS`), indexed `punchIn` range queries (`between`/`aboveOrEqual`, issue #132), `deleteEntry` tombstones, basic CRUD for jobs/labor types/entries |
+| `src/db.test.js` | Schema validation, default settings seed (29 keys incl. the sync keys seeded as null, the per-reminder weekday defaults = all 7 days, and the time-display defaults `decimalHours`/`roundingMinutes`; matches `DEFAULT_SETTINGS`), indexed `punchIn` range queries (`between`/`aboveOrEqual`, issue #132), `deleteEntry` tombstones, basic CRUD for jobs/labor types/entries |
 | `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), `isIOSSafari` (Safari vs CriOS/FxiOS/EdgiOS), `isIPad` incl. desktop-mode iPad (touch-capable "Macintosh" → iOS) vs real Mac, standalone mode detection |
 | `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
@@ -155,7 +155,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/components/EditEntryModal.test.jsx` | Add/edit/active-timer modes, validation, save/delete flows, keyboard |
 | `src/components/EditEntryModal.helpers.test.js` | `formatDateToYYYYMMDD`, `formatTimeToHHMM`, `combineDateAndTime` |
 | `src/components/ErrorBoundary.test.jsx` | Children render, fallback UI on throw, "Try again" reset |
-| `src/components/InvoiceModal.test.jsx` | Line-item calc, period presets, CSV export, print, empty state |
+| `src/components/InvoiceModal.test.jsx` | Line-item calc, period presets, CSV export, print, empty state, billable rounding (issue #208) |
 | `src/components/Layout.test.jsx` | Logo button, nav items, `aria-current`, tab callbacks |
 | `src/components/StartTimerModal.test.jsx` | Render, form validation, concurrent-timer guard |
 | `src/components/TimerCard.test.jsx` | Job/labor-type display, stop timer, open/close EditEntryModal |
@@ -170,6 +170,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 | `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles, per-reminder `WeekdayPicker` (renders, toggling a day, clearing the last day turns the reminder off + restores all days) |
 | `src/views/settings/LongRunningMinutesInput.test.jsx` | Long-running threshold field (issue #111): shows the current value, commits a clean in-range value live, can be backspaced empty without snapping back, turns the reminder off on an empty/zero blur, clamps over-max to 1440, reflects external changes only while not editing |
 | `src/views/settings/RemindersPanel.test.jsx` | Reminders panel local-delivery messaging (issue #112): explains reminders are local and a fully closed app can't alert at an exact time, no longer implies installed-but-closed delivery, hides the note until reminders are enabled |
+| `src/views/settings/GeneralPanel.test.jsx` | Time display & billing controls (issue #208): toggles decimal hours, reflects the current state, sets the rounding increment from the select, defaults to Off |
 | `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
 | `src/views/TimesheetsView.test.jsx` | Daily/weekly tabs, period nav, search/filter, CSV/print, edit/delete |
 | `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks (incl. GitHub username fetch + Settings navigation, issue #83), first-run install nudge gating (mobile-only, ios-other mode, desktop suppression), back-button history navigation (seed/push/popstate, issue #65), transfer-link import prompt (confirm/cancel/corrupt, issue #77) |
@@ -398,6 +399,8 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
 | `accentColor` | hex string | `"#1f6feb"` |
 | `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
+| `decimalHours` | boolean | `false` — show timesheet durations as decimal hours (`1.50 h`) instead of `1h 30m` (issue #208) |
+| `roundingMinutes` | number (`0` \| `15` \| `30`) | `0` — round each billable entry in the user's favour (start floored, end ceiled) for timesheets & invoices; `0` = off (issue #208) |
 | `remindersEnabled` | boolean | `false` — master switch for local reminder notifications (issue #54); enabling it requests notification permission |
 | `remindLongRunning` | boolean | `true` — alert when an active timer exceeds the threshold |
 | `remindLongRunningMinutes` | number | `60` — long-running timer threshold (minutes) |
@@ -581,6 +584,9 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 
 - `formatElapsed(ms)` → `"HH:MM:SS"` for live timers
 - `formatDurationHM(ms)` → `"Xh Ym"` for summaries
+- `formatDecimalHours(ms)` → `"1.50 h"` decimal-hours string for billing display (issue #208)
+- `formatDuration(ms, decimal)` → decimal hours when `decimal` is set, else `"Xh Ym"` (issue #208)
+- `roundEntry(entry, roundingMinutes)` → entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off or still running (issue #208)
 - `getEntryDuration(entry)` → milliseconds (handles active entries)
 - `formatTime(date)` → `"h:mm a"` time-only string (date-fns)
 - `formatDate(date)` → `"EEE, MMM d"` date-only string (date-fns)

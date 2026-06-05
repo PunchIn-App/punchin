@@ -12,8 +12,9 @@ vi.mock('../hooks/usePlatformContext', () => ({
   usePlatformContext: () => ({ isStandalone: false, os: 'web' }),
 }))
 
+let mockSettings = { weekStartsMonday: true }
 vi.mock('../hooks/useSettings', () => ({
-  useSettings: () => ({ settings: { weekStartsMonday: true }, updateSetting: vi.fn() }),
+  useSettings: () => ({ settings: mockSettings, updateSetting: vi.fn() }),
 }))
 
 // A job with a rate of $100/hr for labor type 1
@@ -41,6 +42,7 @@ function renderModal(props = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockSettings = { weekStartsMonday: true }
   // Return [] when no job selected, ENTRIES when selectedJobId is non-empty (deps[2])
   useLiveQuery.mockImplementation((_fn, deps) => {
     if (deps?.[2]) return ENTRIES
@@ -98,6 +100,22 @@ describe('InvoiceModal — line items calculation', () => {
     // 1 hr × $100/hr = $100.00
     await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
     expect(screen.getAllByText('$100.00').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('bills rounded hours when rounding is on (#208)', async () => {
+    mockSettings = { weekStartsMonday: true, roundingMinutes: 30 }
+    useLiveQuery.mockImplementation((_fn, deps) => deps?.[2]
+      ? [{ id: 9, jobId: 1, laborTypeId: 1,
+           punchIn:  new Date('2025-06-01T09:05:00'),
+           punchOut: new Date('2025-06-01T09:50:00') }]
+      : [])
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    // 9:05–9:50 is 0.75 h raw; rounded in the user's favour to the half hour it's
+    // 9:00–10:00 = 1.00 h, billed at $100/hr → $100.00 (not the raw $75.00).
+    await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
+    expect(screen.getAllByText('$100.00').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('0.75')).not.toBeInTheDocument()
   })
 
   it('shows "—" for amount when job has no rate set for that labor type', async () => {

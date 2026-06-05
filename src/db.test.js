@@ -24,10 +24,10 @@ describe('db — schema', () => {
 })
 
 describe('db — populate seed', () => {
-  it('seeds exactly the DEFAULT_SETTINGS keys (27, incl. the sync keys) on fresh install', async () => {
+  it('seeds exactly the DEFAULT_SETTINGS keys (29, incl. the sync keys) on fresh install', async () => {
     const all = await db.settings.toArray()
     expect(all).toHaveLength(Object.keys(DEFAULT_SETTINGS).length)
-    expect(all).toHaveLength(27)
+    expect(all).toHaveLength(29)
     // Single source of truth (issue #131): the seeded rows match DEFAULT_SETTINGS exactly.
     const seeded = Object.fromEntries(all.map(({ key, value }) => [key, value]))
     expect(seeded).toEqual(DEFAULT_SETTINGS)
@@ -82,6 +82,11 @@ describe('db — populate seed', () => {
   it('seeds remindLongRunningMinutes = 60', async () => {
     const s = await db.settings.get('remindLongRunningMinutes')
     expect(s?.value).toBe(60)
+  })
+
+  it('seeds the time-display defaults (decimalHours off, rounding off) (#208)', async () => {
+    expect((await db.settings.get('decimalHours'))?.value).toBe(false)
+    expect((await db.settings.get('roundingMinutes'))?.value).toBe(0)
   })
 
   it('seeds zero jobs', async () => {

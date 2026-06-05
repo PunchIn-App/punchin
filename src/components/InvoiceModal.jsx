@@ -7,7 +7,7 @@ import {
   startOfDay, endOfDay, subWeeks, subMonths,
 } from 'date-fns'
 import { db } from '../db'
-import { getEntryDuration } from '../utils/time'
+import { getEntryDuration, roundEntry } from '../utils/time'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 
@@ -81,14 +81,17 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 
   const lineItems = useMemo(() => {
     if (!allEntries?.length || !job) return []
-    return allEntries.map(e => {
+    return allEntries.map(raw => {
+      // Bill in the user's favour: round the entry (start down, end up) so the
+      // invoiced hours, amount, and shown Start/End times are consistent (#208).
+      const e = roundEntry(raw, settings.roundingMinutes)
       const lt = laborTypes?.find(l => l.id === e.laborTypeId)
       const hours = getEntryDuration(e) / 3600000
       const rate  = (job.laborRates?.[e.laborTypeId]) ?? null
       const amount = rate != null ? hours * rate : null
       return { entry: e, lt, hours, rate, amount }
     }).sort((a, b) => new Date(a.entry.punchIn) - new Date(b.entry.punchIn))
-  }, [allEntries, job, laborTypes])
+  }, [allEntries, job, laborTypes, settings.roundingMinutes])
 
   const totalHours  = lineItems.reduce((s, li) => s + li.hours, 0)
   const totalAmount = lineItems.every(li => li.amount != null)
