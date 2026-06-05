@@ -7,37 +7,40 @@ import { useEffect, useRef } from 'react'
 // shows AM/PM, meaningless for a *duration* (MDN: "create a custom time input").
 // So this is that: two scroll-snap "wheels" (hours + minutes), always 24h, no
 // AM/PM, on every device. Each wheel is an ARIA spinbutton (keyboard + screen
-// reader); touch/mouse users spin it. The stored value stays a minute count
-// (h*60 + m); landing on 0h 0m switches the reminder off.
+// reader); touch/mouse users spin it.
 //
-// The wheels WRAP: each value list is rendered as several stacked copies and,
-// after a spin settles, the scroll position is silently recentered onto the
-// middle copy (it lands on identical content, so there's no visible jump) — an
-// endless wheel without an actual infinite list. Arrow keys wrap modularly.
+// The picker value is a single TOTAL minute count (mod a 24h cycle). Each wheel
+// reports a step delta — the minutes wheel moves the total by ±5, the hours wheel
+// by ±60 — so rolling the minutes past 55→00 carries into the hours automatically
+// (and 00→55 borrows back). The wheels also WRAP: each list is rendered as REPEAT
+// stacked copies and re-centred on the middle copy when the value settles (it
+// lands on identical content, so there's no visible jump). Landing on 0h 0m
+// switches the reminder off.
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0..23
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5) // 0,5,…,55 (5-min grid)
-const MAX_MINUTES = 23 * 60 + 55
+const CYCLE = 24 * 60 // total wraps within a 24h cycle; minutes carry into hours
 const ITEM_H = 30 // px per row
 const VISIBLE = 3 // rows shown: 1 above, the selection, 1 below
 const REPEAT = 5 // copies of the list (buffer for wrap-around)
 const CENTER = Math.floor(REPEAT / 2)
 const PAD = (VISIBLE - 1) / 2
 
-function Wheel({ values, value, onChange, label, format }) {
+// `onStep(delta)` reports how many rows the wheel moved (+ = forward/up); the
+// parent maps that to a change in the total.
+function Wheel({ values, value, onStep, label, format }) {
   const ref = useRef(null)
   const settle = useRef(0)
   const N = values.length
-
-  // scrollTop that centres `valueIndex` on the middle copy.
+  const baseIdx = Math.max(0, values.indexOf(value))
   const scrollFor = (vi) => (CENTER * N + vi - PAD) * ITEM_H
 
-  // Centre the current value on the middle copy (mount + external/keyboard change).
+  // Centre the current value on the middle copy (mount + external change).
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const target = scrollFor(Math.max(0, values.indexOf(value)))
+    const target = scrollFor(baseIdx)
     if (Math.abs(el.scrollTop - target) > 1) el.scrollTop = target
-  }, [value, N]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [baseIdx, N]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onScroll = () => {
     const el = ref.current
@@ -45,20 +48,15 @@ function Wheel({ values, value, onChange, label, format }) {
     clearTimeout(settle.current)
     settle.current = setTimeout(() => {
       const flat = Math.round(el.scrollTop / ITEM_H) + PAD
-      const vi = ((flat % N) + N) % N
-      // Recentre onto the middle copy — identical content, so it's invisible.
-      el.scrollTop = scrollFor(vi)
-      if (values[vi] !== value) onChange(values[vi])
+      const steps = flat - (CENTER * N + baseIdx)
+      if (steps !== 0) onStep(steps)
+      else el.scrollTop = scrollFor(baseIdx) // re-snap exactly to centre
     }, 110)
   }
 
-  const wrap = (delta) => {
-    const vi = (((values.indexOf(value) + delta) % N) + N) % N
-    onChange(values[vi])
-  }
   const onKeyDown = (e) => {
     const by = { ArrowUp: -1, ArrowDown: 1, PageUp: -3, PageDown: 3 }[e.key]
-    if (by !== undefined) { e.preventDefault(); wrap(by) }
+    if (by !== undefined) { e.preventDefault(); onStep(by) }
   }
 
   return (
@@ -96,13 +94,13 @@ const minLabel = (v) => String(v).padStart(2, '0')
 export default function LongRunningMinutesInput({ minutes, onChange, onTurnOff }) {
   const raw = Number.isFinite(minutes) ? Math.round(minutes) : 60
   // Snap to the 5-min grid so a legacy off-grid value still lands on a wheel row.
-  const total = Math.max(0, Math.min(MAX_MINUTES, Math.round(raw / 5) * 5))
+  const total = ((((Math.round(raw / 5) * 5) % CYCLE) + CYCLE) % CYCLE)
   const h = Math.floor(total / 60)
   const m = total % 60
 
-  const commit = (nh, nm) => {
-    const t = nh * 60 + nm
-    if (t <= 0) onTurnOff()
+  const commit = (newTotal) => {
+    const t = (((newTotal % CYCLE) + CYCLE) % CYCLE)
+    if (t === 0) onTurnOff()
     else onChange(t)
   }
 
@@ -117,7 +115,7 @@ export default function LongRunningMinutesInput({ minutes, onChange, onTurnOff }
       <Wheel
         values={HOURS}
         value={h}
-        onChange={(nh) => commit(nh, m)}
+        onStep={(d) => commit(total + d * 60)}
         label="Hours before a long-running timer reminder"
         format={hourLabel}
       />
@@ -125,7 +123,7 @@ export default function LongRunningMinutesInput({ minutes, onChange, onTurnOff }
       <Wheel
         values={MINUTES}
         value={m}
-        onChange={(nm) => commit(h, nm)}
+        onStep={(d) => commit(total + d * 5)}
         label="Minutes before a long-running timer reminder"
         format={minLabel}
       />

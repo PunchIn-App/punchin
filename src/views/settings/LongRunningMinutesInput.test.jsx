@@ -3,7 +3,7 @@ import LongRunningMinutesInput from './LongRunningMinutesInput'
 
 // Focused unit test for the long-running threshold wheel picker (issue #111).
 // jsdom has no layout/scroll, so this drives the ARIA spinbutton keyboard path
-// (the scroll-snap + wrap-on-settle behaviour is exercised in a real browser).
+// (the scroll-snap + wrap behaviour is exercised in a real browser).
 
 const setup = (minutes = 60) => {
   const onChange = vi.fn()
@@ -17,7 +17,7 @@ const setup = (minutes = 60) => {
   }
 }
 
-describe('LongRunningMinutesInput (#111 — 24h wrap-around wheel)', () => {
+describe('LongRunningMinutesInput (#111 — 24h wheel, minutes carry into hours)', () => {
   it('splits the stored minutes across two spinbutton wheels', () => {
     const { hours, mins } = setup(90) // 1h 30m
     expect(hours).toHaveAttribute('role', 'spinbutton')
@@ -51,13 +51,19 @@ describe('LongRunningMinutesInput (#111 — 24h wrap-around wheel)', () => {
     expect(onChange).toHaveBeenCalledWith(90) // 1h30
   })
 
-  it('wraps the minutes wheel past 55 back to 00', () => {
+  it('carries into the hour when minutes roll past 55', () => {
     const { mins, onChange } = setup(115) // 1h 55m
-    fireEvent.keyDown(mins, { key: 'ArrowDown' }) // 55 → 00
-    expect(onChange).toHaveBeenCalledWith(60) // 1h 00m
+    fireEvent.keyDown(mins, { key: 'ArrowDown' }) // 55 → 00, +1 hour
+    expect(onChange).toHaveBeenCalledWith(120) // 2h 00m
   })
 
-  it('wraps the hours wheel past 23 back to 0', () => {
+  it('borrows from the hour when minutes roll below 00', () => {
+    const { mins, onChange } = setup(120) // 2h 00m
+    fireEvent.keyDown(mins, { key: 'ArrowUp' }) // 00 → 55, -1 hour
+    expect(onChange).toHaveBeenCalledWith(115) // 1h 55m
+  })
+
+  it('wraps the hours wheel past 23 back to 0 (keeping minutes)', () => {
     const { hours, onChange } = setup(23 * 60 + 30) // 23h 30m
     fireEvent.keyDown(hours, { key: 'ArrowDown' }) // 23 → 0
     expect(onChange).toHaveBeenCalledWith(30) // 0h 30m
