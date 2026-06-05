@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.20.0] — 2026-06-05
+
+### Changed
+- Reminders — the long-running-timer **"Notify after" threshold is now a 24-hour scroll wheel** (hours + minutes, 5-minute steps) instead of dropdowns. It's always 24-hour with no AM/PM — a native `<input type="time">` can't be forced out of AM/PM on a 12-hour device, so this is a purpose-built control. Spin it, or use the arrow keys. ([#111](https://github.com/PunchIn-App/punchin/issues/111))
+
+---
+
 ## [0.19.0] — 2026-06-05
 
 ### Added

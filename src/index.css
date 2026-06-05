@@ -77,6 +77,16 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* Scroll-snap "wheel" column for the reminder duration picker (issue #111). */
+  .wheel-col {
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    text-align: center;
+  }
+  .wheel-col::-webkit-scrollbar { display: none; }
 }
 
 /* Eliminate 300ms tap delay on interactive elements */
