@@ -6,16 +6,18 @@ Only the latest release of PunchIn is actively supported with security updates.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.16.x  | Yes       |
-| < 0.16  | No        |
+| 0.17.x  | Yes       |
+| < 0.17  | No        |
 
 ## Scope
 
 PunchIn is a client-only PWA: all user data lives in the browser's IndexedDB and
 there is no application backend. In scope are the application itself and the
-Cloudflare Worker that handles OAuth (`worker/oauth.js`). Out of scope is data
-stored locally in a user's own browser, which is plaintext by design and not
-encrypted at rest.
+Cloudflare Worker that handles OAuth (`worker/oauth.js`). Out of scope is the
+user's own time-tracking data stored locally, which is plaintext by design and
+not encrypted at rest. The one exception is the cloud-sync **access token**,
+which is encrypted at rest with a non-extractable WebCrypto key as defense in
+depth (since v0.17.0).
 
 ## Reporting a Vulnerability
 

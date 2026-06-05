@@ -5,6 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.17.0] — 2026-06-04
+
+A maintenance release from a full internal code assessment ([#172](https://github.com/PunchIn-App/punchin/issues/172)): cross-device sync now propagates edits and deletions (not just new entries), a set of security improvements, and a broad sweep of correctness, accessibility, and performance fixes. No new features.
+
+### Security
+- Sync — the cloud-sync **access token is now encrypted at rest** with a non-extractable WebCrypto key, instead of being stored in plaintext. ([#126](https://github.com/PunchIn-App/punchin/issues/126))
+- Sync — OneDrive now uses the **Authorization Code + PKCE** flow, so the access token is never placed in the page URL. ([#128](https://github.com/PunchIn-App/punchin/issues/128))
+- Sync — every provider's OAuth return is verified against a **CSRF `state` nonce**; a mismatched callback is rejected, and the token is scrubbed from the URL even on an unrecognized return. ([#125](https://github.com/PunchIn-App/punchin/issues/125), [#139](https://github.com/PunchIn-App/punchin/issues/139))
+- Sync — the GitHub connect dialog now **discloses the broad gist scope** before you authorize. ([#127](https://github.com/PunchIn-App/punchin/issues/127))
+- The app shell is now served with a **Content-Security-Policy** and hardening headers, and OAuth errors map to fixed messages instead of reflecting text from the URL. ([#129](https://github.com/PunchIn-App/punchin/issues/129))
+
+### Fixed
+- Sync — **edits, deletions, archive state, and per-labor-type rates now sync across devices.** Sync was previously additive-only, so a record edited or deleted on one device could reappear or stay stale on another. Records now carry a stable cross-device id and merge by last-write-wins, with deletions propagated as tombstones. ([#118](https://github.com/PunchIn-App/punchin/issues/118))
+- Sync — a token that expires mid-sync now prompts you to reconnect, and download-vs-upload failures are reported separately and are safe to retry.
+- Timesheets — the **Daily/Weekly totals now match the CSV, print, and Analytics figures**: a still-running timer no longer inflates them, and an entry that crosses midnight is split across the days it actually covers instead of its whole duration landing on the start day. ([#136](https://github.com/PunchIn-App/punchin/issues/136), [#137](https://github.com/PunchIn-App/punchin/issues/137))
+- Analytics — per-day bars clip cross-midnight entries to each local day, and the "Avg / day" figure lines up with the days shown. ([#140](https://github.com/PunchIn-App/punchin/issues/140))
+- Timer — the view no longer briefly flashes "No active timers" while it is still loading. ([#135](https://github.com/PunchIn-App/punchin/issues/135))
+- Settings — **Factory Reset now deletes this device's remote sync file** and clears leftover local storage, so a wipe can't be undone by reconnecting. ([#143](https://github.com/PunchIn-App/punchin/issues/143))
+- Invoices — **Print** no longer fails silently when pop-ups are blocked (it tells you and points to CSV), and a custom end-date now includes the whole final day. ([#150](https://github.com/PunchIn-App/punchin/issues/150), [#157](https://github.com/PunchIn-App/punchin/issues/157))
+- Editing an active timer now rejects a start time in the future, which had rendered a negative running duration. ([#153](https://github.com/PunchIn-App/punchin/issues/153))
+- Color picker — pressing Escape in the custom-color popover now dismisses only the popover, not the dialog it is inside. ([#155](https://github.com/PunchIn-App/punchin/issues/155))
+- Reminders — no longer fire twice with multiple tabs open or after the device clock moves backward, and now begin working if you grant notification permission mid-session. ([#158](https://github.com/PunchIn-App/punchin/issues/158)–[#162](https://github.com/PunchIn-App/punchin/issues/162))
+- Install guidance — iOS in-app browsers (Facebook, Instagram, etc.) no longer show "Add to Home Screen" steps that can't work there. ([#163](https://github.com/PunchIn-App/punchin/issues/163))
+- The browser-tab icon is rendered at a higher resolution so it stays sharp on high-DPI screens. ([#164](https://github.com/PunchIn-App/punchin/issues/164))
+
+### Changed
+- Accessibility — modals now **return keyboard focus to the control that opened them** when they close, and keep focus trapped inside the dialog while open. ([#151](https://github.com/PunchIn-App/punchin/issues/151), [#152](https://github.com/PunchIn-App/punchin/issues/152), [#154](https://github.com/PunchIn-App/punchin/issues/154))
+- Performance — timesheet and analytics queries use the indexed time range instead of scanning the whole table, the views memoize their derived data, running timers stop ticking while the tab is backgrounded, and the charts library now loads only when you open Analytics — shrinking the initial download. ([#132](https://github.com/PunchIn-App/punchin/issues/132), [#138](https://github.com/PunchIn-App/punchin/issues/138), [#142](https://github.com/PunchIn-App/punchin/issues/142), [#167](https://github.com/PunchIn-App/punchin/issues/167))
+
+### Internal
+- Refactors with no user-facing change: the Settings view split into per-panel components; shared modal focus-trap / bottom-sheet / PWA-update hooks; extracted backup and issue-URL helpers; manual import reuses the cloud-sync merge; a single source of truth for default settings. Plus new tests (OAuth worker callback, case-insensitive merge dedup, an App↔views integration test), reproducible CI installs via `npm ci`, and a smaller-bundle guardrail. (internal)
+
 ## [0.16.0] — 2026-06-04
 
 ### Added
