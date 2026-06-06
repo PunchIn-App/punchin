@@ -1,0 +1,40 @@
+name: Docs Sync
+
+# Enforces documentation-sync rules on PRs to main (see scripts/check-doc-sync.mjs and
+# docs/superpowers/specs/2026-06-06-docs-sync-ci-check-design.md). Contract notes:
+#
+#  - The check (job) name is "Docs Sync". To make it BLOCK merges, add this exact name to the
+#    branch-protection "Required status checks" for `main`. Renaming the job is a migration that
+#    must update that setting.
+#  - fetch-depth: 0 is REQUIRED. A shallow clone leaves the base commit out of the object store,
+#    so `git diff base...head` reads every file as "added" and the check goes permanently red.
+#  - The job ALWAYS runs and ALWAYS reports. The `skip-docs-check` label is honoured INSIDE the
+#    script (it exits 0), so a required check is never deadlocked at "waiting for status". For
+#    that bypass to take effect immediately we also trigger on labeled/unlabeled events.
+#  - The token stays read-only: the script reads PR labels and base/head SHAs from the event
+#    payload (GITHUB_EVENT_PATH), not the API, and writes nothing back to the PR.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  docs-sync:
+    name: Docs Sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check documentation sync
+        # No npm install needed — the script uses only Node built-ins + git.
+        run: node scripts/check-doc-sync.mjs
