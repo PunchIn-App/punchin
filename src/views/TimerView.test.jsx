@@ -23,11 +23,11 @@ vi.mock('../components/TimerRail', () => ({ default: () => null }))
 const JOBS = [{ id: 1, name: 'Acme Corp' }]
 const LABOR_TYPES = [{ id: 1, name: 'Design', color: '#6366F1' }]
 
-// useLiveQuery is called 4 times per render: active, jobs, laborTypes, lastEntry
-function setupMocks({ active = [], jobs = JOBS, laborTypes = LABOR_TYPES, lastEntry = null } = {}) {
-  const queue = [active, jobs, laborTypes, lastEntry]
+// useLiveQuery is called 5 times per render: active, completed, jobs, laborTypes, lastEntry
+function setupMocks({ active = [], completed = [], jobs = JOBS, laborTypes = LABOR_TYPES, lastEntry = null } = {}) {
+  const queue = [active, completed, jobs, laborTypes, lastEntry]
   let n = 0
-  useLiveQuery.mockImplementation(() => queue[n++ % 4])
+  useLiveQuery.mockImplementation(() => queue[n++ % 5])
 }
 
 beforeEach(() => {
@@ -38,7 +38,7 @@ describe('TimerView — empty state', () => {
   it('shows "No active timers" subtitle when no entries are active', () => {
     setupMocks()
     render(<TimerView />)
-    expect(screen.getByText('No active timers')).toBeInTheDocument()
+    expect(screen.getByText(/no active timers/i)).toBeInTheDocument()
   })
 
   it('shows "Nothing running" illustration text', () => {
@@ -52,7 +52,7 @@ describe('TimerView — loading state (issue #135)', () => {
   it('does not flash "No active timers" or the empty state while live queries are still undefined', () => {
     useLiveQuery.mockImplementation(() => undefined) // active/jobs/laborTypes/lastEntry all loading
     render(<TimerView />)
-    expect(screen.queryByText('No active timers')).not.toBeInTheDocument()
+    expect(screen.queryByText(/no active timers/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Nothing running')).not.toBeInTheDocument()
   })
 })
@@ -62,7 +62,7 @@ describe('TimerView — active timers', () => {
     const active = [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null }]
     setupMocks({ active })
     render(<TimerView />)
-    expect(screen.getByText('1 timer running')).toBeInTheDocument()
+    expect(screen.getByText(/1 timer running/i)).toBeInTheDocument()
   })
 
   it('shows "2 timers running" for multiple active entries', () => {
@@ -72,7 +72,7 @@ describe('TimerView — active timers', () => {
     ]
     setupMocks({ active })
     render(<TimerView />)
-    expect(screen.getByText('2 timers running')).toBeInTheDocument()
+    expect(screen.getByText(/2 timers running/i)).toBeInTheDocument()
   })
 
   it('renders a TimerCard for each active entry', () => {
@@ -98,7 +98,7 @@ describe('TimerView — last session', () => {
     expect(screen.getByText(/last session/i)).toBeInTheDocument()
   })
 
-  it('does not show Last Session when timers are active', () => {
+  it('shows Last Session even when timers are active (phone tier; rail covers desktop)', () => {
     const active = [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null }]
     const lastEntry = {
       id: 2, jobId: 1, laborTypeId: 1,
@@ -107,7 +107,7 @@ describe('TimerView — last session', () => {
     }
     setupMocks({ active, lastEntry })
     render(<TimerView />)
-    expect(screen.queryByText(/last session/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/last session/i)).toBeInTheDocument()
   })
 })
 
@@ -115,20 +115,20 @@ describe('TimerView — punch in button', () => {
   it('renders a "Punch In" button', () => {
     setupMocks()
     render(<TimerView />)
-    expect(screen.getByRole('button', { name: /punch in/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /punchin/i })).toBeInTheDocument()
   })
 
   it('opens StartTimerModal when Punch In is clicked', () => {
     setupMocks()
     render(<TimerView />)
-    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+    fireEvent.click(screen.getByRole('button', { name: /punchin/i }))
     expect(screen.getByTestId('start-modal')).toBeInTheDocument()
   })
 
   it('closes StartTimerModal when the modal requests close', () => {
     setupMocks()
     render(<TimerView />)
-    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+    fireEvent.click(screen.getByRole('button', { name: /punchin/i }))
     fireEvent.click(screen.getByText('close-modal'))
     expect(screen.queryByTestId('start-modal')).not.toBeInTheDocument()
   })

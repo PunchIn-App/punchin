@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Play } from 'lucide-react'
 import { db } from '../db'
-import { LaborTag } from './LaborGlyph'
 import { formatDurationHM, formatTime, getWeekRange, isEntryInRange, getEntryDuration } from '../utils/time'
 
 // The Timer screen's desktop-only right rail (xl+): Last session · Quick punch ·
@@ -26,7 +25,8 @@ export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMo
     const byJob = new Map()
     for (const e of inWeek) byJob.set(e.jobId, (byJob.get(e.jobId) || 0) + getEntryDuration(e))
     const top = [...byJob.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
-    return { totalMs, top }
+    const maxMs = top.length ? top[0][1] : 1
+    return { totalMs, top, maxMs }
   }, [completed, weekStartsMonday])
 
   const activeJobs = (jobs ?? []).filter(j => j.isActive !== false).slice(0, 6)
@@ -37,7 +37,7 @@ export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMo
       className="hidden xl:flex xl:flex-col xl:w-[304px] flex-shrink-0 border-l border-appBorder scrollable"
     >
       <div className="p-5 space-y-7">
-        {/* Last session */}
+        {/* Last session — lead with the big duration, "<labor> · ended <time>" */}
         {lastEntry && (() => {
           const job = jobMap.get(lastEntry.jobId)
           const lt = ltMap.get(lastEntry.laborTypeId)
@@ -45,62 +45,76 @@ export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMo
           return (
             <section>
               <Overline>Last session</Overline>
-              <div className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
-                <div className="pl-4 pr-3 py-3">
+              <div className="rounded-xl border border-appBorder bg-appCard p-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} aria-hidden="true" />
                   <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || 'Unknown Job'}</p>
-                  {lt && <LaborTag laborType={lt} className="mt-1" />}
-                  <div className="flex items-center justify-between mt-1 gap-2">
-                    <span className="text-xs text-appTextMuted font-mono truncate">
-                      {formatTime(lastEntry.punchIn, timeFormat)}–{formatTime(lastEntry.punchOut, timeFormat)}
-                    </span>
-                    <span className="font-mono text-appTextMuted text-xs flex-shrink-0">{formatDurationHM(getEntryDuration(lastEntry))}</span>
-                  </div>
                 </div>
+                <p className="font-mono text-2xl text-appText mt-1.5">{formatDurationHM(getEntryDuration(lastEntry))}</p>
+                <p className="text-xs text-appTextMuted mt-0.5 truncate">
+                  {lt?.name ? `${lt.name} · ` : ''}ended {formatTime(lastEntry.punchOut, timeFormat)}
+                </p>
               </div>
             </section>
           )
         })()}
 
-        {/* Quick punch */}
+        {/* Quick punch — labor dot + job/labor two-line + filled accent play */}
         {activeJobs.length > 0 && (
           <section>
             <Overline>Quick punch</Overline>
             <div className="space-y-1.5">
-              {activeJobs.map(job => (
-                <button
-                  key={job.id}
-                  onClick={() => onPunch(job)}
-                  aria-label={`Punch in: ${job.name}`}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-appCard border border-appBorder
-                             hover:border-appAccent/50 hover:bg-appInput text-left transition-colors group
-                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent"
-                >
-                  <span className="text-sm text-appText truncate">{job.name}</span>
-                  <Play className="w-4 h-4 text-appTextMuted group-hover:text-appAccent flex-shrink-0" aria-hidden="true" />
-                </button>
-              ))}
+              {activeJobs.map(job => {
+                const jlt = ltMap.get(job.laborTypeId)
+                return (
+                  <button
+                    key={job.id}
+                    onClick={() => onPunch(job)}
+                    aria-label={`Punch in: ${job.name}`}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-appCard border border-appBorder
+                               hover:bg-appInput text-left transition-colors
+                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent"
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: jlt?.color || '#6366F1' }} aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm text-appText truncate">{job.name}</span>
+                      {jlt && <span className="block text-[11px] text-appTextMuted truncate">{jlt.name}</span>}
+                    </span>
+                    <span className="flex-shrink-0 w-7 h-7 rounded-md bg-appAccent/15 flex items-center justify-center">
+                      <Play className="w-3.5 h-3.5 text-appAccent fill-current" aria-hidden="true" />
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </section>
         )}
 
-        {/* This week */}
+        {/* This week — total in the overline + per-job progress bars (job colour) */}
         <section>
-          <Overline>This week</Overline>
-          <div className="rounded-xl border border-appBorder bg-appCard p-4">
-            <p className="font-mono text-2xl text-appText tabular-nums">{week ? formatDurationHM(week.totalMs) : '—'}</p>
-            <p className="text-xs text-appTextMuted mt-0.5">tracked this week</p>
-            {week && week.top.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-appBorderLight space-y-1.5">
-                {week.top.map(([jobId, ms]) => (
-                  <div key={jobId} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="text-appTextMuted truncate">{jobMap.get(jobId)?.name || 'Unknown'}</span>
-                    <span className="font-mono text-appText flex-shrink-0">{formatDurationHM(ms)}</span>
+          <Overline>This week{week ? ` · ${formatDurationHM(week.totalMs)}` : ''}</Overline>
+          {week && week.top.length > 0 ? (
+            <div className="space-y-2.5">
+              {week.top.map(([jobId, ms]) => {
+                const job = jobMap.get(jobId)
+                const jlt = job && ltMap.get(job.laborTypeId)
+                const pct = Math.max(4, Math.round((ms / week.maxMs) * 100))
+                return (
+                  <div key={jobId}>
+                    <div className="flex items-center justify-between gap-2 text-xs mb-1">
+                      <span className="text-appText truncate">{job?.name || 'Unknown'}</span>
+                      <span className="font-mono text-appTextMuted flex-shrink-0">{formatDurationHM(ms)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-appInput overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: jlt?.color || 'var(--accent)' }} />
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-appTextDisabled">No time tracked yet.</p>
+          )}
         </section>
       </div>
     </aside>

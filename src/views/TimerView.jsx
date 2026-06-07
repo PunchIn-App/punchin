@@ -9,7 +9,17 @@ import { LaborTag } from '../components/LaborGlyph'
 import { PunchMark } from '../components/BrandMark'
 import { DEFAULT_ACCENT } from '../accentPresets'
 import { useSettings } from '../hooks/useSettings'
-import { formatDurationHM, formatTime } from '../utils/time'
+import { formatDurationHM, formatTime, formatDate, getDayRange, getWeekRange, getEntryDurationInRange } from '../utils/time'
+
+// A compact stat tile (TODAY / THIS WEEK / AVG·DAY) under the header.
+function StatTile({ label, value, className = '' }) {
+  return (
+    <div className={`rounded-xl border border-appBorder bg-appCard px-4 py-3 ${className}`}>
+      <p className="text-[10px] font-mono font-semibold text-appTextMuted uppercase tracking-widest">{label}</p>
+      <p className="font-mono text-2xl font-semibold text-appText mt-1">{value}</p>
+    </div>
+  )
+}
 
 export default function TimerView() {
   const [showModal, setShowModal] = useState(false)
@@ -17,6 +27,7 @@ export default function TimerView() {
   const { settings } = useSettings()
 
   const active     = useLiveQuery(() => db.entries.filter(e => !e.punchOut).toArray(), [])
+  const completed  = useLiveQuery(() => db.entries.filter(e => !!e.punchOut).toArray(), [])
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
   const lastEntry  = useLiveQuery(async () => {
@@ -36,6 +47,17 @@ export default function TimerView() {
   const getJob = id => jobMap.get(id)
   const getLT  = id => ltMap.get(id)
 
+  // Header stat tiles: today / this-week totals from completed entries (clipped
+  // to each window), and a simple per-day average across the 7-day week.
+  const stats = useMemo(() => {
+    if (!completed) return null
+    const { start: ds, end: de } = getDayRange()
+    const { start: ws, end: we } = getWeekRange(new Date(), settings.weekStartsMonday !== false)
+    const today = completed.reduce((s, e) => s + getEntryDurationInRange(e, ds, de), 0)
+    const week  = completed.reduce((s, e) => s + getEntryDurationInRange(e, ws, we), 0)
+    return { today, week, avg: week / 7 }
+  }, [completed, settings.weekStartsMonday])
+
   // Quick-punch from the rail: one tap when the job has a default labor type,
   // otherwise open the full modal preselected. Both go through db.startTimer so
   // the concurrent-timer rule stays single-source.
@@ -52,13 +74,14 @@ export default function TimerView() {
   return (
     <div className="h-full flex flex-col xl:flex-row">
       <div className="flex-1 min-w-0 scrollable">
-        <div className="px-4 pt-4 pb-24 lg:max-w-3xl lg:mx-auto lg:w-full">
+        <div className="px-4 pt-4 pb-24 lg:px-6">
 
         {/* Header row */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="font-display font-bold text-appText text-2xl leading-none">Active</h1>
-            <p className="text-appTextMuted text-sm mt-0.5">
+            <h1 className="font-display font-bold text-appText text-2xl leading-none">On the clock</h1>
+            <p className="text-appTextMuted text-sm mt-1">
+              <span className="hidden lg:inline">{formatDate(new Date())} · </span>
               {active === undefined
                 ? ' ' /* still loading — don't flash "No active timers" (issue #135) */
                 : active.length
@@ -73,9 +96,18 @@ export default function TimerView() {
                        text-appOnAccent font-display font-bold text-sm transition-all"
           >
             <Plus className="w-4 h-4" strokeWidth={2.5} />
-            Punch In
+            PunchIn
           </button>
         </div>
+
+        {/* Stat tiles */}
+        {stats && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+            <StatTile label="Today" value={formatDurationHM(stats.today)} />
+            <StatTile label="This week" value={formatDurationHM(stats.week)} />
+            <StatTile label="Avg / day" value={formatDurationHM(stats.avg)} className="hidden sm:block" />
+          </div>
+        )}
 
         {/* Empty state */}
         {active?.length === 0 && (
@@ -89,8 +121,11 @@ export default function TimerView() {
           </div>
         )}
 
-        {/* Timer cards */}
-        <div className="space-y-3">
+        {/* Active timers */}
+        {active && active.length > 0 && (
+          <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2">Active · {active.length}</p>
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {active?.map(entry => (
             <TimerCard
               key={entry.id}
@@ -101,8 +136,8 @@ export default function TimerView() {
           ))}
         </div>
 
-        {/* Last completed session */}
-        {lastEntry && active?.length === 0 && (() => {
+        {/* Last completed session (phone/tablet; the xl rail shows it on desktop) */}
+        {lastEntry && (() => {
           const job = getJob(lastEntry.jobId)
           const lt  = getLT(lastEntry.laborTypeId)
           const color = lt?.color || '#6366F1'

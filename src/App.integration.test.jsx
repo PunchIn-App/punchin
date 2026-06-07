@@ -21,9 +21,9 @@ describe('App ↔ views integration (real views + fake-indexeddb)', () => {
 
     render(<App />)
 
-    // Real TimerView mounts as the default view (its "Active" header).
-    expect(await screen.findByRole('heading', { name: 'Active', level: 1 })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /punch in/i })).toBeInTheDocument()
+    // Real TimerView mounts as the default view (its "On the clock" header).
+    expect(await screen.findByRole('heading', { name: 'On the clock', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'PunchIn' })).toBeInTheDocument()
 
     // Navigate via the real bottom-nav Layout to the real JobsView, which reads
     // the seeded job from the real db via useLiveQuery. (The desktop sidebar also

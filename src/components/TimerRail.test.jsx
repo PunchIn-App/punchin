@@ -23,8 +23,10 @@ it('shows the "This week" section once completed entries load', () => {
     { jobId: 2, laborTypeId: 1, punchIn: hoursAgo(1), punchOut: now },
   ])
   render(<TimerRail jobMap={jobMap} ltMap={ltMap} jobs={jobs} lastEntry={null} weekStartsMonday onPunch={vi.fn()} />)
-  expect(screen.getByText('tracked this week')).toBeInTheDocument()
-  expect(screen.queryByText('—')).toBeNull() // a total rendered, not the loading dash
+  // The week total now sits in the section overline ("This week · 3h"); per-job
+  // rows render with their hours.
+  expect(screen.getByText(/this week/i)).toBeInTheDocument()
+  expect(screen.queryByText('No time tracked yet.')).toBeNull()
 })
 
 it('lists only active jobs for quick punch and calls onPunch on click', () => {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Square, Pencil, AlertTriangle } from 'lucide-react'
 import { db } from '../db'
 import { formatElapsed, formatTime } from '../utils/time'
+import { formatMoney } from '../utils/format'
 import EditEntryModal from './EditEntryModal'
 import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
@@ -67,7 +68,7 @@ export default function TimerCard({ entry, job, laborType }) {
             <div className="flex items-center gap-2 mt-1">
               <LaborTag laborType={laborType} />
               <div className="flex items-center gap-1 text-appTextDarker text-xs font-mono">
-                <span>since {formatTime(entry.punchIn, settings.timeFormat)}</span>
+                <span>started {formatTime(entry.punchIn, settings.timeFormat)}</span>
                 <button
                   onClick={() => setShowEditModal(true)}
                   aria-label="Edit start time and notes"
@@ -105,6 +106,20 @@ export default function TimerCard({ entry, job, laborType }) {
         >
           {formatElapsed(elapsed)}
         </div>
+
+        {/* Footer: client + live earnings (when a rate is set for this work) */}
+        {(() => {
+          const rate = job?.laborRates?.[entry.laborTypeId]
+          if (!job?.clientName && rate == null) return null
+          return (
+            <div className="mt-3 pt-3 border-t border-dashed border-appBorderLight flex items-center justify-between gap-2 text-xs">
+              <span className="font-mono uppercase tracking-wider text-appTextDarker truncate">{job?.clientName || ''}</span>
+              {rate != null && (
+                <span className="font-mono text-appTextMuted flex-shrink-0">{formatMoney((elapsed / 3600000) * rate, settings.defaultCurrency)}</span>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {showEditModal && (
