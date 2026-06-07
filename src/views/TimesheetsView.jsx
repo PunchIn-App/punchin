@@ -215,6 +215,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
         <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight shadow-sm">
           {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
             const job = getJob(Number(jid))
+            const barColor = getLT(job?.laborTypeId)?.color || 'var(--accent)'
             const pct = total > 0 ? (ms / total) * 100 : 0
             return (
               <div key={jid} className="px-4 py-3">
@@ -223,7 +224,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                   <span className="font-mono text-sm text-appTextMuted">{formatDuration(ms, decimal)}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-appBg">
-                  <div className="h-full rounded-full bg-appAccent transition-all" style={{ width: `${pct}%` }} />
+                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
                 </div>
               </div>
             )

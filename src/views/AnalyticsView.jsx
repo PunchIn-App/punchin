@@ -103,16 +103,22 @@ export default function AnalyticsView() {
 
   return (
     <div className="h-full scrollable px-4 pt-4 pb-24 space-y-4 lg:max-w-5xl lg:mx-auto">
-      {/* Period toggle */}
-      <div className="flex gap-2" role="group" aria-label="Select analysis period">
-        {['7d', '30d'].map(p => (
-          <button key={p} onClick={() => setPeriod(p)}
-            aria-pressed={period === p}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-              ${period === p ? 'bg-appAccent text-appOnAccent' : 'bg-appCard border border-appBorder text-appTextMuted'}`}>
-            Last {p === '7d' ? '7 days' : '30 days'}
-          </button>
-        ))}
+      {/* Header + segmented period toggle */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display font-bold text-appText text-2xl">Analytics</h1>
+          <p className="text-appTextMuted text-sm mt-1">Last {period === '7d' ? '7 days' : '30 days'} · hours logged</p>
+        </div>
+        <div className="inline-flex flex-shrink-0 bg-appInput border border-appBorder rounded-xl p-1" role="group" aria-label="Select analysis period">
+          {['7d', '30d'].map(p => (
+            <button key={p} onClick={() => setPeriod(p)}
+              aria-pressed={period === p}
+              className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors
+                ${period === p ? 'bg-appCard text-appText shadow-sm' : 'text-appTextMuted hover:text-appText'}`}>
+              {p === '7d' ? '7 days' : '30 days'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Summary cards */}

@@ -62,23 +62,23 @@ describe('AnalyticsView — period toggle', () => {
   it('renders "Last 7 days" and "Last 30 days" buttons', () => {
     setupMocks()
     render(<AnalyticsView />)
-    expect(screen.getByRole('button', { name: /last 7 days/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /last 30 days/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '7 days' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '30 days' })).toBeInTheDocument()
   })
 
   it('"Last 7 days" is active (aria-pressed=true) by default', () => {
     setupMocks()
     render(<AnalyticsView />)
-    expect(screen.getByRole('button', { name: /last 7 days/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /last 30 days/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: '7 days' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '30 days' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('switches to 30d when that button is clicked', () => {
     setupMocks()
     render(<AnalyticsView />)
-    fireEvent.click(screen.getByRole('button', { name: /last 30 days/i }))
-    expect(screen.getByRole('button', { name: /last 30 days/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /last 7 days/i })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: '30 days' }))
+    expect(screen.getByRole('button', { name: '30 days' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '7 days' })).toHaveAttribute('aria-pressed', 'false')
   })
 })
 
