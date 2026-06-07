@@ -69,7 +69,7 @@ punchin/
 │   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
 │   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
 │   │   ├── TimerRail.jsx       # Timer screen's desktop-only (xl+) right rail: Last session · Quick punch (one-tap punch-in per job via db.startTimer, falls back to the modal preselected) · This week (per-job totals honoring weekStartsMonday)
-│   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
+│   │   ├── StartTimerModal.jsx # Punch-in form modal: a custom job combobox (colour dot + client line, listbox/option) + selectable labor-type chips (radiogroup, each carrying its glyph) + notes; auto-punches-out running timers when concurrent timers is off
 │   │   ├── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
 │   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
 │   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
