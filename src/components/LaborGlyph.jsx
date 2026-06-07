@@ -5,7 +5,6 @@ import {
   Code, Paintbrush, MessageSquare, Wrench, Book, FlaskConical, Camera, Truck,
   Leaf, Briefcase, Pencil, BarChart2, DollarSign, Clock, Bell, Settings, Tag,
 } from 'lucide-react'
-import { readableInk } from '../utils/inkOnAccent'
 
 // Curated quick-pick set (string id → Lucide component). Stored as the id string
 // on laborTypes.glyph; mapped here so render sites import one component.
@@ -29,13 +28,15 @@ export function glyphComponent(id) {
 export function LaborGlyphChip({ laborType, className = 'w-5 h-5' }) {
   const color = laborType?.color || DEFAULT_LABOR_COLOR
   const Glyph = glyphComponent(laborType?.glyph)
+  // Soft TINTED chip (≈15% colour fill, glyph in the full colour) per the design
+  // system .pclt-chip — radius ≈ 28% of the box.
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-md flex-shrink-0 ${className}`}
-      style={{ backgroundColor: color }}
+      className={`inline-flex items-center justify-center rounded-[28%] flex-shrink-0 ${className}`}
+      style={{ backgroundColor: `${color}26` }}
       aria-hidden="true"
     >
-      <Glyph className="w-[60%] h-[60%]" style={{ color: readableInk(color) }} strokeWidth={2.5} />
+      <Glyph className="w-[58%] h-[58%]" style={{ color }} strokeWidth={2.2} />
     </span>
   )
 }

@@ -52,9 +52,9 @@ beforeEach(() => {
 })
 
 describe('InvoiceModal — rendering', () => {
-  it('renders the "Generate Invoice" header', () => {
+  it('renders the "Create invoice" header', () => {
     renderModal()
-    expect(screen.getByText('Generate Invoice')).toBeInTheDocument()
+    expect(screen.getByText('Create invoice')).toBeInTheDocument()
   })
 
   it('renders the job select', () => {
@@ -278,6 +278,8 @@ describe('InvoiceModal — export and print', () => {
     expect(html).toContain('Jane Doe')
     expect(html).toContain('Billed to')
     expect(html).toContain('PI-007') // prefix + zero-padded nextInvoiceNumber
+    expect(html).toContain('lt-badge')   // line items carry the colored labor badge
+    expect(html).toContain('Amount due') // paperfoot total band
   })
 
   it('renders the business logo in the print band when set', async () => {
