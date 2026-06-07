@@ -17,6 +17,7 @@ vi.mock('recharts', () => ({
   PieChart: ({ children }) => <div data-testid="pie-chart">{children}</div>,
   Pie: ({ children }) => <div>{children}</div>,
   Cell: () => null,
+  LabelList: () => null,
 }))
 
 const JOBS = [{ id: 1, name: 'Acme Corp' }]

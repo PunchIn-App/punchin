@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LabelList } from 'recharts'
 import { subDays, format, startOfDay, endOfDay } from 'date-fns'
 import { db } from '../db'
 import {
@@ -181,13 +181,18 @@ export default function AnalyticsView() {
               <figure aria-labelledby="job-chart-label" role="img"
                 aria-label={`Bar chart: hours by job. Top job: ${jobData[0]?.name} with ${jobData[0]?.hours}h.`}>
                 <ResponsiveContainer width="100%" height={Math.max(80, jobData.length * 44)}>
-                  <BarChart data={jobData} layout="vertical" barCategoryGap="30%">
-                    <XAxis type="number" hide />
+                  <BarChart data={jobData} layout="vertical" barCategoryGap="30%" margin={{ right: 8 }}>
+                    {/* Headroom on the value axis so the inline hour label at the
+                        bar's end isn't clipped against the container edge. */}
+                    <XAxis type="number" hide domain={[0, (max) => max * 1.18]} />
                     <YAxis type="category" dataKey="name"
                       tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={110} />
                     <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
                       formatter={(v) => [`${v}h`, 'Hours']} />
-                    <Bar dataKey="hours" fill="rgb(var(--accent-rgb))" radius={[0,3,3,0]} />
+                    <Bar dataKey="hours" fill="rgb(var(--accent-rgb))" radius={[0,3,3,0]}>
+                      <LabelList dataKey="hours" position="right" formatter={(v) => `${v}h`}
+                        style={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
                 <table className="sr-only">
@@ -208,7 +213,7 @@ export default function AnalyticsView() {
               <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-4" id="lt-chart-label">By labor type</p>
               <div className="flex items-center gap-5">
                 <figure
-                  className="flex-shrink-0 w-[100px] h-[100px]"
+                  className="relative flex-shrink-0 w-[100px] h-[100px]"
                   aria-labelledby="lt-chart-label"
                   role="img"
                   aria-label={`Donut chart: hours by labor type. ${ltData.map(d => `${d.name}: ${formatDurationHM(d.value)}`).join(', ')}.`}
@@ -219,6 +224,11 @@ export default function AnalyticsView() {
                       {ltData.map((d, i) => <Cell key={i} fill={d.color} />)}
                     </Pie>
                   </PieChart>
+                  {/* Total sits in the donut hole, the way the design system shows it. */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" aria-hidden="true">
+                    <span className="text-[8px] uppercase tracking-widest text-appTextMuted leading-none">Logged</span>
+                    <span className="font-mono text-[11px] font-semibold text-appText mt-1 leading-none">{formatDurationHM(ltData.reduce((a, d) => a + d.value, 0))}</span>
+                  </div>
                 </figure>
                 <div className="flex-1 space-y-2.5" aria-hidden="true">
                   {ltData.map(lt => (
