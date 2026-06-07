@@ -57,7 +57,7 @@ export default function TimerCard({ entry, job, laborType }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-display font-semibold text-appText truncate">{job?.name || 'Unknown Job'}</p>
+              <p className="font-display font-extrabold text-appText truncate">{job?.name || 'Unknown Job'}</p>
               {isOvernight && (
                 <div className="flex items-center gap-1 text-appAccent text-[10px] font-bold uppercase tracking-wider bg-appAccent/10 px-2 py-0.5 rounded-full animate-bounce">
                   <AlertTriangle className="w-3 h-3" />
@@ -101,7 +101,7 @@ export default function TimerCard({ entry, job, laborType }) {
           role="timer"
           aria-live="off"
           aria-label={`Elapsed time: ${formatElapsed(elapsed)}`}
-          className="mt-3 font-mono text-4xl font-medium tracking-wider"
+          className="mt-3 font-mono text-4xl font-extrabold tracking-wider"
           style={{ color }}
         >
           {formatElapsed(elapsed)}

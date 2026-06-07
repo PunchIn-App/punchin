@@ -232,7 +232,7 @@ export default function JobsView() {
         {/* Header: title + count subtitle + segmented tab control */}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="font-display font-bold text-appText text-2xl">{tab === 'labor' ? 'Labor Types' : 'Jobs'}</h1>
+            <h1 className="font-display font-extrabold text-appText text-2xl">{tab === 'labor' ? 'Labor Types' : 'Jobs'}</h1>
             <p className="text-appTextMuted text-sm mt-1">
               {tab === 'jobs'
                 ? `${activeJobCount} active · ${archivedJobCount} archived`

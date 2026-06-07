@@ -16,7 +16,7 @@ function StatTile({ label, value, className = '' }) {
   return (
     <div className={`rounded-xl border border-appBorder bg-appCard px-4 py-3 ${className}`}>
       <p className="text-[10px] font-mono font-semibold text-appTextMuted uppercase tracking-widest">{label}</p>
-      <p className="font-mono text-2xl font-semibold text-appText mt-1">{value}</p>
+      <p className="font-mono text-2xl font-extrabold text-appText mt-1">{value}</p>
     </div>
   )
 }
@@ -79,7 +79,7 @@ export default function TimerView() {
         {/* Header row */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="font-display font-bold text-appText text-2xl leading-none">On the clock</h1>
+            <h1 className="font-display font-extrabold text-appText text-2xl leading-none">On the clock</h1>
             <p className="text-appTextMuted text-sm mt-1">
               <span className="hidden lg:inline">{formatDate(new Date())} · </span>
               {active === undefined

@@ -140,7 +140,7 @@ export function Panel({ title, onBack, children }) {
           Settings
         </button>
       </div>
-      <h2 className="text-xl font-display font-semibold text-appText mb-3 px-1">{title}</h2>
+      <h2 className="text-xl font-display font-extrabold text-appText mb-3 px-1">{title}</h2>
       <div className="space-y-3">{children}</div>
     </section>
   )

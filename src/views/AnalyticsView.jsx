@@ -106,7 +106,7 @@ export default function AnalyticsView() {
       {/* Header + segmented period toggle */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="font-display font-bold text-appText text-2xl">Analytics</h1>
+          <h1 className="font-display font-extrabold text-appText text-2xl">Analytics</h1>
           <p className="text-appTextMuted text-sm mt-1">Last {period === '7d' ? '7 days' : '30 days'} · hours logged</p>
         </div>
         <div className="inline-flex flex-shrink-0 bg-appInput border border-appBorder rounded-xl p-1" role="group" aria-label="Select analysis period">

@@ -17,6 +17,7 @@ export default {
         appBorderLight:  'var(--border-light)',
         appText:         'var(--text-primary)',
         appTextMuted:    'var(--text-muted)',
+        appTextDarker:   'var(--text-darker)',
         appTextDisabled: 'var(--text-disabled)',
         appAccent:       'rgb(var(--accent-rgb) / <alpha-value>)',
         appOnAccent:     'var(--on-accent)',
