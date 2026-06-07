@@ -97,15 +97,19 @@ export function WeekdayPicker({ value, onChange, label, weekStartsMonday }) {
 // A tappable category row on the Settings root list. Drilling in shows that
 // category's own sub-page (iOS-style master → detail), replacing the former
 // single-open accordion so nothing collapses underfoot (issue #60).
-export function CategoryRow({ icon: Icon, title, subtitle, badge, onClick }) {
+export function CategoryRow({ icon: Icon, title, subtitle, badge, active, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-appInput transition-colors text-left first:rounded-t-xl last:rounded-b-xl"
+      aria-current={active ? 'page' : undefined}
+      className={`relative w-full flex items-center justify-between gap-3 px-4 py-4 transition-colors text-left first:rounded-t-xl last:rounded-b-xl
+        ${active ? 'bg-appInput' : 'hover:bg-appInput'}`}
     >
+      {/* Accent rail marks the selected category in the desktop master-detail rail. */}
+      {active && <span aria-hidden="true" className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-appAccent" />}
       <span className="flex items-center gap-3 min-w-0">
-        {Icon && <Icon className="w-5 h-5 flex-shrink-0 text-appTextMuted" aria-hidden="true" />}
+        {Icon && <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-appAccent' : 'text-appTextMuted'}`} aria-hidden="true" />}
         <span className="min-w-0">
           <span className="flex items-center gap-2">
             <span className="text-sm font-medium text-appText">{title}</span>
@@ -114,7 +118,8 @@ export function CategoryRow({ icon: Icon, title, subtitle, badge, onClick }) {
           {subtitle && <span className="block text-xs text-appTextMuted mt-0.5">{subtitle}</span>}
         </span>
       </span>
-      <ChevronRight className="w-4 h-4 flex-shrink-0 text-appTextMuted" aria-hidden="true" />
+      {/* Chevron implies drill-in (mobile); the desktop rail selects in place. */}
+      <ChevronRight className="w-4 h-4 flex-shrink-0 text-appTextMuted lg:hidden" aria-hidden="true" />
     </button>
   )
 }
@@ -125,7 +130,7 @@ export function CategoryRow({ icon: Icon, title, subtitle, badge, onClick }) {
 export function Panel({ title, onBack, children }) {
   return (
     <section>
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-1 lg:hidden">
         <button
           type="button"
           onClick={onBack}
