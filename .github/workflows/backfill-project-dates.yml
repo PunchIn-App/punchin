@@ -1,4 +1,4 @@
-# One-shot backfill of project board dates for the PunchIn project board (user project #3).
+# One-shot backfill of project board dates for the PunchIn project board (org project #1).
 #
 # This complements .github/workflows/project-automation.yml, which only dates NEW
 # items as they open/close. This workflow walks EVERY existing item on the board and
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/github-script@v7
         env:
           PROJECT_OWNER: PunchIn-App
-          PROJECT_NUMBER: "3"
+          PROJECT_NUMBER: "1"
           DRY_RUN: ${{ inputs.dry_run }}
           LIMIT: ${{ inputs.limit }}
         with:
@@ -66,14 +66,14 @@ jobs:
             };
 
             // --- Resolve the project + its field metadata (same query as project-automation.yml). ---
-            const meta = await github.graphql(`query($o:String!,$n:Int!){ user(login:$o){ projectV2(number:$n){ id
+            const meta = await github.graphql(`query($o:String!,$n:Int!){ organization(login:$o){ projectV2(number:$n){ id
               fields(first:50){ nodes{
                 ... on ProjectV2FieldCommon{ id name }
                 ... on ProjectV2SingleSelectField{ id name options{ id name } } } } } } }`, { o: owner, n: number });
 
-            const proj = meta.user && meta.user.projectV2;
+            const proj = meta.organization && meta.organization.projectV2;
             if (!proj) {
-              core.setFailed(`Could not resolve projectV2 #${number} for user "${owner}".`);
+              core.setFailed(`Could not resolve projectV2 #${number} for organization "${owner}".`);
               return;
             }
 

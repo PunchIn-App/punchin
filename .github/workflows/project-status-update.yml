@@ -1,4 +1,4 @@
-# Single source of truth for the PunchIn project (#3) status updates — covers
+# Single source of truth for the PunchIn project (#1) status updates — covers
 # the WHOLE project (both repos) from one place:
 #   - weekly (Monday)                  — a digest of the last 7 days
 #   - on a punchin release              — a "shipped vX.Y.Z" update
@@ -45,12 +45,12 @@ jobs:
             }
 
             // Open P0s drive the status flag.
-            const proj = await github.graphql(`query($o:String!,$n:Int!){ user(login:$o){ projectV2(number:$n){ id
+            const proj = await github.graphql(`query($o:String!,$n:Int!){ organization(login:$o){ projectV2(number:$n){ id
               items(first:100){ nodes{
                 p:fieldValueByName(name:"Priority"){ ... on ProjectV2ItemFieldSingleSelectValue{ name } }
-                content{ ... on Issue{ state } ... on PullRequest{ state } } } } } } }`, { o: owner, n: 3 });
-            const pid = proj.user.projectV2.id;
-            const openP0 = proj.user.projectV2.items.nodes
+                content{ ... on Issue{ state } ... on PullRequest{ state } } } } } } }`, { o: owner, n: 1 });
+            const pid = proj.organization.projectV2.id;
+            const openP0 = proj.organization.projectV2.items.nodes
               .filter(i => i.p && i.p.name === 'P0' && i.content && i.content.state === 'OPEN').length;
 
             // A release update comes either from this repo's own release event
