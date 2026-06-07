@@ -282,7 +282,7 @@ export default function JobsView() {
                   <div key={job.id} className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden transition-all duration-200">
                     {/* ticket left-rail in the job's labor colour */}
                     <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: lt?.color || 'transparent' }} aria-hidden="true" />
-                    <div className="pl-4 pr-3 py-3.5">
+                    <div className="pl-4 pr-3 py-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-display font-semibold text-appText truncate">{job.name}</p>
@@ -300,7 +300,7 @@ export default function JobsView() {
                         </div>
                       </div>
                       {/* meta row: labor tag (left) + rates indicator (right) */}
-                      <div className="flex items-center justify-between gap-2 mt-3">
+                      <div className="flex items-center justify-between gap-2 mt-2.5">
                         {lt ? <LaborTag laborType={lt} /> : <span className="text-[10px] text-appTextDisabled uppercase tracking-wider">No labor type</span>}
                         <span className="flex items-center gap-1 text-xs flex-shrink-0">
                           <DollarSign className="w-3.5 h-3.5 text-appTextMuted" aria-hidden="true" />
@@ -367,7 +367,7 @@ export default function JobsView() {
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <button onClick={() => toggleArchive(job)}
                               aria-label={`Restore ${job.name}`}
-                              className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
                               <ArchiveRestore className="w-4 h-4" aria-hidden="true" />
                             </button>
                           </div>
@@ -404,12 +404,13 @@ export default function JobsView() {
               </div>
             )}
 
+            <div className="space-y-2.5">
             {laborTypes?.filter(lt => !lt.isArchived).map(lt => {
               if (editingLT?.id === lt.id)
                 return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
               return (
                 <div key={lt.id}
-                  className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-4 py-3.5 transition-all duration-200">
+                  className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-3 py-2.5 transition-all duration-200">
                   <div className="flex items-center gap-3">
                     <LaborGlyphChip laborType={lt} />
                     <span className="font-medium text-appText text-sm">{lt.name}</span>
@@ -417,18 +418,19 @@ export default function JobsView() {
                   <div className="flex items-center gap-1">
                     <button onClick={() => setEditingLT(lt)}
                       aria-label={`Edit ${lt.name}`}
-                      className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                      className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
                       <Pencil className="w-4 h-4" aria-hidden="true" />
                     </button>
                     <button onClick={() => toggleArchiveLaborType(lt)}
                       aria-label={`Archive ${lt.name}`}
-                      className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                      className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
                       <Archive className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
               )
             })}
+            </div>
 
             {(() => {
               const archived = laborTypes?.filter(lt => lt.isArchived) ?? []
@@ -464,7 +466,7 @@ export default function JobsView() {
                       return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
                     return (
                       <div key={lt.id}
-                        className="flex items-center justify-between rounded-xl border border-appBorderLight bg-appCard px-4 py-3.5 opacity-60 transition-all duration-200">
+                        className="flex items-center justify-between rounded-xl border border-appBorderLight bg-appCard px-3 py-2.5 opacity-60 transition-all duration-200">
                         <div className="flex items-center gap-3">
                           <LaborGlyphChip laborType={lt} />
                           <span className="font-medium text-appText text-sm">{lt.name}</span>
@@ -472,7 +474,7 @@ export default function JobsView() {
                         <div className="flex items-center gap-1">
                           <button onClick={() => toggleArchiveLaborType(lt)}
                             aria-label={`Restore ${lt.name}`}
-                            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
+                            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
                             <ArchiveRestore className="w-4 h-4" aria-hidden="true" />
                           </button>
                         </div>
