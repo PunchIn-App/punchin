@@ -7,7 +7,8 @@ import {
   startOfDay, endOfDay, subWeeks, subMonths,
 } from 'date-fns'
 import { db } from '../db'
-import { getEntryDuration, roundEntry } from '../utils/time'
+import { getEntryDuration, roundEntry, formatTime } from '../utils/time'
+import { formatMoney, currencySymbol } from '../utils/format'
 import { PRINT_FONT_HEAD, openPrintWindow } from '../utils/printDocument'
 import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
@@ -41,6 +42,9 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   const { isStandalone, os } = usePlatformContext()
   const { settings } = useSettings()
   const wsMon = settings.weekStartsMonday // complete via DEFAULT_SETTINGS merge (issue #134)
+  const timeFormat = settings.timeFormat
+  const currency = settings.defaultCurrency
+  const money = (n) => formatMoney(n, currency)
 
   const uid      = useId()
   const titleId  = `${uid}-title`
@@ -106,12 +110,12 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
       [`Invoice — ${job.name}${job.clientName ? ` / ${job.clientName}` : ''}`],
       [`Period: ${start ? format(start, 'yyyy-MM-dd') : ''} to ${end ? format(end, 'yyyy-MM-dd') : ''}`],
       [],
-      ['Date', 'Labor Type', 'Start', 'End', 'Hours', 'Rate ($/hr)', 'Amount ($)'],
+      ['Date', 'Labor Type', 'Start', 'End', 'Hours', `Rate (${currencySymbol(currency)}/hr)`, `Amount (${currencySymbol(currency)})`],
       ...lineItems.map(li => [
         format(new Date(li.entry.punchIn), 'yyyy-MM-dd'),
         li.lt?.name || '',
-        format(new Date(li.entry.punchIn), 'HH:mm'),
-        format(new Date(li.entry.punchOut), 'HH:mm'),
+        formatTime(li.entry.punchIn, timeFormat),
+        formatTime(li.entry.punchOut, timeFormat),
         li.hours.toFixed(2),
         li.rate != null ? li.rate.toFixed(2) : '',
         li.amount != null ? li.amount.toFixed(2) : '',
@@ -139,10 +143,10 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
       <tr>
         <td>${format(new Date(li.entry.punchIn), 'MMM d, yyyy')}</td>
         <td>${li.lt?.name || '—'}</td>
-        <td class="mono">${format(new Date(li.entry.punchIn), 'HH:mm')} – ${format(new Date(li.entry.punchOut), 'HH:mm')}</td>
+        <td class="mono">${formatTime(li.entry.punchIn, timeFormat)} – ${formatTime(li.entry.punchOut, timeFormat)}</td>
         <td class="right mono">${li.hours.toFixed(2)}</td>
-        <td class="right mono">${li.rate != null ? `$${li.rate.toFixed(2)}` : '—'}</td>
-        <td class="right mono">${li.amount != null ? `$${li.amount.toFixed(2)}` : '—'}</td>
+        <td class="right mono">${li.rate != null ? money(li.rate) : '—'}</td>
+        <td class="right mono">${li.amount != null ? money(li.amount) : '—'}</td>
       </tr>`).join('')
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>Invoice — ${job.name}</title>
@@ -180,7 +184,7 @@ ${PRINT_FONT_HEAD}
     <td colspan="3"><strong>Total</strong></td>
     <td class="right mono">${totalHours.toFixed(2)}</td>
     <td></td>
-    <td class="right mono">${totalAmount != null ? `$${totalAmount.toFixed(2)}` : '—'}</td>
+    <td class="right mono">${totalAmount != null ? money(totalAmount) : '—'}</td>
   </tr></tfoot>
 </table>
 </body></html>`
@@ -331,10 +335,10 @@ ${PRINT_FONT_HEAD}
                         </div>
                         <span className="font-mono text-xs text-appText text-right">{li.hours.toFixed(2)}</span>
                         <span className="font-mono text-xs text-appTextMuted text-right">
-                          {li.rate != null ? `$${li.rate.toFixed(2)}` : '—'}
+                          {li.rate != null ? money(li.rate) : '—'}
                         </span>
                         <span className="font-mono text-xs text-appText text-right">
-                          {li.amount != null ? `$${li.amount.toFixed(2)}` : '—'}
+                          {li.amount != null ? money(li.amount) : '—'}
                         </span>
                       </div>
                     ))}
@@ -346,7 +350,7 @@ ${PRINT_FONT_HEAD}
                     <span className="font-mono text-xs font-bold text-appText text-right">{totalHours.toFixed(2)}</span>
                     <span />
                     <span className="font-mono text-xs font-bold text-appText text-right">
-                      {totalAmount != null ? `$${totalAmount.toFixed(2)}` : '—'}
+                      {totalAmount != null ? money(totalAmount) : '—'}
                     </span>
                   </div>
                 </div>

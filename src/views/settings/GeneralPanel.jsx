@@ -1,4 +1,4 @@
-import { Layers, Calendar, Vibrate, Clock, Hourglass } from 'lucide-react'
+import { Layers, Calendar, Vibrate, Clock, Hourglass, Watch } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { usePlatformContext } from '../../hooks/usePlatformContext'
 import { Panel, SettingsRow, Toggle } from './components'
@@ -39,6 +39,22 @@ export default function GeneralPanel({ onBack }) {
               value={settings.weekStartsMonday !== false}
               onChange={v => updateSetting('weekStartsMonday', v)}
             />
+          }
+        />
+        <SettingsRow
+          icon={Watch}
+          title="Time format"
+          subtitle="How clock times show in timesheets and invoices"
+          right={
+            <select
+              aria-label="Time format"
+              value={settings.timeFormat || '12h'}
+              onChange={e => updateSetting('timeFormat', e.target.value)}
+              className={selectClass}
+            >
+              <option value="12h">12-hour</option>
+              <option value="24h">24-hour</option>
+            </select>
           }
         />
         <SettingsRow

@@ -85,9 +85,9 @@ export function getEntryDuration(entry) {
   return end.getTime() - new Date(entry.punchIn).getTime()
 }
 
-/** @param {Date|string|number} date @returns {string} */
-export function formatTime(date) {
-  return format(new Date(date), 'h:mm a')
+/** @param {Date|string|number} date @param {'12h'|'24h'} [fmt] @returns {string} */
+export function formatTime(date, fmt = '12h') {
+  return format(new Date(date), fmt === '24h' ? 'HH:mm' : 'h:mm a')
 }
 
 /** @param {Date|string|number} date @returns {string} */

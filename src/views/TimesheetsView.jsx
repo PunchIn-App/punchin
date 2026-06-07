@@ -102,7 +102,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
                 <div className="text-right flex-shrink-0 flex flex-col items-end">
                   <p className="font-mono text-appText font-semibold text-sm">{formatDuration(dur, decimal)}</p>
                   <p className="text-appTextDarker text-xs mt-0.5">
-                    {formatTime(entry.punchIn)} → {entry.punchOut ? formatTime(entry.punchOut) : 'running'}
+                    {formatTime(entry.punchIn, settings.timeFormat)} → {entry.punchOut ? formatTime(entry.punchOut, settings.timeFormat) : 'running'}
                   </p>
                   <div className="flex items-center gap-1.5 mt-2">
                     <button onClick={() => onEdit(entry)} aria-label={`Edit entry for ${getJob(entry.jobId)?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
@@ -361,8 +361,8 @@ export default function TimesheetsView() {
         job?.name || '',
         job?.clientName || '',
         lt?.name || '',
-        format(new Date(e.punchIn), 'HH:mm'),
-        format(new Date(e.punchOut), 'HH:mm'),
+        formatTime(e.punchIn, settings.timeFormat),
+        formatTime(e.punchOut, settings.timeFormat),
         dur.toFixed(2),
         raw.notes || '',
       ])
@@ -405,7 +405,7 @@ export default function TimesheetsView() {
           <td>${format(new Date(e.punchIn), 'EEE, MMM d')}</td>
           <td>${job?.name || '—'}${job?.clientName ? `<br><span class="sub">${job.clientName}</span>` : ''}</td>
           <td>${lt ? `<span class="badge" style="background:${lt.color}22;color:${lt.color}">${lt.name}</span>` : '—'}</td>
-          <td class="mono">${format(new Date(e.punchIn), 'HH:mm')} – ${format(new Date(e.punchOut), 'HH:mm')}</td>
+          <td class="mono">${formatTime(e.punchIn, settings.timeFormat)} – ${formatTime(e.punchOut, settings.timeFormat)}</td>
           <td class="right mono">${hrs}</td>
           ${e.notes ? `<td class="notes">${e.notes}</td>` : '<td></td>'}
         </tr>`

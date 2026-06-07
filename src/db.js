@@ -179,6 +179,25 @@ export const DEFAULT_SETTINGS = {
   // and invoices: 0 = off, 15 = nearest quarter hour, 30 = nearest half hour.
   decimalHours: false,
   roundingMinutes: 0,
+  // Time display + invoice formatting. timeFormat drives clock-time rendering
+  // (in-app default is 12h); defaultCurrency is an ISO 4217 code formatted via
+  // Intl.NumberFormat in invoices/CSV.
+  timeFormat: '12h',       // '12h' | '24h'
+  defaultCurrency: 'USD',  // ISO 4217
+  // Billing profile — the invoice "Billed from" identity. Flat keys (the
+  // useSettings merge is shallow, so a nested object wouldn't auto-default new
+  // sub-fields for existing installs). All optional; the invoice band hides
+  // blank lines. Invoice numbering is display-only (set/bump the counter here).
+  billingName: '',
+  billingBusiness: '',
+  billingEmail: '',
+  billingPhone: '',
+  billingAddress: '',
+  billingPaymentTerms: '',
+  billingNotes: '',
+  numberInvoices: false,
+  invoicePrefix: '',
+  nextInvoiceNumber: 1,
   // Reminder notifications (issue #54) — all off by default; the master toggle
   // requests notification permission when first enabled.
   remindersEnabled: false,
