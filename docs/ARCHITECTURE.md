@@ -75,6 +75,7 @@ punchin/
 │   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
 │   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
 │   │   ├── GlyphPicker.jsx     # Labor-type glyph picker: single quick-pick row + searchable "more" dropdown over the LABOR_GLYPHS set
+│   │   ├── EntitySelect.jsx    # Bespoke single-select replacing native <select> where choices carry colour/glyph (jobs, labor types): listbox of options { value,label,sublabel?,color?,glyph? } showing a colour dot / labor glyph + label + sublabel; configurable empty/clear row; in-flow menu (no clip in scroll-container modals), capture-Escape + outside-click
 │   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets; centered reading-modal — closes on device Back (pushes {modal:true} history entry)
 │   │   ├── LicenseModal.jsx     # Centered reading-modal showing the app license (LICENSE ?raw, BUSL-1.1) and third-party attributions (docs/THIRD-PARTY-LICENSES.md ?raw, rendered via a small built-in markdown renderer); two-way section switch via aria-pressed buttons; closes on device Back
 │   │   ├── DataTransfer.jsx     # Account-free device-to-device transfer (issue #77): "Create share link" snapshots the DB → compressed #import= link + QR (qrcode-generator); "Import from a link" pastes a link/code and merges via importSnapshot
