@@ -185,7 +185,7 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `allowConcurrentTimers` | boolean | `false` |
 | `weekStartsMonday` | boolean | `true` |
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
-| `accentColor` | hex string | `"#1f6feb"` |
+| `accentColor` | hex string | `"#2D5BF5"` (PunchIn Blue; light theme renders the default as the darker `#2348DB`) |
 | `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
 | `decimalHours` | boolean | `false` — show timesheet durations as decimal hours (`1.50 h`) instead of `1h 30m` (issue #208) |
 | `roundingMinutes` | number (`0` \| `15` \| `30`) | `0` — round each billable entry in the user's favour (start floored, end ceiled) for timesheets & invoices; `0` = off (issue #208) |
@@ -288,9 +288,9 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 
 ### Color Conventions
 
-- **Accent:** `appAccent` / `text-appAccent` tokens — active nav, buttons, highlights (user-configurable; defaults to `#1f6feb`)
+- **Accent:** `appAccent` / `text-appAccent` tokens — active nav, buttons, highlights (user-configurable; defaults to PunchIn Blue `#2D5BF5` dark / `#2348DB` light). `App.jsx` writes both `--accent-rgb` (for the Tailwind token) and `--accent` (raw hex, backs `color-mix` tokens like `--shadow-accent`); the default accent shifts to the darker `#2348DB` in light mode, a custom accent is used as-is in both themes
 - **Stop/end actions:** red (`red-500`, `red-600`) — punch-out buttons and other irreversible-but-non-destructive actions; also used for destructive confirmations
-- **Labor type colors:** 9 preset hex values defined in `JobsView.jsx` (`#6366F1 #F59E0B #22C55E #3B82F6 #EF4444 #EC4899 #8B5CF6 #14B8A6 #F97316`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
+- **Labor type colors:** 10 suggested pastel presets defined in `JobsView.jsx` (`#FF8FA3 #FFB163 #E6C84B #5FD08A #4FC6E8 #6FA8FF #9B8CFF #C77DFF #FF8FD9 #9AA4B2` — the design-system pastel rainbow, mirrored as `--pastel-*` tokens in `index.css`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
 
 ### Typography & Fonts
 
@@ -322,7 +322,7 @@ The UI uses Google's **Noto** type family, mapped to Tailwind tokens in `tailwin
 | `text-appText` | `--text-primary` | `#FFFFFF` | `#111827` |
 | `text-appTextMuted` | `--text-muted` | `#6B7280` | `#6B7280` |
 | `text-appTextDisabled` | `--text-disabled` | `#374151` | `#D1D5DB` |
-| `bg-appAccent` / `text-appAccent` | `--accent-rgb` | `#1f6feb` (user-configurable) | same |
+| `bg-appAccent` / `text-appAccent` | `--accent-rgb` | `#2D5BF5` (user-configurable) | `#2348DB` (default; user-configurable) |
 
 Two additional CSS variables exist in `index.css` but have **no Tailwind token** — use them via `var()` in CSS files or Recharts style props only, not via Tailwind utilities:
 
@@ -334,6 +334,19 @@ Two additional CSS variables exist in `index.css` but have **no Tailwind token**
 The accent color is stored as a hex string in the `accentColor` setting. `App.jsx` converts it to space-separated RGB values and writes them to `--accent-rgb` on the root element. The Tailwind token uses `rgb(var(--accent-rgb) / <alpha-value>)` so opacity modifiers like `bg-appAccent/30` work correctly. **Never use hardcoded `amber-*` Tailwind classes** — always use `appAccent` so the user's chosen color is respected.
 
 In JSX, use Tailwind token classes rather than raw hex values or inline `var()` calls — except for `--text-secondary` and `--text-darker` which have no token. `color-scheme: dark/light` is set on `:root`/`.light` in `index.css` so browser-native controls (date/time pickers, caret, scrollbars) render in the correct scheme.
+
+### Design-system tokens
+
+`index.css` also defines the PunchIn design-system token layer (CSS custom properties; reference via `var()`):
+
+- **Type scale / weights / tracking:** `--text-display|h1|h2|lg|base|sm|xs|2xs`, `--weight-regular…black`, `--track-tight|normal|over`
+- **Radii:** `--radius-sm` 8 · `--radius` 11 · `--radius-md` 13 · `--radius-lg` 16 · `--radius-xl` 20 · `--radius-pill`
+- **Spacing:** `--space-1…8` (4px base)
+- **Elevation:** `--shadow-card|pop|modal` + `--shadow-accent` (`color-mix` against `--accent`)
+- **Status colours (per theme):** `--green --violet --amber --red`
+- **Pastel presets:** `--pastel-red…gray` — the suggested accent + labor-type colours (users may still pick any custom hex)
+
+The radii/spacing/type/shadow/pastel scales are theme-independent; `--accent`, `--accent-rgb`, and the status colours are overridden under `.light`.
 
 ---
 

@@ -4,10 +4,11 @@ import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, Che
 import { db } from '../db'
 import ColorPicker from '../components/ColorPicker'
 
+// Suggested labor-type colours — the PunchIn design-system pastel rainbow. Users
+// can still pick any custom hex via ColorPicker; these are just the quick presets.
 const PRESET_COLORS = [
-  '#6366F1','#F59E0B','#22C55E','#3B82F6',
-  '#EF4444','#EC4899','#8B5CF6','#14B8A6',
-  '#F97316',
+  '#FF8FA3','#FFB163','#E6C84B','#5FD08A','#4FC6E8',
+  '#6FA8FF','#9B8CFF','#C77DFF','#FF8FD9','#9AA4B2',
 ]
 
 const PRESET_COLOR_OBJECTS = PRESET_COLORS.map(hex => ({ hex }))

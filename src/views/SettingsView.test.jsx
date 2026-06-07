@@ -40,7 +40,7 @@ vi.mock('../db', () => ({
     { key: 'allowConcurrentTimers', value: false },
     { key: 'weekStartsMonday', value: true },
     { key: 'theme', value: 'auto' },
-    { key: 'accentColor', value: '#1f6feb' },
+    { key: 'accentColor', value: '#2D5BF5' },
     { key: 'syncProvider', value: null },
   ],
   db: {
@@ -481,7 +481,7 @@ describe('SettingsView — Danger Zone', () => {
     }
   })
 
-  it('re-seeds the default blue accent (#1f6feb), not amber, after factory reset (#69)', async () => {
+  it('re-seeds the default PunchIn Blue accent (#2D5BF5), not amber, after factory reset (#69)', async () => {
     render(<SettingsView />)
     expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
@@ -490,7 +490,7 @@ describe('SettingsView — Danger Zone', () => {
     await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalled())
     const seeded = mockDbSettingsBulkPut.mock.calls.at(-1)[0]
     const accent = seeded.find(s => s.key === 'accentColor')
-    expect(accent.value).toBe('#1f6feb')
+    expect(accent.value).toBe('#2D5BF5')
   })
 
   it('returns to null stage after factory reset completes', async () => {

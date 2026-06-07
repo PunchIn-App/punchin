@@ -112,10 +112,27 @@ describe('App — accent color CSS variable', () => {
     expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('255 0 0')
   })
 
-  it('falls back to #1f6feb when accentColor is missing', () => {
-    mockUseSettings.mockReturnValue({ settings: {}, updateSetting: vi.fn() })
+  it('also writes the raw hex to the --accent token', () => {
+    mockUseSettings.mockReturnValue({
+      settings: { theme: 'dark', accentColor: '#FF0000' },
+      updateSetting: vi.fn(),
+    })
     render(<App />)
-    expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('31 111 235')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#FF0000')
+  })
+
+  it('defaults to PunchIn Blue #2D5BF5 (dark) when accentColor is missing', () => {
+    mockUseSettings.mockReturnValue({ settings: { theme: 'dark' }, updateSetting: vi.fn() })
+    render(<App />)
+    expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('45 91 245')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#2D5BF5')
+  })
+
+  it('uses the darker light-mode default #2348DB when accentColor is missing in light theme', () => {
+    mockUseSettings.mockReturnValue({ settings: { theme: 'light' }, updateSetting: vi.fn() })
+    render(<App />)
+    expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('35 72 219')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#2348DB')
   })
 })
 

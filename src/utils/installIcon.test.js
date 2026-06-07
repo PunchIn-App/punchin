@@ -11,8 +11,8 @@ describe('applyInstallIcon (#228)', () => {
   beforeEach(() => { document.head.innerHTML = '' })
 
   it('points the manifest at the pre-rendered static set for a preset', () => {
-    applyInstallIcon('#1f6feb')
-    expect(link('manifest').getAttribute('href')).toBe('/icons/1f6feb/manifest.webmanifest')
+    applyInstallIcon('#2D5BF5')
+    expect(link('manifest').getAttribute('href')).toBe('/icons/2d5bf5/manifest.webmanifest')
   })
 
   it('points a custom colour at the worker exact-render route', () => {

@@ -4,18 +4,18 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-1f6feb?style=flat" alt="License" /></a>
-  <a href="../../actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/PunchIn-App/punchin/ci.yml?branch=main&style=flat&label=CI&color=1f6feb" alt="CI" /></a>
-  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.20.3-1f6feb?style=flat" alt="Version 0.20.3" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-2d5bf5?style=flat" alt="License" /></a>
+  <a href="../../actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/PunchIn-App/punchin/ci.yml?branch=main&style=flat&label=CI&color=2d5bf5" alt="CI" /></a>
+  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.20.3-2d5bf5?style=flat" alt="Version 0.20.3" /></a>
 </p>
 
 <p align="center">
-  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-1f6feb?style=flat&logo=react&logoColor=white" alt="React 19" /></a>
-  <a href="https://dexie.org"><img src="https://img.shields.io/badge/Dexie-4-1f6feb?style=flat" alt="Dexie 4" /></a>
-  <a href="https://recharts.org"><img src="https://img.shields.io/badge/Recharts-3-1f6feb?style=flat" alt="Recharts 3" /></a>
-  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-8-1f6feb?style=flat&logo=vite&logoColor=white" alt="Vite 8" /></a>
-  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-4-1f6feb?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4" /></a>
-  <a href="https://workers.cloudflare.com"><img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-1f6feb?style=flat&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" /></a>
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-2d5bf5?style=flat&logo=react&logoColor=white" alt="React 19" /></a>
+  <a href="https://dexie.org"><img src="https://img.shields.io/badge/Dexie-4-2d5bf5?style=flat" alt="Dexie 4" /></a>
+  <a href="https://recharts.org"><img src="https://img.shields.io/badge/Recharts-3-2d5bf5?style=flat" alt="Recharts 3" /></a>
+  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-8-2d5bf5?style=flat&logo=vite&logoColor=white" alt="Vite 8" /></a>
+  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-4-2d5bf5?style=flat&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4" /></a>
+  <a href="https://workers.cloudflare.com"><img src="https://img.shields.io/badge/deployed%20on-Cloudflare%20Workers-2d5bf5?style=flat&logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare Workers" /></a>
 </p>
 
 <p align="center"><strong>Precision time tracking for freelancers</strong> — punch in, punch out, get paid accurately.</p>

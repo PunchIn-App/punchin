@@ -64,9 +64,9 @@ describe('db — populate seed', () => {
     expect(s?.value).toBe('auto')
   })
 
-  it('seeds accentColor = "#1f6feb"', async () => {
+  it('seeds accentColor = "#2D5BF5"', async () => {
     const s = await db.settings.get('accentColor')
-    expect(s?.value).toBe('#1f6feb')
+    expect(s?.value).toBe('#2D5BF5')
   })
 
   it('seeds hapticFeedback = true', async () => {

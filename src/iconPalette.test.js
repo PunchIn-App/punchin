@@ -9,12 +9,12 @@ describe('iconPalette (#228)', () => {
   })
 
   it('snaps a preset colour to itself (exact match)', () => {
-    expect(nearestPaletteKey('#1f6feb')).toBe('1f6feb')
+    expect(nearestPaletteKey('#2D5BF5')).toBe('2d5bf5')
     expect(nearestPaletteKey('#F59E0B')).toBe('f59e0b')
   })
 
   it('snaps a colour a hair off a preset to that preset', () => {
-    expect(nearestPaletteKey('#1f6fec')).toBe('1f6feb')
+    expect(nearestPaletteKey('#2d5bf6')).toBe('2d5bf5')
   })
 
   it('always returns a key that has a generated palette folder', () => {

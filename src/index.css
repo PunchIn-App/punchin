@@ -3,7 +3,10 @@
 
 :root {
   color-scheme: dark;
-  --accent-rgb: 31 111 235;
+  /* PunchIn Blue — the DEFAULT accent. App.jsx overrides --accent / --accent-rgb
+     at runtime from the user's chosen colour (and the light-mode default). */
+  --accent: #2D5BF5;
+  --accent-rgb: 45 91 245;
   --bg-primary: #0F1117;
   --bg-secondary: #161923;
   --bg-tertiary: #1E2232;
@@ -16,10 +19,18 @@
   --text-darker: #4B5563;
   --text-disabled: #374151;
   --shadow-color: rgba(0, 0, 0, 0.5);
+
+  /* Semantic / status colours (dark). */
+  --green:  #34D399;
+  --violet: #8B8CF8;
+  --amber:  #F5A524;
+  --red:    #FB6B6B;
 }
 
 .light {
   color-scheme: light;
+  --accent: #2348DB;
+  --accent-rgb: 35 72 219;
   --bg-primary: #F3F4F6;
   --bg-secondary: #FFFFFF;
   --bg-tertiary: #E5E7EB;
@@ -32,6 +43,73 @@
   --text-darker: #9CA3AF;
   --text-disabled: #D1D5DB;
   --shadow-color: rgba(0, 0, 0, 0.05);
+
+  /* Semantic / status colours (light). */
+  --green:  #0EA66B;
+  --violet: #6366F1;
+  --amber:  #D9870A;
+  --red:    #E5484D;
+}
+
+/* Design tokens — scale values shared by both themes (PunchIn design system). */
+:root {
+  /* Type scale (px) */
+  --text-display: 30px;
+  --text-h1: 23px;
+  --text-h2: 19px;
+  --text-lg: 16px;
+  --text-base: 14px;
+  --text-sm: 13px;
+  --text-xs: 12px;
+  --text-2xs: 10.5px;
+
+  /* Font weights */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-black: 800;
+
+  /* Letter tracking */
+  --track-tight: -0.02em;
+  --track-normal: 0;
+  --track-over: 0.16em;
+
+  /* Radii — climb with elevation */
+  --radius-sm: 8px;
+  --radius: 11px;
+  --radius-md: 13px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Elevation */
+  --shadow-card:   0 1px 0 rgba(0, 0, 0, .04);
+  --shadow-pop:    0 8px 24px rgba(0, 0, 0, .35);
+  --shadow-modal:  0 30px 80px rgba(0, 0, 0, .55);
+  --shadow-accent: 0 6px 18px color-mix(in srgb, var(--accent) 38%, transparent);
+
+  /* Pastel presets — suggested picks for accent + labor-type colours; users may
+     also pick any custom hex. Not a fixed brand palette. */
+  --pastel-red:    #FF8FA3;
+  --pastel-orange: #FFB163;
+  --pastel-yellow: #E6C84B;
+  --pastel-green:  #5FD08A;
+  --pastel-cyan:   #4FC6E8;
+  --pastel-blue:   #6FA8FF;
+  --pastel-indigo: #9B8CFF;
+  --pastel-purple: #C77DFF;
+  --pastel-pink:   #FF8FD9;
+  --pastel-gray:   #9AA4B2;
 }
 
 @layer base {

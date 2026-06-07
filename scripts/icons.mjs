@@ -26,7 +26,7 @@ import { ICON_PALETTE, paletteKey } from '../src/iconPalette.js'
 import { iconSvg } from '../src/iconSvg.js'
 import { manifest } from '../config/manifest.base.js'
 
-const DEFAULT_ACCENT = '#1f6feb'
+const DEFAULT_ACCENT = '#2D5BF5'
 const publicDir = fileURLToPath(new URL('../app/public/', import.meta.url))
 const iconsDir = publicDir + 'icons/'
 

@@ -147,7 +147,7 @@ export const DEFAULT_SETTINGS = {
   allowConcurrentTimers: false,
   weekStartsMonday: true,
   theme: 'auto',
-  accentColor: '#1f6feb',
+  accentColor: '#2D5BF5',
   hapticFeedback: true,
   // Time display & billing (issue #208). decimalHours shows durations as decimal
   // hours ("1.50 h") instead of "1h 30m" in timesheets. roundingMinutes rounds

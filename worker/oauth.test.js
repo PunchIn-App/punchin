@@ -138,7 +138,7 @@ describe('accent install icons (issue #228)', () => {
     // The catch in handleAccentIcon 302s to this path so a render failure can
     // never break the icon (or, since it's the same worker, asset serving).
     expect(nearestSwatchPath('7c3aed', 'icon-512.png')).toMatch(/^\/icons\/[0-9a-f]{6}\/icon-512\.png$/)
-    expect(nearestSwatchPath('1f6feb', 'icon-192.png')).toBe('/icons/1f6feb/icon-192.png')
+    expect(nearestSwatchPath('2d5bf5', 'icon-192.png')).toBe('/icons/2d5bf5/icon-192.png')
   })
 
   it('passes non-icon paths through to ASSETS', async () => {

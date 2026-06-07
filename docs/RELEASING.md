@@ -38,7 +38,7 @@ Every version bump must update all of the following in the **same commit or PR**
 | File | What to change |
 |------|----------------|
 | `package.json` | `"version"` field — **source of truth** |
-| `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-1f6feb...` |
+| `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-2d5bf5...` |
 | `CLAUDE.md` | `**Version:** {X.Y.Z}` in the Project Overview header |
 | `docs/CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top |
 | `SECURITY.md`        | Update the **Supported Versions** table — bump the supported version to `{X.Y.Z}.x` and mark all prior minor versions as `No` |

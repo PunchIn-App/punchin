@@ -16,6 +16,7 @@ import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { useReminders } from './hooks/useReminders'
 import { updateFavicon } from './utils/favicon'
 import { applyInstallIcon } from './utils/installIcon'
+import { DEFAULT_ACCENT, DEFAULT_ACCENT_LIGHT } from './accentPresets'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
@@ -187,7 +188,7 @@ export default function App() {
   }, [])
 
   const theme       = settings.theme       || 'auto'
-  const accentColor = settings.accentColor || '#1f6feb'
+  const accentColor = settings.accentColor || DEFAULT_ACCENT
 
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -211,8 +212,24 @@ export default function App() {
     }
   }, [resolvedTheme])
 
+  // One token repaints every accent surface. The DEFAULT accent shifts to a
+  // darker blue in light mode for contrast; a user-chosen custom accent is used
+  // as-is in both themes (per-theme darkening of custom accents is a later step).
+  // --accent (raw hex) backs color-mix tokens like --shadow-accent; --accent-rgb
+  // backs the rgb(var(--accent-rgb) / <alpha>) Tailwind token.
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent-rgb', hexToRgb(accentColor))
+    const effectiveAccent =
+      accentColor === DEFAULT_ACCENT && resolvedTheme === 'light'
+        ? DEFAULT_ACCENT_LIGHT
+        : accentColor
+    const rootStyle = document.documentElement.style
+    rootStyle.setProperty('--accent', effectiveAccent)
+    rootStyle.setProperty('--accent-rgb', hexToRgb(effectiveAccent))
+  }, [accentColor, resolvedTheme])
+
+  // The favicon / install icon follow the stored accent (theme-independent — the
+  // browser-tab/home-screen tile is the same in light and dark).
+  useEffect(() => {
     updateFavicon(accentColor)
     applyInstallIcon(accentColor)
   }, [accentColor])
