@@ -7,6 +7,7 @@ import {
   getEntryDuration, getEntryDurationInRange, entryOverlapsRange,
   formatDurationHM, sumDurations,
 } from '../utils/time'
+import { LaborGlyphChip } from '../components/LaborGlyph'
 
 const TOOLTIP = {
   backgroundColor: 'var(--bg-tertiary)',
@@ -69,6 +70,7 @@ export default function AnalyticsView() {
       name: lt.name,
       value: entries.filter(e => e.laborTypeId === lt.id).reduce((a, e) => a + getEntryDuration(e), 0),
       color: lt.color,
+      glyph: lt.glyph,
     })).filter(d => d.value > 0)
 
     return { total, dailyData, jobData, ltData }
@@ -192,7 +194,7 @@ export default function AnalyticsView() {
                   {ltData.map(lt => (
                     <div key={lt.name} className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+                        <LaborGlyphChip laborType={lt} className="w-4 h-4" />
                         <span className="text-xs text-appTextMuted truncate">{lt.name}</span>
                       </div>
                       <span className="font-mono text-xs text-appText flex-shrink-0">{formatDurationHM(lt.value)}</span>

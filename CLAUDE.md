@@ -147,7 +147,7 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 | Table | Indexes | Purpose |
 |-------|---------|---------|
 | `settings` | `key` | KV store for app preferences |
-| `laborTypes` | `id, name, uuid` | Billable categories with color; soft-archived via `isArchived` |
+| `laborTypes` | `id, name, uuid` | Billable categories with `color` + `glyph` (a Lucide icon id; unindexed, render-time `Tag` fallback so existing rows need no migration — see `src/components/LaborGlyph.jsx`); soft-archived via `isArchived` |
 | `jobs` | `id, name, laborTypeId, isActive, uuid` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field |
 | `entries` | `id, jobId, laborTypeId, punchIn, punchOut, uuid` | Time records; optional `notes` (string) field |
 | `deletions` | `uuid, deletedAt` | Delete **tombstones**: when an entry is removed it is hard-deleted from `entries` (so every view/analytics/export query is unaffected) and its `uuid` is recorded here with a `deletedAt` timestamp, so cloud merge propagates the deletion across devices instead of the entry resurrecting from a peer's snapshot. Use `deleteEntry(id)` (in `db.js`) to delete an entry — never `db.entries.delete` directly. |
@@ -292,6 +292,7 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 - **Brand mark:** a **stopwatch** glyph (crown + stem + body + clock hands, Lucide visual language) on the accent tile. One geometry, three renderers kept in sync: `src/iconSvg.js` (SVG → build PNGs + worker), `src/utils/favicon.js` (canvas favicon/apple-touch), and `src/components/BrandMark.jsx` (`PunchMark` inline SVG for the header/sidebar). The glyph flips between white and dark ink (`#0F1117`) via `src/utils/inkOnAccent.js` `readableInk()` so it reads on any accent (incl. light pastels). The **wordmark** is `PunchIn` in `font-display` with the capital **I** tinted `text-appAccent` (`Wordmark`). All accent-driven — never hardcode the mark colour. The `scripts/social-preview.py` card mirrors the same stopwatch + tinted I (with a `readable_ink` port — keep it in sync).
 - **Stop/end actions:** red (`red-500`, `red-600`) — punch-out buttons and other irreversible-but-non-destructive actions; also used for destructive confirmations
 - **Labor type colors:** 10 suggested pastel presets defined in `JobsView.jsx` (`#FF8FA3 #FFB163 #E6C84B #5FD08A #4FC6E8 #6FA8FF #9B8CFF #C77DFF #FF8FD9 #9AA4B2` — the design-system pastel rainbow, mirrored as `--pastel-*` tokens in `index.css`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
+- **Labor type glyphs:** each labor type also carries a **glyph** (a Lucide icon, accessibility — read by shape + colour, not colour alone). Render labor types via the shared `LaborTag` (tinted pill + glyph + name) or `LaborGlyphChip` (solid colour chip + glyph) from `src/components/LaborGlyph.jsx` — **never** a bare colour dot/pill — so the glyph rides along on every surface (timer ticket, timesheets, analytics legend, invoice line items, management lists)
 
 ### Typography & Fonts
 

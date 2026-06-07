@@ -30,6 +30,7 @@ export function genUuid() {
  *   uuid?: string,
  *   name: string,
  *   color: string,
+ *   glyph?: string,
  *   isArchived: boolean,
  *   updatedAt?: number,
  * }} LaborType

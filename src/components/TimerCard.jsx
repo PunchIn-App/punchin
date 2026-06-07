@@ -3,6 +3,7 @@ import { Square, Pencil, AlertTriangle } from 'lucide-react'
 import { db } from '../db'
 import { formatElapsed, formatTime } from '../utils/time'
 import EditEntryModal from './EditEntryModal'
+import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
@@ -64,15 +65,7 @@ export default function TimerCard({ entry, job, laborType }) {
               )}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              {laborType && (
-                <span
-                  className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium"
-                  style={{ backgroundColor: `${color}25`, color }}
-                  aria-label={laborType.name}
-                >
-                  {laborType.name}
-                </span>
-              )}
+              <LaborTag laborType={laborType} />
               <div className="flex items-center gap-1 text-appTextDarker text-xs font-mono">
                 <span>since {formatTime(entry.punchIn)}</span>
                 <button

@@ -65,13 +65,13 @@ async function mergeSnapshot(remote) {
         ltMap[lt.id] = match.id
         // Last-write-wins for mutable fields (issue #120): name, color, archive.
         if (lt.uuid && (lt.updatedAt ?? 0) > (match.updatedAt ?? 0)) {
-          const fields = { name: lt.name, color: lt.color, isArchived: lt.isArchived ?? false }
+          const fields = { name: lt.name, color: lt.color, glyph: lt.glyph ?? null, isArchived: lt.isArchived ?? false }
           await db.laborTypes.update(match.id, { ...fields, updatedAt: lt.updatedAt })
           Object.assign(match, fields, { updatedAt: lt.updatedAt })
         }
       } else {
         const newId = await db.laborTypes.add({
-          name: lt.name, color: lt.color, isArchived: lt.isArchived ?? false,
+          name: lt.name, color: lt.color, glyph: lt.glyph ?? null, isArchived: lt.isArchived ?? false,
           uuid: lt.uuid, updatedAt: lt.updatedAt,
         })
         ltMap[lt.id] = newId

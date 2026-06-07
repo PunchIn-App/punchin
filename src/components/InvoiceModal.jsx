@@ -9,6 +9,7 @@ import {
 import { db } from '../db'
 import { getEntryDuration, roundEntry } from '../utils/time'
 import { PRINT_FONT_HEAD, openPrintWindow } from '../utils/printDocument'
+import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 
@@ -326,12 +327,7 @@ ${PRINT_FONT_HEAD}
                       <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-4 py-2.5 items-center">
                         <div className="min-w-0">
                           <p className="text-xs text-appText">{format(new Date(li.entry.punchIn), 'MMM d')}</p>
-                          {li.lt && (
-                            <span className="text-[10px] px-1 py-0.5 rounded mt-0.5 inline-block"
-                              style={{ backgroundColor: `${li.lt.color}25`, color: li.lt.color }}>
-                              {li.lt.name}
-                            </span>
-                          )}
+                          {li.lt && <LaborTag laborType={li.lt} className="mt-0.5" />}
                         </div>
                         <span className="font-mono text-xs text-appText text-right">{li.hours.toFixed(2)}</span>
                         <span className="font-mono text-xs text-appTextMuted text-right">

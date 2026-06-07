@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { db } from '../db'
 import ColorPicker from '../components/ColorPicker'
+import { LABOR_GLYPH_IDS, glyphComponent, LaborGlyphChip, DEFAULT_LABOR_COLOR } from '../components/LaborGlyph'
 
 // Suggested labor-type colours — the PunchIn design-system pastel rainbow. Users
 // can still pick any custom hex via ColorPicker; these are just the quick presets.
@@ -81,7 +82,7 @@ function JobForm({ job, laborTypes, onDone }) {
             <div className="mt-2 space-y-2">
               {activeLTs.map(lt => (
                 <div key={lt.id} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+                  <LaborGlyphChip laborType={lt} className="w-4 h-4" />
                   <span className="text-xs text-appText flex-1 truncate">{lt.name}</span>
                   <div className="relative w-28 flex-shrink-0">
                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-appTextMuted pointer-events-none">$/hr</span>
@@ -118,32 +119,70 @@ function JobForm({ job, laborTypes, onDone }) {
 
 function LaborTypeForm({ lt, onDone }) {
   const [name, setName]   = useState(lt?.name || '')
-  const [color, setColor] = useState(lt?.color || '#6366F1')
+  const [color, setColor] = useState(lt?.color || DEFAULT_LABOR_COLOR)
+  const [glyph, setGlyph] = useState(lt?.glyph || '')
 
   const save = async () => {
     if (!name.trim()) return
+    const data = { name: name.trim(), color, glyph: glyph || null }
     if (lt?.id) {
-      await db.laborTypes.update(lt.id, { name: name.trim(), color })
+      await db.laborTypes.update(lt.id, data)
     } else {
-      await db.laborTypes.add({ name: name.trim(), color })
+      await db.laborTypes.add(data)
     }
     onDone()
   }
 
   return (
-    <div className="rounded-xl border border-appAccent/30 bg-appCard p-4 space-y-3 shadow-md">
+    <div className="rounded-xl border border-appAccent/30 bg-appCard p-4 space-y-4 shadow-md">
       <input autoFocus value={name} onChange={e => setName(e.target.value)}
         placeholder="Labor type name *"
         onKeyDown={e => e.key === 'Enter' && save()}
         className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
                    placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors" />
+
+      {/* Glyph — so a type reads by shape, not colour alone */}
+      <div className="space-y-1.5">
+        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Glyph</p>
+        <div className="grid grid-cols-8 gap-1.5" role="radiogroup" aria-label="Glyph">
+          {LABOR_GLYPH_IDS.map(id => {
+            const Glyph = glyphComponent(id)
+            const selected = glyph === id
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setGlyph(id)}
+                role="radio"
+                aria-checked={selected}
+                aria-label={id}
+                className={`aspect-square flex items-center justify-center rounded-lg border transition-colors
+                  ${selected ? 'border-appAccent bg-appAccent/10 text-appAccent' : 'border-appBorder text-appTextMuted hover:text-appText hover:bg-appInput'}`}
+              >
+                <Glyph className="w-4 h-4" aria-hidden="true" />
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <ColorPicker
         presets={PRESET_COLOR_OBJECTS}
         value={color}
         onChange={setColor}
         size="lg"
-        label="Select color"
+        label="Color"
       />
+
+      {/* Live preview */}
+      <div className="flex items-center gap-3 rounded-lg border border-appBorderLight bg-appBg px-3 py-2.5">
+        <LaborGlyphChip laborType={{ color, glyph }} className="w-9 h-9" />
+        <div className="min-w-0">
+          <p className="font-display font-semibold text-appText text-sm truncate">{name.trim() || 'Labor type'}</p>
+          <p className="text-xs text-appTextMuted">Shown on timers, timesheets &amp; invoices</p>
+        </div>
+      </div>
+
       <div className="flex gap-2 pt-1">
         <button onClick={save}
           className="flex-1 py-2 rounded-lg bg-appAccent hover:brightness-110 text-appOnAccent font-bold text-sm transition-all">
@@ -355,7 +394,7 @@ export default function JobsView() {
                 <div key={lt.id}
                   className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-4 py-3.5 transition-all duration-200">
                   <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+                    <LaborGlyphChip laborType={lt} />
                     <span className="font-medium text-appText text-sm">{lt.name}</span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -410,7 +449,7 @@ export default function JobsView() {
                       <div key={lt.id}
                         className="flex items-center justify-between rounded-xl border border-appBorderLight bg-appCard px-4 py-3.5 opacity-60 transition-all duration-200">
                         <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />
+                          <LaborGlyphChip laborType={lt} />
                           <span className="font-medium text-appText text-sm">{lt.name}</span>
                         </div>
                         <div className="flex items-center gap-1">

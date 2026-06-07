@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Play } from 'lucide-react'
 import { db } from '../db'
+import { LaborTag } from './LaborGlyph'
 import { formatDurationHM, formatTime, getWeekRange, isEntryInRange, getEntryDuration } from '../utils/time'
 
 // The Timer screen's desktop-only right rail (xl+): Last session · Quick punch ·
@@ -48,6 +49,7 @@ export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMo
                 <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
                 <div className="pl-4 pr-3 py-3">
                   <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || 'Unknown Job'}</p>
+                  {lt && <LaborTag laborType={lt} className="mt-1" />}
                   <div className="flex items-center justify-between mt-1 gap-2">
                     <span className="text-xs text-appTextMuted font-mono truncate">
                       {formatTime(lastEntry.punchIn)}–{formatTime(lastEntry.punchOut)}

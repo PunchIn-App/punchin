@@ -10,6 +10,7 @@ import {
   entryOverlapsRange, getEntryDurationInRange, sumDurationsInRange,
 } from '../utils/time'
 import { PRINT_FONT_HEAD, openPrintWindow } from '../utils/printDocument'
+import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
 import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
 import ConfirmModal from '../components/ConfirmModal'
@@ -96,12 +97,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || '—'}</p>
-                  {lt && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded mt-0.5 inline-block"
-                      style={{ backgroundColor: `${lt.color}25`, color: lt.color }}>
-                      {lt.name}
-                    </span>
-                  )}
+                  {lt && <LaborTag laborType={lt} className="mt-0.5" />}
                 </div>
                 <div className="text-right flex-shrink-0 flex flex-col items-end">
                   <p className="font-mono text-appText font-semibold text-sm">{formatDuration(dur, decimal)}</p>
@@ -261,7 +257,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                   return (
                     <div key={e.id} className="flex items-center justify-between text-xs py-1.5">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        {lt && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />}
+                        {lt && <LaborGlyphChip laborType={lt} className="w-4 h-4" />}
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">

@@ -5,6 +5,7 @@ import { db, startTimer } from '../db'
 import TimerCard from '../components/TimerCard'
 import StartTimerModal from '../components/StartTimerModal'
 import TimerRail from '../components/TimerRail'
+import { LaborTag } from '../components/LaborGlyph'
 import { useSettings } from '../hooks/useSettings'
 import { formatDurationHM, formatTime } from '../utils/time'
 
@@ -112,12 +113,7 @@ export default function TimerView() {
                   <div className="min-w-0">
                     <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || 'Unknown Job'}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      {lt && (
-                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium"
-                          style={{ backgroundColor: `${color}25`, color }}>
-                          {lt.name}
-                        </span>
-                      )}
+                      <LaborTag laborType={lt} />
                       <span className="text-xs text-appTextMuted font-mono">
                         {formatTime(lastEntry.punchIn)} – {formatTime(lastEntry.punchOut)}
                       </span>
