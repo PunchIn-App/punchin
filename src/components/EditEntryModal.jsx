@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteEntry } from '../db'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ConfirmModal from './ConfirmModal'
+import EntitySelect from './EntitySelect'
 
 // Helper helpers for date/time controls — exported for unit testing
 export function formatDateToYYYYMMDD(date) {
@@ -53,8 +54,6 @@ export default function EditEntryModal({ entry, onClose }) {
 
   const uid = useId()
   const titleId    = `${uid}-title`
-  const jobId_     = `${uid}-job`
-  const ltId_      = `${uid}-lt`
   const startDate_ = `${uid}-start-date`
   const startTime_ = `${uid}-start-time`
   const endDate_   = `${uid}-end-date`
@@ -153,6 +152,24 @@ export default function EditEntryModal({ entry, onClose }) {
 
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2.5 text-sm
                     placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors`
+  const labelCls = 'block mb-1.5 font-mono text-[10.5px] font-semibold text-appTextMuted uppercase tracking-[0.14em]'
+
+  // A job's dot colour is its own colour, else its labor type's. Both lists
+  // already include the entry's own (possibly archived) job/type from the
+  // queries above, so editing an old entry never drops its reference.
+  const laborColorOf = (id) => laborTypes?.find(lt => lt.id === Number(id))?.color
+  const jobOptions = (jobs ?? []).map(j => ({
+    value: String(j.id),
+    label: j.name,
+    sublabel: j.clientName || undefined,
+    color: j.color || laborColorOf(j.laborTypeId),
+  }))
+  const laborOptions = (laborTypes ?? []).map(lt => ({
+    value: String(lt.id),
+    label: lt.name,
+    color: lt.color,
+    glyph: lt.glyph,
+  }))
 
   return (
     <>
@@ -192,27 +209,27 @@ export default function EditEntryModal({ entry, onClose }) {
 
           {/* Fields */}
           <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[85vh]">
-            {/* Job Selection */}
-            <div className="space-y-1.5">
-              <label htmlFor={jobId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Job</label>
-              <select id={jobId_} value={jobId} onChange={e => setJobId(e.target.value)} className={inputCls}>
-                <option value="">Select a job...</option>
-                {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
-              </select>
-            </div>
+            {/* Job — bespoke colour/client picker (replaces the native select) */}
+            <EntitySelect
+              label="Job"
+              value={jobId}
+              onChange={setJobId}
+              options={jobOptions}
+              placeholder="Select a job…"
+            />
 
-            {/* Labor Type Selection */}
-            <div className="space-y-1.5">
-              <label htmlFor={ltId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Labor Type</label>
-              <select id={ltId_} value={laborTypeId} onChange={e => setLaborTypeId(e.target.value)} className={inputCls}>
-                <option value="">Select labor type...</option>
-                {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
-              </select>
-            </div>
+            {/* Labor type — bespoke glyph/colour picker */}
+            <EntitySelect
+              label="Labor type"
+              value={laborTypeId}
+              onChange={setLaborTypeId}
+              options={laborOptions}
+              placeholder="Select labor type…"
+            />
 
             {/* Start Date */}
             <div className="space-y-1.5">
-              <label htmlFor={startDate_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Date</label>
+              <label htmlFor={startDate_} className={labelCls}>Start Date</label>
               <input
                 id={startDate_}
                 type="date"
@@ -224,7 +241,7 @@ export default function EditEntryModal({ entry, onClose }) {
 
             {/* Start Time */}
             <div className="space-y-1.5">
-              <label htmlFor={startTime_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Start Time</label>
+              <label htmlFor={startTime_} className={labelCls}>Start Time</label>
               <input
                 id={startTime_}
                 type="time"
@@ -237,7 +254,7 @@ export default function EditEntryModal({ entry, onClose }) {
             {/* End Date */}
             {!isActiveTimer && (
               <div className="space-y-1.5">
-                <label htmlFor={endDate_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Date</label>
+                <label htmlFor={endDate_} className={labelCls}>End Date</label>
                 <input
                   id={endDate_}
                   type="date"
@@ -251,7 +268,7 @@ export default function EditEntryModal({ entry, onClose }) {
             {/* End Time */}
             {!isActiveTimer && (
               <div className="space-y-1.5">
-                <label htmlFor={endTime_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">End Time</label>
+                <label htmlFor={endTime_} className={labelCls}>End Time</label>
                 <input
                   id={endTime_}
                   type="time"
@@ -264,7 +281,7 @@ export default function EditEntryModal({ entry, onClose }) {
 
             {/* Notes */}
             <div className="space-y-1.5">
-              <label htmlFor={notesId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Notes</label>
+              <label htmlFor={notesId_} className={labelCls}>Notes</label>
               <input
                 id={notesId_}
                 type="text"
