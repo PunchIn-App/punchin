@@ -11,6 +11,9 @@ const mockEntriesFilter  = vi.fn(() => ({ toArray: mockEntriesToArray }))
 const mockEntriesUpdate  = vi.fn().mockResolvedValue(1)
 const mockEntriesAdd     = vi.fn().mockResolvedValue(1)
 const mockTransaction    = vi.fn(async (_mode, _tables, fn) => fn())
+// The punch logic lives in db.startTimer (tested in db.test.js); the modal just
+// delegates to it, so here we assert the delegation.
+const mockStartTimer     = vi.fn().mockResolvedValue(undefined)
 
 // --------------------------------------------------------------------------
 // Module mocks
@@ -29,6 +32,7 @@ vi.mock('../db', () => ({
     },
     get transaction() { return mockTransaction },
   },
+  startTimer: (...args) => mockStartTimer(...args),
 }))
 
 const mockSettings = { allowConcurrentTimers: false }
@@ -108,19 +112,15 @@ describe('StartTimerModal — validation', () => {
   })
 })
 
-describe('StartTimerModal — concurrent timer guard', () => {
+describe('StartTimerModal — punch flow (delegates to db.startTimer)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSettings.allowConcurrentTimers = false
-    mockEntriesToArray.mockResolvedValue([])
-    mockTransaction.mockImplementation(async (_mode, _tables, fn) => fn())
+    mockStartTimer.mockResolvedValue(undefined)
     useAlternatingMock()
   })
 
-  it('auto-punches-out a running timer and starts a new one when concurrent mode is off', async () => {
-    const runningEntry = { id: 5, punchOut: null }
-    mockEntriesToArray.mockResolvedValue([runningEntry])
-
+  it('calls startTimer with the selected job/labor + concurrent setting, then closes', async () => {
     const onClose = vi.fn()
     render(<StartTimerModal onClose={onClose} />)
 
@@ -129,28 +129,13 @@ describe('StartTimerModal — concurrent timer guard', () => {
     fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
 
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(mockEntriesUpdate).toHaveBeenCalledWith(5, expect.objectContaining({ punchOut: expect.any(Date) }))
-    expect(mockEntriesAdd).toHaveBeenCalled()
+    expect(mockStartTimer).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: '1', laborTypeId: '1', allowConcurrentTimers: false }),
+    )
   })
 
-  it('starts a new timer directly when no timers are running and concurrent mode is off', async () => {
-    mockEntriesToArray.mockResolvedValue([]) // no running timers
-
-    const onClose = vi.fn()
-    render(<StartTimerModal onClose={onClose} />)
-
-    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } })
-    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
-
-    await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(mockEntriesUpdate).not.toHaveBeenCalled()
-    expect(mockEntriesAdd).toHaveBeenCalled()
-  })
-
-  it('allows start when concurrent mode is on, even with a running timer', async () => {
+  it('forwards allowConcurrentTimers: true when concurrent mode is on', async () => {
     mockSettings.allowConcurrentTimers = true
-    mockEntriesAdd.mockResolvedValue(2)
-
     const onClose = vi.fn()
     render(<StartTimerModal onClose={onClose} />)
 
@@ -158,8 +143,14 @@ describe('StartTimerModal — concurrent timer guard', () => {
     fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
 
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    // filter is never called when concurrent mode is on
-    expect(mockEntriesFilter).not.toHaveBeenCalled()
+    expect(mockStartTimer).toHaveBeenCalledWith(
+      expect.objectContaining({ allowConcurrentTimers: true }),
+    )
+  })
+
+  it('preselects the job from initialJobId (quick-punch into the modal)', async () => {
+    render(<StartTimerModal onClose={vi.fn()} initialJobId={1} />)
+    expect(screen.getAllByRole('combobox')[0].value).toBe('1')
   })
 })
 
@@ -230,11 +221,11 @@ describe('StartTimerModal — error handling', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSettings.allowConcurrentTimers = false
-    mockTransaction.mockRejectedValue(new Error('DB error'))
+    mockStartTimer.mockRejectedValue(new Error('DB error'))
     useAlternatingMock()
   })
 
-  it('shows the error message in role="alert" when the transaction throws', async () => {
+  it('shows the error message in role="alert" when the punch fails', async () => {
     render(<StartTimerModal onClose={vi.fn()} />)
 
     // Select a job — auto-fills laborTypeId via useEffect (job.laborTypeId = 1)

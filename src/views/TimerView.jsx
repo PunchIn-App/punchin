@@ -1,13 +1,17 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Clock } from 'lucide-react'
-import { db } from '../db'
+import { db, startTimer } from '../db'
 import TimerCard from '../components/TimerCard'
 import StartTimerModal from '../components/StartTimerModal'
+import TimerRail from '../components/TimerRail'
+import { useSettings } from '../hooks/useSettings'
 import { formatDurationHM, formatTime } from '../utils/time'
 
 export default function TimerView() {
   const [showModal, setShowModal] = useState(false)
+  const [quickJobId, setQuickJobId] = useState(null)
+  const { settings } = useSettings()
 
   const active     = useLiveQuery(() => db.entries.filter(e => !e.punchOut).toArray(), [])
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
@@ -29,9 +33,23 @@ export default function TimerView() {
   const getJob = id => jobMap.get(id)
   const getLT  = id => ltMap.get(id)
 
+  // Quick-punch from the rail: one tap when the job has a default labor type,
+  // otherwise open the full modal preselected. Both go through db.startTimer so
+  // the concurrent-timer rule stays single-source.
+  const handleQuickPunch = async (job) => {
+    if (job.laborTypeId) {
+      await startTimer({ jobId: job.id, laborTypeId: job.laborTypeId, allowConcurrentTimers: settings.allowConcurrentTimers })
+    } else {
+      setQuickJobId(job.id)
+    }
+  }
+
+  const closeModal = () => { setShowModal(false); setQuickJobId(null) }
+
   return (
-    <div className="h-full flex flex-col scrollable">
-      <div className="flex-1 px-4 pt-4 pb-24 lg:max-w-3xl lg:mx-auto lg:w-full">
+    <div className="h-full flex flex-col xl:flex-row">
+      <div className="flex-1 min-w-0 scrollable">
+        <div className="px-4 pt-4 pb-24 lg:max-w-3xl lg:mx-auto lg:w-full">
 
         {/* Header row */}
         <div className="flex items-center justify-between mb-5">
@@ -86,7 +104,7 @@ export default function TimerView() {
           const color = lt?.color || '#6366F1'
           const duration = new Date(lastEntry.punchOut) - new Date(lastEntry.punchIn)
           return (
-            <div className="mt-8">
+            <div className="mt-8 xl:hidden">
               <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2">Last Session</p>
               <div className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden opacity-70">
                 <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
@@ -111,9 +129,21 @@ export default function TimerView() {
             </div>
           )
         })()}
+        </div>
       </div>
 
-      {showModal && <StartTimerModal onClose={() => setShowModal(false)} />}
+      <TimerRail
+        jobMap={jobMap}
+        ltMap={ltMap}
+        jobs={jobs}
+        lastEntry={lastEntry}
+        weekStartsMonday={settings.weekStartsMonday !== false}
+        onPunch={handleQuickPunch}
+      />
+
+      {(showModal || quickJobId != null) && (
+        <StartTimerModal initialJobId={quickJobId} onClose={closeModal} />
+      )}
     </div>
   )
 }

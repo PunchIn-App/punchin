@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useId } from 'react'
 import { X } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db'
+import { db, startTimer } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { useSwipeDismiss, useAndroidBackDismiss, useSheetStyles } from '../hooks/useBottomSheet'
 
-export default function StartTimerModal({ onClose }) {
-  const [jobId, setJobId]             = useState('')
+export default function StartTimerModal({ onClose, initialJobId = null }) {
+  const [jobId, setJobId]             = useState(initialJobId ? String(initialJobId) : '')
   const [laborTypeId, setLaborTypeId] = useState('')
   const [notes, setNotes]             = useState('')
   const [error, setError]             = useState('')
@@ -63,21 +63,11 @@ export default function StartTimerModal({ onClose }) {
     hapticTrigger()
     setSubmitting(true)
     try {
-      await db.transaction('rw', db.entries, async () => {
-        if (!settings.allowConcurrentTimers) {
-          const now = new Date()
-          const running = await db.entries.filter(e => !e.punchOut).toArray()
-          for (const e of running) {
-            await db.entries.update(e.id, { punchOut: now })
-          }
-        }
-        await db.entries.add({
-          jobId:       Number(jobId),
-          laborTypeId: Number(laborTypeId),
-          punchIn:     new Date(),
-          punchOut:    null,
-          notes:       notes.trim() || null,
-        })
+      await startTimer({
+        jobId,
+        laborTypeId,
+        notes: notes.trim() || null,
+        allowConcurrentTimers: settings.allowConcurrentTimers,
       })
       onClose()
     } catch (err) {

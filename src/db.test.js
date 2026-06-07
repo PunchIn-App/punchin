@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { db, deleteEntry, DEFAULT_SETTINGS } from './db'
+import { db, deleteEntry, startTimer, DEFAULT_SETTINGS } from './db'
 
 afterAll(async () => {
   await db.close()
@@ -124,6 +124,32 @@ describe('db — basic CRUD', () => {
     const id = await db.entries.add({ jobId: 1, laborTypeId: 1, punchIn, punchOut: null })
     const entry = await db.entries.get(id)
     expect(entry?.punchIn).toEqual(punchIn)
+  })
+})
+
+describe('db — startTimer', () => {
+  afterEach(async () => { await db.entries.clear() })
+
+  it('adds a running entry (punchOut null) for the job/labor type', async () => {
+    await startTimer({ jobId: 3, laborTypeId: 7, notes: 'hi' })
+    const running = await db.entries.filter(e => !e.punchOut).toArray()
+    expect(running).toHaveLength(1)
+    expect(running[0]).toMatchObject({ jobId: 3, laborTypeId: 7, punchOut: null, notes: 'hi' })
+  })
+
+  it('punches out already-running timers when concurrent timers are off', async () => {
+    await db.entries.add({ jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null })
+    await startTimer({ jobId: 2, laborTypeId: 1, allowConcurrentTimers: false })
+    const running = await db.entries.filter(e => !e.punchOut).toArray()
+    expect(running).toHaveLength(1)
+    expect(running[0].jobId).toBe(2)
+  })
+
+  it('keeps existing timers running when concurrent timers are allowed', async () => {
+    await db.entries.add({ jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null })
+    await startTimer({ jobId: 2, laborTypeId: 1, allowConcurrentTimers: true })
+    const running = await db.entries.filter(e => !e.punchOut).toArray()
+    expect(running).toHaveLength(2)
   })
 })
 

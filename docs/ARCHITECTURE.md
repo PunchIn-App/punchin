@@ -61,12 +61,13 @@ punchin/
 │   ├── accentPresets.js    # Single source of truth for the accent presets (the AppearancePanel swatches) + accentIconKey(); shared by the settings UI, installIcon.js, and iconPalette.js (issue #228)
 │   ├── iconSvg.js          # The brand mark as an SVG string (stopwatch glyph on a rounded accent square; glyph tinted white/dark-ink via utils/inkOnAccent for contrast). Single source of truth for the mark, shared by scripts/icons.mjs (build) and worker/iconRender.js (on-demand render) (issue #228)
 │   ├── iconPalette.js      # The pre-rendered install-icon "crayon box": ~65 swatches (presets + an HSL grid) and nearestPaletteKey(). Shared by scripts/icons.mjs (renders the sets) and worker/oauth.js (nearest-swatch fallback when the on-demand render fails) (issue #228)
-│   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131)
+│   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131), deleteEntry() (tombstoned delete), and startTimer() (the punch-in flow shared by StartTimerModal + TimerRail quick-punch)
 │   ├── components/
 │   │   ├── Layout.jsx          # Responsive app shell: phone = top header + bottom tab nav; tablet (md) = collapsed icon sidebar; desktop (lg) = labelled left sidebar (rehomes brand/version/update-badge + a live "On the clock" status). Reuses one NAV array + navigate wrapper; logo taps → timer
 │   │   ├── BrandMark.jsx       # Shared brand identity: PunchMark (stopwatch glyph on the accent tile, ink via inkOnAccent) + Wordmark ("PunchIn", capital I tinted with the accent); used by Layout (and the desktop sidebar)
 │   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
 │   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
+│   │   ├── TimerRail.jsx       # Timer screen's desktop-only (xl+) right rail: Last session · Quick punch (one-tap punch-in per job via db.startTimer, falls back to the modal preselected) · This week (per-job totals honoring weekStartsMonday)
 │   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
 │   │   ├── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
 │   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
@@ -77,7 +78,7 @@ punchin/
 │   │   ├── DataTransfer.jsx     # Account-free device-to-device transfer (issue #77): "Create share link" snapshots the DB → compressed #import= link + QR (qrcode-generator); "Import from a link" pastes a link/code and merges via importSnapshot
 │   │   └── InstallPromptModal.jsx # First-run install bottom sheet; mode = 'native' (Chrome/Edge one-tap), 'ios-safari' (Share→Add-to-Home-Screen), or 'ios-other' (open-in-Safari guidance for Chrome/Firefox on iOS)
 │   ├── views/
-│   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
+│   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle; on xl+ renders the TimerRail beside it
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
 │   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
 │   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie

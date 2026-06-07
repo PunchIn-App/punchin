@@ -138,6 +138,29 @@ export async function deleteEntry(id) {
   })
 }
 
+// Punch in a new timer. Single source of truth for the punch-in flow, shared by
+// StartTimerModal and the Timer rail's quick-punch so the "stop the running
+// timer(s) first unless concurrent timers are allowed" rule can never diverge.
+// Atomic: any punch-outs + the new entry are written in one transaction.
+export async function startTimer({ jobId, laborTypeId, notes = null, allowConcurrentTimers = false }) {
+  return db.transaction('rw', db.entries, async () => {
+    if (!allowConcurrentTimers) {
+      const now = new Date()
+      const running = await db.entries.filter(e => !e.punchOut).toArray()
+      for (const e of running) {
+        await db.entries.update(e.id, { punchOut: now })
+      }
+    }
+    await db.entries.add({
+      jobId:       Number(jobId),
+      laborTypeId: Number(laborTypeId),
+      punchIn:     new Date(),
+      punchOut:    null,
+      notes:       notes || null,
+    })
+  })
+}
+
 // Single source of truth for default settings (issues #131/#134). Seeded on a
 // fresh install (populate) and restored by factoryReset, and merged under the
 // live rows by useSettings so every consumer reads a complete, typed object.

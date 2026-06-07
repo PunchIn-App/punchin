@@ -14,6 +14,11 @@ vi.mock('../components/StartTimerModal', () => ({
     </div>
   ),
 }))
+// useSettings + TimerRail both call useLiveQuery internally; mock them so the
+// 4-call queue below stays aligned with TimerView's own queries. TimerRail has
+// its own test.
+vi.mock('../hooks/useSettings', () => ({ useSettings: () => ({ settings: {} }) }))
+vi.mock('../components/TimerRail', () => ({ default: () => null }))
 
 const JOBS = [{ id: 1, name: 'Acme Corp' }]
 const LABOR_TYPES = [{ id: 1, name: 'Design', color: '#6366F1' }]
