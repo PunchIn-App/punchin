@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { SlidersHorizontal, Palette, Bell, MonitorDown, Database, Info } from 'lucide-react'
+import { SlidersHorizontal, Palette, Bell, MonitorDown, Database, Info, Receipt } from 'lucide-react'
 import { useSettings } from '../hooks/useSettings'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { usePwaUpdate } from '../hooks/usePwaUpdate'
@@ -10,6 +10,7 @@ import AppearancePanel from './settings/AppearancePanel'
 import RemindersPanel from './settings/RemindersPanel'
 import InstallPanel from './settings/InstallPanel'
 import DataSyncPanel from './settings/DataSyncPanel'
+import BillingPanel from './settings/BillingPanel'
 import AboutPanel from './settings/AboutPanel'
 
 // Thin router for the iOS-style drill-in Settings (issue #60): a root list of
@@ -79,6 +80,7 @@ export default function SettingsView() {
           {(isInstalled || canInstall || isIOS) && (
             <CategoryRow icon={MonitorDown} title="Install" subtitle="Add PunchIn to your device" onClick={() => openPanel('install')} />
           )}
+          <CategoryRow icon={Receipt} title="Billing" subtitle="Invoice identity, currency, numbering" onClick={() => openPanel('billing')} />
           <CategoryRow icon={Database} title="Data & Sync" subtitle="Backup, sync, transfer, reset" onClick={() => openPanel('data')} />
           <CategoryRow icon={Info} title="About" subtitle={`v${__APP_VERSION__}`} badge={pwaUpdate.updateAvailable} onClick={() => openPanel('about')} />
         </div>
@@ -88,6 +90,7 @@ export default function SettingsView() {
       {activePanel === 'appearance' && <AppearancePanel onBack={closePanel} />}
       {activePanel === 'reminders'  && <RemindersPanel onBack={closePanel} notifPerm={notifPerm} setNotifPerm={setNotifPerm} />}
       {activePanel === 'install'    && <InstallPanel onBack={closePanel} />}
+      {activePanel === 'billing'    && <BillingPanel onBack={closePanel} />}
       {activePanel === 'data'       && <DataSyncPanel onBack={closePanel} />}
       {activePanel === 'about'      && (
         <AboutPanel

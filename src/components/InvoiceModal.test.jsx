@@ -263,6 +263,21 @@ describe('InvoiceModal — export and print', () => {
     expect(html).not.toContain('-apple-system')
     expect(html).not.toContain('SF Mono')
   })
+
+  it('renders the Billed-from band + invoice number in the print HTML when configured', async () => {
+    mockSettings = { weekStartsMonday: true, billingName: 'Jane Doe', billingEmail: 'jane@example.com', numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = fakeWin.document.write.mock.calls[0][0]
+    expect(html).toContain('Billed from')
+    expect(html).toContain('Jane Doe')
+    expect(html).toContain('Billed to')
+    expect(html).toContain('PI-7') // prefix + nextInvoiceNumber
+  })
 })
 
 describe('InvoiceModal — backdrop and label', () => {

@@ -148,6 +148,27 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
         <td class="right mono">${li.rate != null ? money(li.rate) : '—'}</td>
         <td class="right mono">${li.amount != null ? money(li.amount) : '—'}</td>
       </tr>`).join('')
+
+    // Billed-from (the billing profile) / Billed-to (the client) band + optional
+    // invoice number (display-only). Escape the free-text billing fields.
+    const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+    const fromLines = [settings.billingBusiness, settings.billingEmail, settings.billingPhone, settings.billingAddress].filter(Boolean)
+    const hasFrom = settings.billingName || fromLines.length
+    const invNo = settings.numberInvoices ? `${settings.invoicePrefix || ''}${settings.nextInvoiceNumber ?? 1}` : ''
+    const bandHtml = hasFrom ? `
+<div class="band">
+  <div class="party">
+    <div class="cap">Billed from</div>
+    ${settings.billingName ? `<div class="pname">${esc(settings.billingName)}</div>` : ''}
+    ${fromLines.map(l => `<div class="pline">${esc(l).replace(/\n/g, '<br>')}</div>`).join('')}
+  </div>
+  <div class="party to">
+    <div class="cap">Billed to</div>
+    <div class="pname">${esc(job.clientName || job.name)}</div>
+    ${job.clientName ? `<div class="pline">${esc(job.name)}</div>` : ''}
+  </div>
+</div>` : ''
+
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>Invoice — ${job.name}</title>
 ${PRINT_FONT_HEAD}
@@ -167,13 +188,28 @@ ${PRINT_FONT_HEAD}
   .right { text-align: right; }
   .mono { font-family: 'Noto Sans Mono', monospace; }
   .lt-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .invno { text-align: right; }
+  .invno .cap { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+  .invno .num { font-family: 'Noto Sans Mono', monospace; font-size: 15px; font-weight: 700; }
+  .band { display: flex; justify-content: space-between; gap: 24px; margin: 0 0 24px; padding: 14px 0; border-top: 1px solid #e5e5e5; border-bottom: 1px solid #e5e5e5; }
+  .party .cap { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+  .party .pname { font-weight: 700; font-size: 13px; }
+  .party .pline { color: #555; font-size: 12px; margin-top: 1px; }
+  .party.to { text-align: right; }
   @media print { @page { margin: 24mm 20mm; } body { padding: 0; } }
 </style></head><body>
 <div class="header">
-  <h1>Invoice</h1>
-  <p class="meta">${job.name}${job.clientName ? ` · ${job.clientName}` : ''}</p>
-  ${periodStr ? `<p class="period">${periodStr}</p>` : ''}
+  <div class="header-row">
+    <div>
+      <h1>Invoice</h1>
+      <p class="meta">${esc(job.name)}</p>
+      ${periodStr ? `<p class="period">${periodStr}</p>` : ''}
+    </div>
+    ${invNo ? `<div class="invno"><div class="cap">Invoice №</div><div class="num">${esc(invNo)}</div></div>` : ''}
+  </div>
 </div>
+${bandHtml}
 <table>
   <thead><tr>
     <th>Date</th><th>Labor Type</th><th>Time</th>
