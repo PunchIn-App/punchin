@@ -154,11 +154,14 @@ export default function App() {
       return
     }
     if (view === DEFAULT_VIEW) {
-      // Returning home: unwind our single pushed entry so Back from home exits
-      // the app. popstate restores the default view for us.
+      // Returning home: unwind our pushed entry so Back from home exits the app.
+      // A Settings drill-in pushes an extra {settingsPanel} entry on top of our
+      // tab entry, so a bare history.back() would only close that sub-page and
+      // leave us on Settings — unwind past it too so the tap always reaches the
+      // default view. popstate restores the default view for us.
       if (hasPushedRef.current) {
         hasPushedRef.current = false
-        history.back()
+        history.go(history.state?.settingsPanel ? -2 : -1)
         return
       }
     } else if (hasPushedRef.current) {

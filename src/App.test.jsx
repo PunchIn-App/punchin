@@ -68,6 +68,7 @@ vi.mock('./components/Layout', () => ({
     <div data-testid="layout">
       <button onClick={() => onNavigate('jobs')}>go-jobs</button>
       <button onClick={() => onNavigate('settings')}>go-settings</button>
+      <button onClick={() => onNavigate('timer')}>go-timer</button>
       {children}
     </div>
   ),
@@ -220,6 +221,24 @@ describe('App — back-button navigation (#65)', () => {
     fireEvent.click(screen.getByText('go-settings'))
     expect(history.length).toBe(before + 1)
     expect(history.state?.piView).toBe('settings')
+  })
+
+  it('returns home with history.go(-1) when no sub-panel is open', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('go-jobs'))
+    const goSpy = vi.spyOn(history, 'go')
+    fireEvent.click(screen.getByText('go-timer'))
+    expect(goSpy).toHaveBeenCalledWith(-1)
+  })
+
+  it('unwinds past a Settings sub-panel entry with history.go(-2) so Timer is not swallowed', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('go-settings'))
+    // A Settings drill-in pushes a {settingsPanel} entry on top of our tab entry.
+    act(() => history.pushState({ settingsPanel: 'general' }, ''))
+    const goSpy = vi.spyOn(history, 'go')
+    fireEvent.click(screen.getByText('go-timer'))
+    expect(goSpy).toHaveBeenCalledWith(-2)
   })
 })
 
