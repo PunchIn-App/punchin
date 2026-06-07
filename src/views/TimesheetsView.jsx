@@ -203,36 +203,43 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   if (!filteredEntries) return null
 
   return (
-    <div className="space-y-3">
-      {/* Week total */}
-      <div className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
-        <span className="text-sm text-appTextMuted">Week total</span>
-        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(total, decimal)}</span>
+    <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-4 lg:items-start">
+      {/* Summary — on top on mobile, a sticky right rail on desktop */}
+      <div className="space-y-3 mb-3 lg:mb-0 lg:order-2 lg:sticky lg:top-4">
+        {/* Hero week total */}
+        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-widest text-appTextMuted">Week total</p>
+          <p className="font-mono font-bold text-appText text-3xl mt-1">{formatDuration(total, decimal)}</p>
+        </div>
+
+        {/* By job */}
+        {Object.keys(jobTotals).length > 0 && (
+          <div className="rounded-xl border border-appBorder bg-appCard p-4 shadow-sm">
+            <p className="text-[10px] uppercase tracking-widest text-appTextMuted mb-3">By job</p>
+            <div className="space-y-3">
+              {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
+                const job = getJob(Number(jid))
+                const barColor = getLT(job?.laborTypeId)?.color || 'var(--accent)'
+                const pct = total > 0 ? (ms / total) * 100 : 0
+                return (
+                  <div key={jid}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm text-appText font-medium truncate">{job?.name || '—'}</span>
+                      <span className="font-mono text-sm text-appTextMuted flex-shrink-0 ml-2">{formatDuration(ms, decimal)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-appBg">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Job breakdown */}
-      {Object.keys(jobTotals).length > 0 && (
-        <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight shadow-sm">
-          {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
-            const job = getJob(Number(jid))
-            const barColor = getLT(job?.laborTypeId)?.color || 'var(--accent)'
-            const pct = total > 0 ? (ms / total) * 100 : 0
-            return (
-              <div key={jid} className="px-4 py-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-appText font-medium">{job?.name || '—'}</span>
-                  <span className="font-mono text-sm text-appTextMuted">{formatDuration(ms, decimal)}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-appBg">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
       {/* Day-by-day */}
+      <div className="space-y-3 lg:order-1">
       {dayData.map(({ day, ds, de, dayEntries, dayTotal }) => {
         const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
@@ -280,6 +287,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
           </div>
         )
       })}
+      </div>
     </div>
   )
 }
@@ -458,44 +466,54 @@ ${PRINT_FONT_HEAD}
 
   return (
     <div className="h-full flex flex-col">
-      {/* Tabs */}
-      <div role="tablist" className="flex-shrink-0 flex border-b border-appBorderLight">
-        {['daily','weekly'].map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            role="tab"
-            aria-selected={tab === t}
-            className={`flex-1 py-3 text-sm font-medium capitalize transition-colors
-              ${tab === t ? 'text-appAccent border-b-2 border-appAccent' : 'text-appTextMuted'}`}>
-            {t}
+      {/* Toolbar row 1 — segmented period tabs, centered date nav, Log Manual.
+          Stacks on mobile; a single grouped control bar at lg. */}
+      <div className="flex-shrink-0 flex flex-col gap-2.5 px-4 py-2.5 border-b border-appBorderLight lg:flex-row lg:items-center">
+        <div role="tablist" className="flex lg:inline-flex flex-shrink-0 bg-appInput border border-appBorder rounded-xl p-1">
+          {['daily','weekly'].map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              role="tab"
+              aria-selected={tab === t}
+              className={`flex-1 lg:flex-initial px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors
+                ${tab === t ? 'bg-appCard text-appText shadow-sm' : 'text-appTextMuted hover:text-appText'}`}>
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-center gap-1 lg:mx-auto">
+          <button
+            onClick={() => go(-1)}
+            aria-label={tab === 'daily' ? 'Previous day' : 'Previous week'}
+            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
           </button>
-        ))}
-      </div>
+          <button onClick={() => setDate(new Date())}
+            aria-label={`${isCurrent() ? 'Current period: ' : 'Jump to today, currently viewing: '}${title()}`}
+            className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors
+              ${isCurrent() ? 'text-appAccent' : 'text-appText hover:bg-appInput'}`}>
+            {title()}
+          </button>
+          <button
+            onClick={() => go(1)}
+            aria-label={tab === 'daily' ? 'Next day' : 'Next week'}
+            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" aria-hidden="true" />
+          </button>
+        </div>
 
-      {/* Period nav */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-appBorderLight">
         <button
-          onClick={() => go(-1)}
-          aria-label={tab === 'daily' ? 'Previous day' : 'Previous week'}
-          className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center justify-center gap-1 flex-shrink-0 px-3 py-2 rounded-lg bg-appAccent hover:brightness-110 active:brightness-90 text-appOnAccent text-xs font-bold transition-all"
         >
-          <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-        </button>
-        <button onClick={() => setDate(new Date())}
-          aria-label={`${isCurrent() ? 'Current period: ' : 'Jump to today, currently viewing: '}${title()}`}
-          className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors
-            ${isCurrent() ? 'text-appAccent' : 'text-appText hover:bg-appInput'}`}>
-          {title()}
-        </button>
-        <button
-          onClick={() => go(1)}
-          aria-label={tab === 'daily' ? 'Next day' : 'Next week'}
-          className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
-        >
-          <ChevronRight className="w-5 h-5" aria-hidden="true" />
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
+          Log Manual
         </button>
       </div>
 
-      {/* Search, Filter & Quick Manual Log Actions */}
+      {/* Toolbar row 2 — search, filters, and the grouped export cluster */}
       <div className="flex-shrink-0 px-4 py-2.5 border-b border-appBorderLight bg-appNav flex gap-2 flex-wrap items-center">
         {/* Search */}
         <div className="relative flex-1 min-w-[150px]">
@@ -557,13 +575,6 @@ ${PRINT_FONT_HEAD}
           >
             <Receipt className="w-3.5 h-3.5" aria-hidden="true" />
             Invoice
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-appAccent hover:brightness-110 active:brightness-90 text-appOnAccent text-xs font-bold transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
-            Log Manual
           </button>
         </div>
       </div>
