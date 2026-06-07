@@ -55,6 +55,28 @@ describe('EntitySelect', () => {
     expect(opt.querySelector('svg')).toBeTruthy() // the glyph rides along
   })
 
+  it('falls back to the PunchIn brand mark for a labor option whose glyph is unset', () => {
+    // A labor type always carries a `glyph` key, even when unset (old records).
+    // Like glyphComponent()/LaborTag everywhere else, the picker must then show
+    // the brand mark — never a bare colour dot — so the glyph rides along.
+    const opts = [{ value: '1', label: 'Untagged', color: '#FF0000', glyph: undefined }]
+    render(<EntitySelect label="Labor type" value="" onChange={() => {}} options={opts} placeholder="Select…" />)
+    fireEvent.click(screen.getByRole('button', { name: /labor/i }))
+    const opt = screen.getByRole('option', { name: /untagged/i })
+    expect(opt.querySelector('svg')).toBeTruthy()                      // a glyph, not a dot
+    expect(opt.querySelector('svg path[d="M9.5 2.6h5"]')).toBeTruthy() // the crown bar is unique to PunchGlyph
+  })
+
+  it('renders a colour dot (no glyph) for a job option that omits the glyph key', () => {
+    // Jobs intentionally have no glyph — they read by colour, so they show a dot,
+    // not a stopwatch. (Guards the labor-fallback discriminator from leaking to jobs.)
+    render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+    fireEvent.click(screen.getByRole('button', { name: /job/i }))
+    const opt = screen.getByRole('option', { name: /acme corp/i })
+    expect(opt.querySelector('svg')).toBeFalsy()                  // no glyph
+    expect(opt.querySelector('span.rounded-full')).toBeTruthy()  // a colour dot
+  })
+
   it('renders a configurable empty/clear row and selects it with value ""', () => {
     const onChange = vi.fn()
     render(<EntitySelect label="Job" value="1" onChange={onChange} options={JOB_OPTS} emptyOption={{ label: 'All Jobs' }} />)
@@ -89,5 +111,25 @@ describe('EntitySelect', () => {
     // rather than crashing (callers inject archived-but-selected options).
     render(<EntitySelect label="Job" value="999" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
     expect(screen.getByText('Select a job…')).toBeInTheDocument()
+  })
+
+  it('compact mode renders a smaller toolbar-chip trigger and floats the menu absolutely', () => {
+    render(<EntitySelect compact label="Job" value="" onChange={() => {}} options={JOB_OPTS} emptyOption={{ label: 'All Jobs' }} />)
+    const trigger = screen.getByRole('button', { name: /job/i })
+    // The compact trigger matches the Timesheets toolbar filter chips:
+    // rounded-lg + text-xs (vs the default rounded-xl text-[15px] modal trigger).
+    expect(trigger).toHaveClass('rounded-lg')
+    expect(trigger).toHaveClass('text-xs')
+
+    fireEvent.click(trigger)
+    // The compact menu floats (absolute) anchored to the trigger instead of
+    // expanding in flow, so it doesn't shove the toolbar content down.
+    expect(screen.getByRole('listbox')).toHaveClass('absolute')
+  })
+
+  it('default (non-compact) mode keeps the in-flow menu (not absolute)', () => {
+    render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+    fireEvent.click(screen.getByRole('button', { name: /job/i }))
+    expect(screen.getByRole('listbox')).not.toHaveClass('absolute')
   })
 })

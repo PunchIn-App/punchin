@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useId } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useId } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { glyphComponent } from './LaborGlyph'
 
@@ -6,7 +6,10 @@ import { glyphComponent } from './LaborGlyph'
 // label + optional sublabel (e.g. a job's client) — the replacement for native
 // <select> wherever the choices carry colour/glyph identity. Option shape:
 //   { value, label, sublabel?, color?, glyph? }
-// A `glyph` renders the labor glyph in `color`; otherwise a colour dot.
+// Presence of the `glyph` KEY marks a labor option: it renders the glyph in
+// `color`, falling back to the PunchIn brand mark when the value is unset (old
+// records) — exactly like glyphComponent()/LaborTag, so the glyph rides along on
+// every surface. Job options omit the key entirely and render a colour dot.
 //
 // `emptyOption` (optional) adds a clear/none row whose value is '' — use it for
 // "All Jobs" (filter) or "No default" (optional) selects; omit it for required
@@ -16,14 +19,19 @@ import { glyphComponent } from './LaborGlyph'
 // floating absolutely. That keeps it from being clipped inside a scroll-container
 // modal (e.g. EditEntryModal's `overflow-y-auto` body) and from fighting a modal
 // focus trap — the menu lives inside the dialog, so Tab and Escape compose.
-function OptionVisual({ opt }) {
-  if (opt?.glyph) {
+// `small` shrinks the glyph/dot for the compact toolbar-chip trigger only —
+// the menu rows always render the default size so the open list is unchanged.
+function OptionVisual({ opt, small = false }) {
+  // A labor option carries a `glyph` key (possibly unset) → render the glyph,
+  // defaulting to the brand mark via glyphComponent(undefined). A job option has
+  // no `glyph` key → render the colour dot below.
+  if (opt && 'glyph' in opt) {
     const Glyph = glyphComponent(opt.glyph)
-    return <Glyph className="w-4 h-4 flex-shrink-0" style={{ color: opt.color }} strokeWidth={2} aria-hidden="true" />
+    return <Glyph className={`${small ? 'w-3.5 h-3.5' : 'w-4 h-4'} flex-shrink-0`} style={{ color: opt.color }} strokeWidth={2} aria-hidden="true" />
   }
   return (
     <span
-      className="w-2 h-2 rounded-full flex-shrink-0"
+      className={`${small ? 'w-1.5 h-1.5' : 'w-2 h-2'} rounded-full flex-shrink-0`}
       style={{ backgroundColor: opt?.color || 'var(--text-disabled)' }}
       aria-hidden="true"
     />
@@ -39,11 +47,26 @@ export default function EntitySelect({
   emptyOption,        // { label } | undefined
   hideLabel = false,  // keep `label` as the accessible name but hide the overline
   buttonClassName = '',
+  compact = false,    // toolbar-chip trigger + floating (absolute) menu — for filter rows
 }) {
   const [open, setOpen] = useState(false)
+  const [alignRight, setAlignRight] = useState(false)
   const wrapRef = useRef(null)
   const uid = useId()
   const labelId = `${uid}-label`
+
+  // Compact (toolbar-filter) menus float `absolute`. In a wrapping toolbar a chip
+  // can land in the right half of the row, where a left-anchored 200px menu would
+  // overflow the viewport (clipped by Layout's `<main overflow-hidden>`). Measure
+  // on open and flip to right-anchored when a left anchor wouldn't fit. Vertical
+  // never clips (the menu caps at max-h-60 near the top of the view), so no portal
+  // is needed. useLayoutEffect avoids a one-frame flash of the wrong side.
+  const MENU_MIN_W = 200
+  useLayoutEffect(() => {
+    if (!open || !compact) return
+    const rect = wrapRef.current?.getBoundingClientRect()
+    if (rect) setAlignRight(rect.left + MENU_MIN_W > window.innerWidth - 8)
+  }, [open, compact])
 
   // Outside-click + capture-phase Escape (closes the menu before a surrounding
   // modal's Escape→onClose can fire) — the ColorPicker / GlyphPicker contract.
@@ -93,20 +116,21 @@ export default function EntitySelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={triggerName}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border bg-appBg text-left transition-colors
+        className={`w-full flex items-center gap-3 border text-left transition-colors
+          ${compact ? 'px-2.5 py-2 rounded-lg text-xs bg-appCard' : 'px-4 py-3 rounded-xl text-[15px] bg-appBg'}
           ${open ? 'border-appAccent ring-2 ring-appAccent/20' : 'border-appBorder hover:border-appAccent/40'} ${buttonClassName}`}
       >
-        <OptionVisual opt={selected} />
+        <OptionVisual opt={selected} small={compact} />
         {display ? (
           <>
-            <span className={`text-[15px] truncate ${selected ? 'font-bold text-appText' : 'text-appTextMuted'}`}>{display}</span>
+            <span className={`${compact ? 'text-xs' : 'text-[15px]'} truncate ${selected ? 'font-bold text-appText' : 'text-appTextMuted'}`}>{display}</span>
             {selected?.sublabel && <span className="text-xs text-appTextMuted truncate">{selected.sublabel}</span>}
           </>
         ) : (
-          <span className="text-[15px] text-appTextMuted truncate">{placeholder}</span>
+          <span className={`${compact ? 'text-xs' : 'text-[15px]'} text-appTextMuted truncate`}>{placeholder}</span>
         )}
         <ChevronDown
-          className={`w-[18px] h-[18px] ml-auto flex-shrink-0 text-appTextMuted transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`${compact ? 'w-3.5 h-3.5' : 'w-[18px] h-[18px]'} ml-auto flex-shrink-0 text-appTextMuted transition-transform ${open ? 'rotate-180' : ''}`}
           aria-hidden="true"
         />
       </button>
@@ -115,7 +139,7 @@ export default function EntitySelect({
         <div
           role="listbox"
           aria-label={label}
-          className="mt-1.5 bg-appCard border border-appBorder rounded-xl shadow-[var(--shadow-pop)] p-1.5 max-h-60 overflow-y-auto"
+          className={`${compact ? `absolute z-50 mt-1 min-w-[200px] ${alignRight ? 'right-0' : 'left-0'}` : 'mt-1.5'} bg-appCard border border-appBorder rounded-xl shadow-[var(--shadow-pop)] p-1.5 max-h-60 overflow-y-auto`}
         >
           {emptyOption && (
             <button
