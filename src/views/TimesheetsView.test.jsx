@@ -120,14 +120,16 @@ describe('TimesheetsView — search and filter', () => {
     expect(screen.getByRole('searchbox', { name: /search time entries/i })).toBeInTheDocument()
   })
 
-  it('renders the job filter select', () => {
+  it('renders the job filter picker', () => {
     render(<TimesheetsView />)
-    expect(screen.getByRole('combobox', { name: /filter by job/i })).toBeInTheDocument()
+    // The native <select> filters are now bespoke EntitySelect (compact) pickers,
+    // whose trigger is a button (aria-haspopup="listbox"), not a combobox.
+    expect(screen.getByRole('button', { name: /filter by job/i })).toBeInTheDocument()
   })
 
-  it('renders the labor type filter select', () => {
+  it('renders the labor type filter picker', () => {
     render(<TimesheetsView />)
-    expect(screen.getByRole('combobox', { name: /filter by labor type/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /filter by labor type/i })).toBeInTheDocument()
   })
 })
 
@@ -187,15 +189,16 @@ describe('TimesheetsView — DailySheet with entries', () => {
   it('renders the entry job name', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    // "Acme Corp" appears in both the filter dropdown and the entry card
-    expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(2)
+    // The job filter is now a collapsed EntitySelect picker (its options only
+    // render when the menu is open), so "Acme Corp" appears once — in the card.
+    expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders the entry labor type badge', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    // "Design" appears in both the filter dropdown and the entry badge
-    expect(screen.getAllByText('Design').length).toBeGreaterThanOrEqual(2)
+    // Likewise the labor filter is collapsed, so "Design" appears in the badge.
+    expect(screen.getAllByText('Design').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders a non-zero formatted duration', () => {
@@ -459,24 +462,27 @@ function setupWithTwoOptions(entries = [AN_ENTRY]) {
   })
 }
 
+// The filters are bespoke EntitySelect (compact) pickers, not native <select>:
+// open the picker by its accessible name, then click an option by role.
+function pickFilter(filterName, optionName) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(filterName, 'i') }))
+  fireEvent.click(screen.getByRole('option', { name: new RegExp(optionName, 'i') }))
+}
+
 describe('TimesheetsView — job filter', () => {
   it('hides entry when job filter does not match', () => {
-    // AN_ENTRY.jobId = 1; filter to job id=2 → no match → empty state
+    // AN_ENTRY.jobId = 1; filter to Beta LLC (id=2) → no match → empty state
     setupWithTwoOptions()
     render(<TimesheetsView />)
-    fireEvent.change(screen.getByRole('combobox', { name: /filter by job/i }), {
-      target: { value: '2' },
-    })
+    pickFilter('filter by job', 'Beta LLC')
     expect(screen.getByText('No entries this day')).toBeInTheDocument()
   })
 
   it('keeps entry visible when job filter matches the entry job', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    // value '1' matches AN_ENTRY.jobId = 1
-    fireEvent.change(screen.getByRole('combobox', { name: /filter by job/i }), {
-      target: { value: '1' },
-    })
+    // Acme Corp (id=1) matches AN_ENTRY.jobId = 1
+    pickFilter('filter by job', 'Acme Corp')
     expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
   })
 })
@@ -485,22 +491,18 @@ describe('TimesheetsView — job filter', () => {
 
 describe('TimesheetsView — labor type filter', () => {
   it('hides entry when labor type filter does not match', () => {
-    // AN_ENTRY.laborTypeId = 1; filter to type id=2 → no match → empty state
+    // AN_ENTRY.laborTypeId = 1 (Design); filter to Dev (id=2) → no match → empty
     setupWithTwoOptions()
     render(<TimesheetsView />)
-    fireEvent.change(screen.getByRole('combobox', { name: /filter by labor type/i }), {
-      target: { value: '2' },
-    })
+    pickFilter('filter by labor type', '^Dev$')
     expect(screen.getByText('No entries this day')).toBeInTheDocument()
   })
 
   it('keeps entry visible when labor type filter matches the entry', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    // value '1' matches AN_ENTRY.laborTypeId = 1
-    fireEvent.change(screen.getByRole('combobox', { name: /filter by labor type/i }), {
-      target: { value: '1' },
-    })
+    // Design (id=1) matches AN_ENTRY.laborTypeId = 1
+    pickFilter('filter by labor type', 'Design')
     expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
   })
 })

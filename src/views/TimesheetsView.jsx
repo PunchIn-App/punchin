@@ -11,6 +11,7 @@ import {
 } from '../utils/time'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
 import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
+import EntitySelect from '../components/EntitySelect'
 import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
 import ConfirmModal from '../components/ConfirmModal'
@@ -313,6 +314,10 @@ export default function TimesheetsView() {
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
 
+  // A job's filter dot is its own colour, else its labor type's (mirrors the
+  // job card's left-rail colour resolution).
+  const laborColorOf = (id) => laborTypes?.find(l => l.id === id)?.color
+
   const go = dir => {
     setDate(d => tab === 'daily'
       ? (dir > 0 ? addDays(d, 1)   : subDays(d, 1))
@@ -528,26 +533,26 @@ ${PRINT_FONT_HEAD}
         </div>
 
         {/* Job Filter */}
-        <select
+        <EntitySelect
+          compact
+          hideLabel
+          label="Filter by job"
           value={filterJobId}
-          onChange={e => setFilterJobId(e.target.value)}
-          aria-label="Filter by job"
-          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50"
-        >
-          <option value="">All Jobs</option>
-          {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
-        </select>
+          onChange={setFilterJobId}
+          emptyOption={{ label: 'All Jobs' }}
+          options={jobs?.map(j => ({ value: j.id, label: j.name, color: j.color || laborColorOf(j.laborTypeId) })) || []}
+        />
 
         {/* Labor Type Filter */}
-        <select
+        <EntitySelect
+          compact
+          hideLabel
+          label="Filter by labor type"
           value={filterLaborTypeId}
-          onChange={e => setFilterLaborTypeId(e.target.value)}
-          aria-label="Filter by labor type"
-          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50"
-        >
-          <option value="">All Types</option>
-          {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
-        </select>
+          onChange={setFilterLaborTypeId}
+          emptyOption={{ label: 'All Types' }}
+          options={laborTypes?.map(lt => ({ value: lt.id, label: lt.name, glyph: lt.glyph, color: lt.color })) || []}
+        />
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 ml-auto">
