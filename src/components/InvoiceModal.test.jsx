@@ -41,6 +41,13 @@ function renderModal(props = {}) {
   )
 }
 
+// The job select is now a bespoke EntitySelect (colour dot + label/sublabel),
+// not a native <select>. Open the picker by its label and click the job option.
+function pickJob(name = 'Acme Corp') {
+  fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+  fireEvent.click(screen.getByRole('option', { name: new RegExp(name, 'i') }))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockSettings = { weekStartsMonday: true }
@@ -59,7 +66,7 @@ describe('InvoiceModal — rendering', () => {
 
   it('renders the job select', () => {
     renderModal()
-    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^job/i })).toBeInTheDocument()
   })
 
   it('renders date-range preset buttons', () => {
@@ -97,7 +104,7 @@ describe('InvoiceModal — rendering', () => {
 describe('InvoiceModal — line items calculation', () => {
   it('displays correct hours, rate, and amount after selecting a job', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     // 1 hr × $100/hr = $100.00
     await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
     expect(screen.getAllByText('$100.00').length).toBeGreaterThanOrEqual(1)
@@ -111,7 +118,7 @@ describe('InvoiceModal — line items calculation', () => {
            punchOut: new Date('2025-06-01T09:50:00') }]
       : [])
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     // 9:05–9:50 is 0.75 h raw; rounded in the user's favour to the half hour it's
     // 9:00–10:00 = 1.00 h, billed at $100/hr → $100.00 (not the raw $75.00).
     await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
@@ -122,7 +129,7 @@ describe('InvoiceModal — line items calculation', () => {
   it('shows "—" for amount when job has no rate set for that labor type', async () => {
     const jobNoRates = [{ id: 1, name: 'No Rates Job', isActive: true, laborRates: {} }]
     renderModal({ jobs: jobNoRates })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob('No Rates Job')
     // "1.00" appears twice (line-item hours + total hours); "—" for rate and amount
     await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1)
@@ -130,7 +137,7 @@ describe('InvoiceModal — line items calculation', () => {
 
   it('enables Export CSV once line items are present', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /export csv/i })).not.toBeDisabled()
     )
@@ -139,7 +146,7 @@ describe('InvoiceModal — line items calculation', () => {
   it('shows "No completed entries" when entries list is empty', async () => {
     useLiveQuery.mockImplementation(() => [])
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() =>
       expect(screen.getByText(/no completed entries/i)).toBeInTheDocument()
     )
@@ -149,7 +156,7 @@ describe('InvoiceModal — line items calculation', () => {
     const jobNoRates = [{ id: 1, name: 'Plain Job', isActive: true, laborRates: {} }]
     useLiveQuery.mockImplementation(() => [])
     renderModal({ jobs: jobNoRates })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob('Plain Job')
     await waitFor(() =>
       expect(screen.getByText(/no hourly rates set/i)).toBeInTheDocument()
     )
@@ -225,7 +232,7 @@ describe('InvoiceModal — export and print', () => {
 
   it('calls URL.createObjectURL when Export CSV is clicked with line items', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /export csv/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /export csv/i }))
     expect(global.URL.createObjectURL).toHaveBeenCalled()
@@ -233,7 +240,7 @@ describe('InvoiceModal — export and print', () => {
 
   it('calls window.open when Print is clicked with line items', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     expect(window.open).toHaveBeenCalled()
@@ -243,7 +250,7 @@ describe('InvoiceModal — export and print', () => {
     window.open.mockReturnValue(null)
     global.alert = vi.fn()
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     expect(() => fireEvent.click(screen.getByRole('button', { name: /print/i }))).not.toThrow()
     expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('pop-ups'))
@@ -253,7 +260,7 @@ describe('InvoiceModal — export and print', () => {
     const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
     vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     const html = fakeWin.document.write.mock.calls[0][0]
@@ -270,7 +277,7 @@ describe('InvoiceModal — export and print', () => {
     const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
     vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     const html = fakeWin.document.write.mock.calls[0][0]
@@ -287,7 +294,7 @@ describe('InvoiceModal — export and print', () => {
     const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
     vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     const html = fakeWin.document.write.mock.calls[0][0]
@@ -299,7 +306,7 @@ describe('InvoiceModal — export and print', () => {
     const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
     vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.change(screen.getByLabelText('Invoice number'), { target: { value: '50' } })
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
@@ -312,7 +319,7 @@ describe('InvoiceModal — export and print', () => {
     mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
     vi.spyOn(window, 'open').mockReturnValue({ document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() })
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('nextInvoiceNumber', 8)
@@ -322,7 +329,7 @@ describe('InvoiceModal — export and print', () => {
     const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
     vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     const html = fakeWin.document.write.mock.calls[0][0]
@@ -335,7 +342,7 @@ describe('InvoiceModal — export and print', () => {
     vi.spyOn(window, 'open').mockReturnValue(null)
     global.alert = vi.fn()
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     expect(mockUpdateSetting).not.toHaveBeenCalledWith('nextInvoiceNumber', expect.anything())
@@ -352,7 +359,7 @@ describe('InvoiceModal — backdrop and label', () => {
 
   it('shows job name and client name in the invoice header once a job is selected', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1))
   })
 

@@ -7,6 +7,7 @@ import {
   startOfDay, endOfDay, subWeeks, subMonths,
 } from 'date-fns'
 import { db } from '../db'
+import EntitySelect from './EntitySelect'
 import { getEntryDuration, roundEntry, formatTime } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
@@ -53,7 +54,6 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 
   const uid      = useId()
   const titleId  = `${uid}-title`
-  const jobSelId = `${uid}-job`
   const dialogRef = useRef(null)
 
   const initialPreset = currentTab === 'daily' ? 4 : 0
@@ -272,6 +272,14 @@ ${totalAmount != null ? `<div class="paperfoot">
   const inputCls = 'bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-appAccent/60 transition-colors'
 
   const activeJobs = jobs?.filter(j => j.isActive !== false) ?? []
+  // A job's dot colour is its own colour, else its labor type's.
+  const laborColorOf = (id) => laborTypes?.find(l => l.id === id)?.color
+  const jobOptions = activeJobs.map(j => ({
+    value: j.id,
+    label: j.name,
+    sublabel: j.clientName || undefined,
+    color: j.color || laborColorOf(j.laborTypeId),
+  }))
 
   return (
     <div
@@ -301,21 +309,14 @@ ${totalAmount != null ? `<div class="paperfoot">
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Job selector */}
-          <div>
-            <label htmlFor={jobSelId} className="block text-xs text-appTextMuted mb-1.5">Job *</label>
-            <select
-              id={jobSelId}
-              value={selectedJobId}
-              onChange={e => setJobId(e.target.value)}
-              className={`w-full ${inputCls}`}
-            >
-              <option value="">Select a job…</option>
-              {activeJobs.map(j => (
-                <option key={j.id} value={j.id}>{j.name}{j.clientName ? ` — ${j.clientName}` : ''}</option>
-              ))}
-            </select>
-          </div>
+          {/* Job selector — bespoke colour/client picker (replaces the native select) */}
+          <EntitySelect
+            label="Job *"
+            value={selectedJobId}
+            onChange={setJobId}
+            options={jobOptions}
+            placeholder="Select a job…"
+          />
 
           {/* Invoice number — editable; defaults to the next number */}
           {settings.numberInvoices && (
