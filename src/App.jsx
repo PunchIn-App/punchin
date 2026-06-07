@@ -109,7 +109,7 @@ function GitHubAccountConfirm({ username, onConfirm, onDismiss }) {
           <button
             data-autofocus
             onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl bg-appAccent hover:opacity-90 text-white font-semibold text-sm transition-opacity focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:outline-none"
+            className="flex-1 py-2.5 rounded-xl bg-appAccent hover:opacity-90 text-appOnAccent font-semibold text-sm transition-opacity focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:outline-none"
           >
             Connect
           </button>
