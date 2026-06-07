@@ -151,6 +151,51 @@ beforeEach(() => {
   global.alert = vi.fn()
 })
 
+// The lg+ master-detail is JS-gated on matchMedia('(min-width: 1024px)'); the
+// global test-setup stub returns matches:false, so the rest of the suite only
+// exercises the mobile drill-in. Override it true here to cover the desktop
+// branch — rail + detail render together and selection swaps in place.
+describe('SettingsView — desktop master-detail (lg+)', () => {
+  let originalMatchMedia
+  beforeEach(() => {
+    originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn().mockImplementation((q) => ({
+      matches: q.includes('1024px'),
+      media: q,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: () => false,
+    }))
+  })
+  afterEach(() => { window.matchMedia = originalMatchMedia })
+
+  it('shows the category rail and a default General detail pane at the same time', () => {
+    render(<SettingsView />)
+    // Rail is present…
+    expect(screen.getByRole('button', { name: /^appearance/i })).toBeInTheDocument()
+    // …alongside the General detail pane. Rail + detail visible at the same time
+    // is unique to desktop: the mobile root list shows EITHER the list OR a panel,
+    // never both (cf. "shows only the root list by default"). The "‹ Settings"
+    // back button is CSS-hidden at lg (lg:hidden), which jsdom can't assert, so
+    // the rail+detail coexistence is the regression signal here.
+    expect(screen.getByRole('switch', { name: /allow concurrent timers/i })).toBeInTheDocument()
+  })
+
+  it('selecting a category swaps the detail pane while the rail persists', () => {
+    render(<SettingsView />)
+    fireEvent.click(screen.getByRole('button', { name: /^billing/i }))
+    // Detail swapped from General to Billing…
+    expect(screen.queryByRole('switch', { name: /allow concurrent timers/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/billed from/i)).toBeInTheDocument()
+    // …and the rail stays put — selection swapped the detail in place, it didn't
+    // drill in and replace the list the way the mobile path does.
+    expect(screen.getByRole('button', { name: /^appearance/i })).toBeInTheDocument()
+  })
+})
+
 describe('SettingsView — root list & drill-in', () => {
   it('renders General, Appearance, Reminders, Data & Sync, and About category rows', () => {
     render(<SettingsView />)
