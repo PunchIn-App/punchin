@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search, DollarSign } from 'lucide-react'
 import { db } from '../db'
 import ColorPicker from '../components/ColorPicker'
-import { LABOR_GLYPH_IDS, glyphComponent, LaborGlyphChip, DEFAULT_LABOR_COLOR } from '../components/LaborGlyph'
+import { LABOR_GLYPH_IDS, glyphComponent, LaborGlyphChip, LaborTag, DEFAULT_LABOR_COLOR } from '../components/LaborGlyph'
 
 // Suggested labor-type colours — the PunchIn design-system pastel rainbow. Users
 // can still pick any custom hex via ColorPicker; these are just the quick presets.
@@ -222,22 +222,33 @@ export default function JobsView() {
     await db.jobs.update(job.id, { isActive: job.isActive === false ? true : false })
   }
 
+  const activeJobCount = jobs?.filter(j => j.isActive !== false).length ?? 0
+  const archivedJobCount = jobs?.filter(j => j.isActive === false).length ?? 0
+  const activeLtCount = laborTypes?.filter(lt => !lt.isArchived).length ?? 0
+
   return (
     <div className="h-full flex flex-col">
-      {/* Tabs */}
-      <div role="tablist" className="flex-shrink-0 flex border-b border-appBorderLight">
-        {['jobs','labor'].map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            role="tab"
-            aria-selected={tab === t}
-            className={`flex-1 py-3 text-sm font-medium capitalize transition-colors
-              ${tab === t ? 'text-appAccent border-b-2 border-appAccent' : 'text-appTextMuted'}`}>
-            {t === 'labor' ? 'Labor Types' : 'Jobs'}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 scrollable px-4 pt-4 pb-24 space-y-3 lg:max-w-2xl lg:mx-auto lg:w-full">
+      <div className="flex-1 scrollable px-4 pt-4 pb-24 lg:px-6 space-y-4">
+        {/* Header: title + count subtitle + segmented tab control */}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display font-bold text-appText text-2xl">{tab === 'labor' ? 'Labor Types' : 'Jobs'}</h1>
+            <p className="text-appTextMuted text-sm mt-1">
+              {tab === 'jobs'
+                ? `${activeJobCount} active · ${archivedJobCount} archived`
+                : `${activeLtCount} labor type${activeLtCount === 1 ? '' : 's'}`}
+            </p>
+          </div>
+          <div role="tablist" className="inline-flex flex-shrink-0 bg-appCard border border-appBorder rounded-xl p-1">
+            {['jobs','labor'].map(t => (
+              <button key={t} onClick={() => setTab(t)} role="tab" aria-selected={tab === t}
+                className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors
+                  ${tab === t ? 'bg-appInput text-appText' : 'text-appTextMuted hover:text-appText'}`}>
+                {t === 'labor' ? 'Labor Types' : 'Jobs'}
+              </button>
+            ))}
+          </div>
+        </div>
         {/* ── JOBS tab ── */}
         {tab === 'jobs' && (
           <>
@@ -261,42 +272,48 @@ export default function JobsView() {
               </div>
             )}
 
-            {jobs?.filter(j => j.isActive !== false).map(job => {
-              const lt = laborTypes?.find(l => l.id === job.laborTypeId)
-              if (editingJob?.id === job.id)
-                return <JobForm key={job.id} job={job} laborTypes={laborTypes} onDone={() => setEditingJob(null)} />
-              return (
-                <div key={job.id}
-                  className="rounded-xl border border-appBorder bg-appCard p-4 transition-all duration-200">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-display font-semibold text-appText truncate">{job.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {job.clientName && <span className="text-xs text-appTextMuted">{job.clientName}</span>}
-                        {lt && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded"
-                            style={{ backgroundColor: `${lt.color}25`, color: lt.color }}>
-                            {lt.name}
-                          </span>
-                        )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {jobs?.filter(j => j.isActive !== false).map(job => {
+                const lt = laborTypes?.find(l => l.id === job.laborTypeId)
+                const rateCount = Object.keys(job.laborRates || {}).length
+                if (editingJob?.id === job.id)
+                  return <div key={job.id} className="lg:col-span-2"><JobForm job={job} laborTypes={laborTypes} onDone={() => setEditingJob(null)} /></div>
+                return (
+                  <div key={job.id} className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden transition-all duration-200">
+                    {/* ticket left-rail in the job's labor colour */}
+                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: lt?.color || 'transparent' }} aria-hidden="true" />
+                    <div className="pl-4 pr-3 py-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-display font-semibold text-appText truncate">{job.name}</p>
+                          {job.clientName && <p className="text-xs text-appTextMuted truncate mt-0.5">{job.clientName}</p>}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button onClick={() => setEditingJob(job)} aria-label={`Edit ${job.name}`}
+                            className="w-9 h-9 flex items-center justify-center rounded-lg border border-appBorder bg-appBg text-appTextMuted hover:text-appText hover:bg-appInput transition-colors">
+                            <Pencil className="w-4 h-4" aria-hidden="true" />
+                          </button>
+                          <button onClick={() => toggleArchive(job)} aria-label={`Archive ${job.name}`}
+                            className="w-9 h-9 flex items-center justify-center rounded-lg border border-appBorder bg-appBg text-appTextMuted hover:text-appText hover:bg-appInput transition-colors">
+                            <Archive className="w-4 h-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                      {/* meta row: labor tag (left) + rates indicator (right) */}
+                      <div className="flex items-center justify-between gap-2 mt-3">
+                        {lt ? <LaborTag laborType={lt} /> : <span className="text-[10px] text-appTextDisabled uppercase tracking-wider">No labor type</span>}
+                        <span className="flex items-center gap-1 text-xs flex-shrink-0">
+                          <DollarSign className="w-3.5 h-3.5 text-appTextMuted" aria-hidden="true" />
+                          {rateCount > 0
+                            ? <span className="text-appTextMuted">{rateCount} rate{rateCount === 1 ? '' : 's'} set</span>
+                            : <span className="text-appTextDisabled">No rates set</span>}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button onClick={() => setEditingJob(job)}
-                        aria-label={`Edit ${job.name}`}
-                        className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
-                        <Pencil className="w-4 h-4" aria-hidden="true" />
-                      </button>
-                      <button onClick={() => toggleArchive(job)}
-                        aria-label={`Archive ${job.name}`}
-                        className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
-                        <Archive className="w-4 h-4" aria-hidden="true" />
-                      </button>
-                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
 
             {(() => {
               const archived = jobs?.filter(j => j.isActive === false) ?? []
