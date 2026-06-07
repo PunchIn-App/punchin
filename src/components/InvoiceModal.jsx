@@ -8,6 +8,7 @@ import {
 } from 'date-fns'
 import { db } from '../db'
 import { getEntryDuration, roundEntry } from '../utils/time'
+import { PRINT_FONT_HEAD, openPrintWindow } from '../utils/printDocument'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 
@@ -144,11 +145,12 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
       </tr>`).join('')
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>Invoice — ${job.name}</title>
+${PRINT_FONT_HEAD}
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #111; padding: 48px; }
+  body { font-family: 'Noto Sans', sans-serif; font-size: 13px; color: #111; padding: 48px; }
   .header { margin-bottom: 32px; }
-  .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .header h1 { font-family: 'Noto Sans Display', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
   .header .meta { color: #666; font-size: 13px; margin-top: 6px; }
   .header .period { color: #333; font-size: 13px; margin-top: 2px; }
   table { width: 100%; border-collapse: collapse; margin-top: 8px; }
@@ -158,7 +160,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   tbody tr:last-child td { border-bottom: none; }
   .tfoot td { padding: 10px 8px 4px 0; border-top: 2px solid #111; font-weight: 700; }
   .right { text-align: right; }
-  .mono { font-family: 'SF Mono', 'Fira Mono', monospace; }
+  .mono { font-family: 'Noto Sans Mono', monospace; }
   .lt-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
   @media print { @page { margin: 24mm 20mm; } body { padding: 0; } }
 </style></head><body>
@@ -181,18 +183,13 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   </tr></tfoot>
 </table>
 </body></html>`
-    const w = window.open('', '_blank', 'width=800,height=600')
-    // A popup blocker returns null; without this guard the next line throws in an
-    // onClick (the ErrorBoundary can't catch it) and the button silently dies.
-    // CSV export remains available as a fallback (issue #150).
-    if (!w) {
+    // openPrintWindow writes the doc and prints once the Noto webfonts load. It
+    // returns false when the popup is blocked (window.open → null); without this
+    // guard the throw inside the onClick is uncatchable and the button silently
+    // dies, so we alert and leave CSV as the fallback (issue #150).
+    if (!openPrintWindow(html, { width: 800, height: 600 })) {
       alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use Export CSV instead.')
-      return
     }
-    w.document.write(html)
-    w.document.close()
-    w.focus()
-    setTimeout(() => { w.print() }, 250)
   }
 
   // Focus trap, Escape, and focus restoration (issues #151/#152/#154)

@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+_Brand refresh (`design/brand-refresh`) — in progress._
+
+### Fixed
+- Printed and PDF-exported **invoices and timesheets now render in the brand Noto font** instead of falling back to the OS's system-UI face. The print document loads the Noto webfonts and waits for them before printing, so exports match the app. ([brand refresh](https://github.com/PunchIn-App/punchin))
+
+---
+
 ## [0.20.3] — 2026-06-05
 
 ### Changed

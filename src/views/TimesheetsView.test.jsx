@@ -356,6 +356,21 @@ describe('TimesheetsView — print timesheet', () => {
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
     await waitFor(() => expect(window.open).toHaveBeenCalled())
   })
+
+  it('prints the timesheet in the Noto brand font, loading the webfont (not the system-UI fallback)', async () => {
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
+    await waitFor(() => expect(fakeWin.document.write).toHaveBeenCalled())
+    const html = fakeWin.document.write.mock.calls[0][0]
+    expect(html).toContain("font-family: 'Noto Sans', sans-serif")
+    expect(html).toContain("'Noto Sans Mono', monospace")
+    expect(html).toContain("'Noto Sans Display'")
+    expect(html).toContain('fonts.googleapis.com')
+    expect(html).not.toContain('-apple-system')
+    expect(html).not.toContain('SF Mono')
+  })
 })
 
 // ─── WeeklySheet content ──────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
   getDayRange, getWeekRange, getWeekDays,
   entryOverlapsRange, getEntryDurationInRange, sumDurationsInRange,
 } from '../utils/time'
+import { PRINT_FONT_HEAD, openPrintWindow } from '../utils/printDocument'
 import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
 import ConfirmModal from '../components/ConfirmModal'
@@ -416,10 +417,11 @@ export default function TimesheetsView() {
 
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>Timesheet — ${titleStr}</title>
+${PRINT_FONT_HEAD}
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #111; padding: 48px; }
-  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  body { font-family: 'Noto Sans', sans-serif; font-size: 13px; color: #111; padding: 48px; }
+  h1 { font-family: 'Noto Sans Display', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
   .sub-title { color: #666; font-size: 13px; margin-bottom: 28px; }
   table { width: 100%; border-collapse: collapse; }
   thead th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #888; padding: 6px 8px 6px 0; border-bottom: 2px solid #111; }
@@ -427,7 +429,7 @@ export default function TimesheetsView() {
   tbody td { padding: 7px 8px 7px 0; border-bottom: 1px solid #e5e5e5; vertical-align: middle; }
   tfoot td { padding: 10px 8px 4px 0; border-top: 2px solid #111; font-weight: 700; }
   .right { text-align: right; }
-  .mono { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 12px; }
+  .mono { font-family: 'Noto Sans Mono', monospace; font-size: 12px; }
   .sub { font-size: 11px; color: #888; }
   .notes { font-size: 11px; color: #666; font-style: italic; }
   .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
@@ -449,17 +451,12 @@ export default function TimesheetsView() {
 </table>
 </body></html>`
 
-    const w = window.open('', '_blank', 'width=900,height=700')
-    // Popup blocked → window.open returns null; guard so the button doesn't throw
-    // in its onClick handler (same hardening as InvoiceModal print, issue #150).
-    if (!w) {
+    // openPrintWindow writes the doc and prints once the Noto webfonts load; it
+    // returns false when the popup is blocked (window.open → null), same hardening
+    // as InvoiceModal print so the button doesn't throw in its onClick (issue #150).
+    if (!openPrintWindow(html, { width: 900, height: 700 })) {
       alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use the CSV export instead.')
-      return
     }
-    w.document.write(html)
-    w.document.close()
-    w.focus()
-    setTimeout(() => { w.print() }, 250)
   }
 
   return (
