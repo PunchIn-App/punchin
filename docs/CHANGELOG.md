@@ -5,9 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [0.21.0] — 2026-06-07
 
-_Brand refresh (`design/brand-refresh`) — in progress._
+PunchIn brand refresh — new identity (PunchIn Blue + stopwatch mark), self-hosted fonts, a desktop/tablet layout, labor-type glyphs, a billing profile, and more.
 
 ### Changed
 - **Weekday pickers follow "Week starts Monday."** The reminder day pickers and the weekly-reminder day selector now display Monday-first when you have that preference on (the stored days are unchanged). ([brand refresh](https://github.com/PunchIn-App/punchin))
