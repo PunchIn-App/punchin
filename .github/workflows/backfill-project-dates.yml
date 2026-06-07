@@ -87,15 +87,16 @@ jobs:
               completion: F[DATE_FIELDS.completion],
             };
 
-            // Fail loudly if any of the three date fields is missing.
-            const missing = Object.entries(DATE_FIELDS)
-              .filter(([k]) => !fieldId[k])
-              .map(([, name]) => `"${name}"`);
+            // Start/Target are required; Completion Date is optional — the board's
+            // built-in (auto-populated) "Closed" field now tracks completion, so the
+            // custom Completion Date field may have been removed.
+            const missing = ['start', 'target'].filter(k => !fieldId[k]).map(k => `"${DATE_FIELDS[k]}"`);
             if (missing.length) {
               core.setFailed(`Missing required date field(s) on the project: ${missing.join(', ')}. ` +
                 `Found fields: ${Object.keys(F).map(n => `"${n}"`).join(', ')}`);
               return;
             }
+            if (!fieldId.completion) core.warning(`"${DATE_FIELDS.completion}" not on board — completion backfill skipped (built-in "Closed" covers it).`);
 
             // --- Helpers ---
             // Date mutation: identical shape to project-automation.yml ($d is a Date! = "YYYY-MM-DD").
@@ -225,7 +226,7 @@ jobs:
                   toSet.push({ key: 'target', fid: fieldId.target, name: DATE_FIELDS.target, date: plus3(created) });
                 }
                 // Completion only when the item is actually closed/merged AND the field is empty.
-                if (closedish && !(item.compVal && item.compVal.date)) {
+                if (fieldId.completion && closedish && !(item.compVal && item.compVal.date)) {
                   toSet.push({ key: 'completion', fid: fieldId.completion, name: DATE_FIELDS.completion, date: ymd(closedish) });
                 }
 

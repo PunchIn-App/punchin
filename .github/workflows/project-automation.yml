@@ -1,6 +1,6 @@
 # Auto-assign new issues/PRs to the "PunchIn" project board (org project #1)
 # and populate the fields GitHub's built-in project workflows DON'T:
-#   Labels · Priority · Size · Start/Target/Completion dates.
+#   Labels · Priority · Size · Start/Target dates (completion = built-in "Closed" field).
 # On close it also clears any assignees (finished work shouldn't stay assigned).
 # Status is intentionally left to the project's built-in workflows (Item added /
 # Item closed / Pull request merged) so this never fights them or trips the
@@ -91,7 +91,8 @@ jobs:
             } else if (action === 'synchronize' && isPR) {
               await setOpt('Size', sizeOf((c.additions || 0) + (c.deletions || 0)));
             } else if (action === 'closed') {
-              await setDate('Completion Date', today);
+              // Completion date is tracked by the board's built-in (auto-populated)
+              // "Closed" field — no custom Completion Date write needed here.
               // Clear assignees on close — finished work shouldn't stay assigned.
               const assignees = (c.assignees || []).map(a => a.login);
               if (assignees.length) {
