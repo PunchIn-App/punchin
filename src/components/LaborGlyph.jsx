@@ -34,17 +34,16 @@ export function glyphComponent(id) {
   return LABOR_GLYPHS[id] || PunchGlyph
 }
 
-// A solid colour chip holding the glyph (ink flipped for contrast). Replaces the
-// bare colour dots in management lists, rate rows, and the editor preview.
+// A tinted colour chip holding the glyph — the design system's `.gl` chip:
+// a ~22% colour fill with a ~42% colour border, the glyph drawn in the full
+// colour. Replaces the bare colour dots in management lists, rate rows, etc.
 export function LaborGlyphChip({ laborType, className = 'w-5 h-5' }) {
   const color = laborType?.color || DEFAULT_LABOR_COLOR
   const Glyph = glyphComponent(laborType?.glyph)
-  // Soft TINTED chip (≈15% colour fill, glyph in the full colour) per the design
-  // system .pclt-chip — radius ≈ 28% of the box.
   return (
     <span
       className={`inline-flex items-center justify-center rounded-[28%] flex-shrink-0 ${className}`}
-      style={{ backgroundColor: `${color}26` }}
+      style={{ backgroundColor: `${color}38`, border: `1px solid ${color}6B` }}
       aria-hidden="true"
     >
       <Glyph className="w-1/2 h-1/2" style={{ color }} strokeWidth={2} />
@@ -52,20 +51,28 @@ export function LaborGlyphChip({ laborType, className = 'w-5 h-5' }) {
   )
 }
 
-// The labor-type tag — a colour-tinted pill carrying the glyph + name, so it
-// reads by shape and colour. Use everywhere a labor type is labelled inline
-// (timer ticket, timesheet entries, invoice line items, last session).
+// The labor-type tag — the design system's `.lbadge`: a NEUTRAL pill (surface +
+// border, the name in primary text) carrying a small tinted glyph chip that
+// holds the colour. This deliberately avoids colour-text-on-a-colour-tinted-pill
+// (the washed-out pattern the DS rejected). Reads by shape AND colour. Use
+// everywhere a labor type is labelled inline (timer ticket, timesheet entries,
+// invoice line items, last session).
 export function LaborTag({ laborType, className = '' }) {
   if (!laborType) return null
   const color = laborType.color || DEFAULT_LABOR_COLOR
   const Glyph = glyphComponent(laborType.glyph)
   return (
     <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${className}`}
-      style={{ backgroundColor: `${color}25`, color }}
+      className={`inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-md bg-appInput border border-appBorder text-appText text-[11px] font-semibold ${className}`}
       aria-label={laborType.name}
     >
-      <Glyph className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+      <span
+        className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-[5px] flex-shrink-0"
+        style={{ backgroundColor: `${color}38`, border: `1px solid ${color}6B` }}
+        aria-hidden="true"
+      >
+        <Glyph className="w-3 h-3" style={{ color }} strokeWidth={2} />
+      </span>
       {laborType.name}
     </span>
   )

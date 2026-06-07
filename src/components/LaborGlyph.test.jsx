@@ -33,6 +33,26 @@ it('LaborTag renders nothing without a labor type', () => {
   expect(container).toBeEmptyDOMElement()
 })
 
+it('LaborTag is a neutral pill with the colour carried by an inner glyph chip (DS pattern)', () => {
+  // The design system rejected colour-text-on-a-colour-tinted-pill (washed out).
+  // The pill itself must be neutral (no labor-colour fill or text colour inline);
+  // the colour lives only on a small tinted glyph chip inside it.
+  render(<LaborTag laborType={{ name: 'Design', color: '#FF0000', glyph: 'brush' }} />)
+  const pill = screen.getByLabelText('Design')
+  expect(pill.style.backgroundColor).toBe('')
+  expect(pill.style.color).toBe('')
+  const chip = pill.querySelector('span[style*="background"]')
+  expect(chip).toBeTruthy()                       // the colour-bearing glyph chip
+  expect(chip.querySelector('svg')).toBeTruthy()  // glyph rides inside it
+})
+
+it('LaborGlyphChip carries the colour as a tint with a matching border (DS .gl)', () => {
+  const { container } = render(<LaborGlyphChip laborType={{ color: '#FF0000', glyph: 'code' }} />)
+  const chip = container.querySelector('span[style]')
+  expect(chip.style.backgroundColor).not.toBe('') // tinted fill
+  expect(chip.style.border).not.toBe('')          // + a tint border, per the DS chip
+})
+
 it('LaborGlyphChip renders a glyph even when glyph/color are unset (fallbacks)', () => {
   const { container } = render(<LaborGlyphChip laborType={{}} />)
   expect(container.querySelector('svg')).toBeTruthy()
