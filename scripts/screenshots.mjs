@@ -81,9 +81,9 @@ async function seedData(theme) {
   // Labor types (explicit IDs for deterministic job references)
   { const tx = db.transaction(['laborTypes'], 'readwrite')
     const s = tx.objectStore('laborTypes')
-    s.put({ id:1, name:'Development', color:'#22C55E', isArchived:false })
-    s.put({ id:2, name:'Design',      color:'#6366F1', isArchived:false })
-    s.put({ id:3, name:'Meetings',    color:'#F59E0B', isArchived:false })
+    s.put({ id:1, name:'Development', color:'#22C55E', glyph:'code',  isArchived:false })
+    s.put({ id:2, name:'Design',      color:'#6366F1', glyph:'brush', isArchived:false })
+    s.put({ id:3, name:'Meetings',    color:'#F59E0B', glyph:'chat',  isArchived:false })
     await txDone(tx) }
 
   // Jobs
