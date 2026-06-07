@@ -414,10 +414,24 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
     expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders edit and delete buttons in the day-by-day view', () => {
+  it('keeps a populated day collapsed by default and reveals its entries on expand', () => {
+    // The weekly view is a clean day-totals list (design-system fidelity); each
+    // populated day discloses its entries on tap rather than rendering them inline.
     setupWithEntries()
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    // Collapsed: the entry's edit button is not in the DOM yet.
+    expect(screen.queryByRole('button', { name: /edit entry for acme corp/i })).not.toBeInTheDocument()
+    // Expand the only populated day.
+    fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
+    expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
+  })
+
+  it('renders edit and delete buttons in the day-by-day view (once expanded)', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /delete entry for acme corp/i })).toBeInTheDocument()
   })
@@ -426,6 +440,7 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
     setupWithEntries()
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     fireEvent.click(screen.getByRole('button', { name: /edit entry for acme corp/i }))
     expect(screen.getByTestId('edit-entry-modal')).toBeInTheDocument()
   })
@@ -434,6 +449,7 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
     setupWithEntries()
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     fireEvent.click(screen.getByRole('button', { name: /delete entry for acme corp/i }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })

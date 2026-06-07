@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronLeft, ChevronRight, Calendar, Pencil, Trash2, Plus, Search, FileDown, Receipt, Printer } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar, Pencil, Trash2, Plus, Search, FileDown, Receipt, Printer } from 'lucide-react'
 import { format, addDays, subDays, addWeeks, subWeeks } from 'date-fns'
 import { db, deleteEntry } from '../db'
 import { useSettings } from '../hooks/useSettings'
@@ -93,29 +93,36 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
           // today, keeping the card durations summing to the day Total (#136).
           // Round for billing first (issue #208) so cards agree with the Total.
           const dur = getEntryDurationInRange(roundEntry(entry, rm), start, end)
+          // Leading dot is the JOB's own colour (its identity cue), falling back to
+          // its labor type's colour — distinct from the LaborTag's labor colour.
+          const jobColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
           return (
-            <div key={entry.id} className="rounded-xl border border-appBorder bg-appCard p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+            // Compact entry row (design-system pcts-entry): job dot · name + tag +
+            // time, with the duration and actions pinned right. The tag/time pair
+            // wraps under the name on narrow phones.
+            <div key={entry.id} className="rounded-xl border border-appBorder bg-appCard px-4 py-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: jobColor }} aria-hidden="true" />
+                <div className="min-w-0 flex-1">
                   <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || '—'}</p>
-                  {lt && <LaborTag laborType={lt} className="mt-0.5" />}
-                </div>
-                <div className="text-right flex-shrink-0 flex flex-col items-end">
-                  <p className="font-mono text-appText font-semibold text-sm">{formatDuration(dur, decimal)}</p>
-                  <p className="text-appTextDarker text-xs mt-0.5">
-                    {formatTime(entry.punchIn, settings.timeFormat)} → {entry.punchOut ? formatTime(entry.punchOut, settings.timeFormat) : 'running'}
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <button onClick={() => onEdit(entry)} aria-label={`Edit entry for ${getJob(entry.jobId)?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
-                      <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
-                    </button>
-                    <button onClick={() => onDelete(entry.id)} aria-label={`Delete entry for ${getJob(entry.jobId)?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                    </button>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    {lt && <LaborTag laborType={lt} />}
+                    <span className="font-mono text-xs text-appTextDarker whitespace-nowrap">
+                      {formatTime(entry.punchIn, settings.timeFormat)} → {entry.punchOut ? formatTime(entry.punchOut, settings.timeFormat) : 'running'}
+                    </span>
                   </div>
                 </div>
+                <span className="font-mono text-appText font-semibold text-sm flex-shrink-0">{formatDuration(dur, decimal)}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => onEdit(entry)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
+                    <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                  <button onClick={() => onDelete(entry.id)} aria-label={`Delete entry for ${job?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-              {entry.notes && <p className="mt-2 text-xs text-appTextMuted">{entry.notes}</p>}
+              {entry.notes && <p className="mt-2 text-xs text-appTextMuted pl-[22px]">{entry.notes}</p>}
             </div>
           )
         })
@@ -132,6 +139,9 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const { start, end } = getWeekRange(date, wsMon)
   const days = getWeekDays(date, wsMon)
   const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
+  // Which day rows are expanded. The weekly view reads as a clean day-totals list
+  // (design-system fidelity); a populated day discloses its entries on tap.
+  const [expanded, setExpanded] = useState({})
 
   const allEntries = useLiveQuery(
     // Indexed range query (issue #132) with a one-day look-back (issue #136) so
@@ -239,32 +249,53 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
         )}
       </div>
 
-      {/* Day-by-day */}
-      <div className="space-y-3 lg:order-1">
-      {dayData.map(({ day, ds, de, dayEntries, dayTotal }) => {
+      {/* Day-by-day — one unified card of day-total rows (design-system daylist);
+          a populated day toggles open to reveal its entries (edit/delete intact). */}
+      <div className="lg:order-1">
+      <div className="rounded-xl border border-appBorder bg-appCard shadow-sm overflow-hidden">
+      {dayData.map(({ day, ds, de, dayEntries, dayTotal }, idx) => {
         const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+        const hasEntries = dayEntries.length > 0
+        const key = day.toISOString()
+        const isOpen = !!expanded[key]
+        const dayLabel = format(day, 'EEE, MMM d')
+        const durLabel = formatDuration(dayTotal, decimal)
 
         return (
-          <div key={day.toISOString()}
-            className={`rounded-xl border bg-appCard shadow-sm transition-colors duration-200 ${isToday ? 'border-appAccent/30' : 'border-appBorder'}`}>
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2">
-                {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
-                <span className={`text-sm font-medium ${isToday ? 'text-appAccent' : 'text-appTextMuted'}`}>
-                  {format(day, 'EEE, MMM d')}
+          <div key={key} className={idx > 0 ? 'border-t border-appBorder' : ''}>
+            {hasEntries ? (
+              <button
+                type="button"
+                onClick={() => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))}
+                aria-expanded={isOpen}
+                aria-label={`${dayLabel}, ${durLabel} — ${isOpen ? 'hide' : 'show'} entries`}
+                className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-appInput/40 transition-colors"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
+                  <span className={`text-sm font-medium truncate ${isToday ? 'text-appAccent' : 'text-appText'}`}>{dayLabel}</span>
                 </span>
+                <span className="flex items-center gap-2.5 flex-shrink-0">
+                  <span className="font-mono text-sm text-appTextMuted">{durLabel}</span>
+                  <ChevronDown className={`w-4 h-4 text-appTextMuted transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </span>
+              </button>
+            ) : (
+              <div className="flex items-center justify-between px-4 py-3.5">
+                <span className="flex items-center gap-2 min-w-0">
+                  {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
+                  <span className={`text-sm font-medium truncate ${isToday ? 'text-appAccent' : 'text-appTextMuted'}`}>{dayLabel}</span>
+                </span>
+                <span className="font-mono text-sm text-appTextDisabled">—</span>
               </div>
-              <span className="font-mono text-sm text-appText">
-                {dayEntries.length > 0 ? formatDuration(dayTotal, decimal) : '—'}
-              </span>
-            </div>
-            {dayEntries.length > 0 && (
-              <div className="px-4 pb-3 space-y-1 divide-y divide-appBorderLight/30">
+            )}
+            {hasEntries && isOpen && (
+              <div className="px-4 pb-3 space-y-1 divide-y divide-appBorderLight/30 bg-appBg/20">
                 {dayEntries.map(e => {
                   const lt = getLT(e.laborTypeId)
                   const job = getJob(e.jobId)
                   return (
-                    <div key={e.id} className="flex items-center justify-between text-xs py-1.5">
+                    <div key={e.id} className="flex items-center justify-between text-xs py-2">
                       <div className="flex items-center gap-1.5 min-w-0">
                         {lt && <LaborGlyphChip laborType={lt} className="w-4 h-4" />}
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
@@ -272,10 +303,10 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                         <span className="font-mono text-appTextDarker">{formatDuration(getEntryDurationInRange(roundEntry(e, rm), ds, de), decimal)}</span>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${getJob(e.jobId)?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
+                          <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
                           </button>
-                          <button onClick={() => onDelete(e.id)} aria-label={`Delete entry for ${getJob(e.jobId)?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
+                          <button onClick={() => onDelete(e.id)} aria-label={`Delete entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
                             <Trash2 className="w-3 h-3" aria-hidden="true" />
                           </button>
                         </div>
@@ -288,6 +319,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
           </div>
         )
       })}
+      </div>
       </div>
     </div>
   )
