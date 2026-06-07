@@ -35,6 +35,7 @@
 | `src/components/LicenseModal.test.jsx` | Dialog a11y, default app-license (BUSL) tab, switch to third-party (aria-pressed), close button/Escape/backdrop, device-Back (popstate) dismiss |
 | `src/components/InstallPromptModal.test.jsx` | All three modes (native / ios-safari / ios-other), dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
 | `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
+| `src/components/GlyphPicker.test.jsx` | Quick-pick row + "more" button, `onChange` on pick, `aria-checked` selection, search-chosen glyph stays visible, search filter + select, empty-state |
 | `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management, unique title id per instance (#156) |
 | `src/hooks/useFocusTrap.test.jsx` | Initial focus (first / `[data-autofocus]` / `opts.initialFocus`), Escape→onClose, focus restoration on unmount (#152), focus pulled back into the dialog on Tab (#154) |
 | `src/components/DataTransfer.test.jsx` | Share-link + QR generation, "Includes N jobs/entries" summary, import junk rejection, end-to-end import of a real encoded link with count (issue #77) |

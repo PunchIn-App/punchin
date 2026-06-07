@@ -74,6 +74,7 @@ punchin/
 │   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
 │   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
 │   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
+│   │   ├── GlyphPicker.jsx     # Labor-type glyph picker: single quick-pick row + searchable "more" dropdown over the LABOR_GLYPHS set
 │   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets; centered reading-modal — closes on device Back (pushes {modal:true} history entry)
 │   │   ├── LicenseModal.jsx     # Centered reading-modal showing the app license (LICENSE ?raw, BUSL-1.1) and third-party attributions (docs/THIRD-PARTY-LICENSES.md ?raw, rendered via a small built-in markdown renderer); two-way section switch via aria-pressed buttons; closes on device Back
 │   │   ├── DataTransfer.jsx     # Account-free device-to-device transfer (issue #77): "Create share link" snapshots the DB → compressed #import= link + QR (qrcode-generator); "Import from a link" pastes a link/code and merges via importSnapshot

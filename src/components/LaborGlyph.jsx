@@ -4,15 +4,23 @@
 import {
   Code, Paintbrush, MessageSquare, Wrench, Book, FlaskConical, Camera, Truck,
   Leaf, Briefcase, Pencil, BarChart2, DollarSign, Clock, Bell, Settings, Tag,
+  Megaphone, PenTool, Hammer, Scissors, Music, Video, Mail, Phone, Globe, Map,
+  Zap, Coffee, Package, Plane, Users, GraduationCap,
 } from 'lucide-react'
 
-// Curated quick-pick set (string id → Lucide component). Stored as the id string
-// on laborTypes.glyph; mapped here so render sites import one component.
+// Glyph set (string id → Lucide component). Stored as the id string on
+// laborTypes.glyph; mapped here so render sites import one component. The first
+// few are the quick-picks shown in the picker row; the rest are reachable via
+// the picker's search ("more") dropdown.
 export const LABOR_GLYPHS = {
   code: Code, brush: Paintbrush, chat: MessageSquare, wrench: Wrench,
   book: Book, beaker: FlaskConical, camera: Camera, truck: Truck,
   leaf: Leaf, briefcase: Briefcase, pencil: Pencil, chart: BarChart2,
   dollar: DollarSign, clock: Clock, bell: Bell, settings: Settings,
+  megaphone: Megaphone, pen: PenTool, hammer: Hammer, scissors: Scissors,
+  music: Music, video: Video, mail: Mail, phone: Phone, globe: Globe,
+  map: Map, zap: Zap, coffee: Coffee, package: Package, plane: Plane,
+  users: Users, grad: GraduationCap,
 }
 export const LABOR_GLYPH_IDS = Object.keys(LABOR_GLYPHS)
 export const DEFAULT_LABOR_COLOR = '#6366F1'

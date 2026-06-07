@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search, DollarSign } from 'lucide-react'
 import { db } from '../db'
 import ColorPicker from '../components/ColorPicker'
-import { LABOR_GLYPH_IDS, glyphComponent, LaborGlyphChip, LaborTag, DEFAULT_LABOR_COLOR } from '../components/LaborGlyph'
+import GlyphPicker from '../components/GlyphPicker'
+import { LaborGlyphChip, LaborTag, DEFAULT_LABOR_COLOR } from '../components/LaborGlyph'
 
 // Suggested labor-type colours — the PunchIn design-system pastel rainbow. Users
 // can still pick any custom hex via ColorPicker; these are just the quick presets.
@@ -159,26 +160,7 @@ function LaborTypeForm({ lt, onDone }) {
       {/* Glyph — so a type reads by shape, not colour alone */}
       <div className="space-y-1.5">
         <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Glyph</p>
-        <div className="grid grid-cols-8 gap-1.5" role="radiogroup" aria-label="Glyph">
-          {LABOR_GLYPH_IDS.map(id => {
-            const Glyph = glyphComponent(id)
-            const selected = glyph === id
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setGlyph(id)}
-                role="radio"
-                aria-checked={selected}
-                aria-label={id}
-                className={`aspect-square flex items-center justify-center rounded-lg border transition-colors
-                  ${selected ? 'border-appAccent bg-appAccent/10 text-appAccent' : 'border-appBorder text-appTextMuted hover:text-appText hover:bg-appInput'}`}
-              >
-                <Glyph className="w-4 h-4" aria-hidden="true" />
-              </button>
-            )
-          })}
-        </div>
+        <GlyphPicker value={glyph} onChange={setGlyph} />
       </div>
 
       <ColorPicker
