@@ -19,8 +19,10 @@ describe('worker security headers (issue #129)', () => {
     expect(csp).toContain('https://api.github.com')
     expect(csp).toContain('https://www.googleapis.com')
     expect(csp).toContain('https://graph.microsoft.com')
-    expect(csp).toContain('https://fonts.gstatic.com')
-    expect(csp).toContain('https://fonts.googleapis.com')
+    // Fonts are self-hosted (no Google Fonts CDN) — they load from same origin.
+    expect(csp).toMatch(/font-src 'self'/)
+    expect(csp).not.toContain('fonts.gstatic.com')
+    expect(csp).not.toContain('fonts.googleapis.com')
 
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff')
     expect(res.headers.get('Referrer-Policy')).toBe('no-referrer')

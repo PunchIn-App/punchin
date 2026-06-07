@@ -20,12 +20,14 @@ and is also available with a FAQ at <https://openfontlicense.org>.
 
 ### How the fonts are used
 
-- **At runtime** the fonts are loaded from the **Google Fonts CDN**
-  (`fonts.googleapis.com` / `fonts.gstatic.com`), declared in
-  [`app/index.html`](../app/index.html). The project does **not** bundle,
-  self-host, or redistribute the font binaries — they are served by Google to
-  the user's browser. This is plain *use* of the fonts, which the OFL permits
-  freely.
+- **At runtime** the fonts are **self-hosted**: the variable WOFF2 binaries are
+  committed under [`app/public/fonts/`](../app/public/fonts/) and served from the
+  app's own origin (`/fonts/*.woff2`), declared via `@font-face` in
+  [`src/index.css`](../src/index.css). No third-party font CDN is used. Because
+  the font binaries are now redistributed in this repository, the OFL's bundling
+  condition applies — and is met: this license file and the full
+  [`OFL-1.1.txt`](licenses/OFL-1.1.txt) ship alongside them, and no reserved name
+  is used. (Noto Sans JP from the design system is **not** shipped.)
 
 - **At build time** the social-preview cards
   ([`docs/social-preview.svg`](social-preview.svg),
@@ -36,6 +38,7 @@ and is also available with a FAQ at <https://openfontlicense.org>.
   artwork/documents created with a font — including text converted to outlines —
   are **not** bound by the OFL, and no font binary is committed to this repo.
 
-Because no Noto font software is redistributed in this repository, the OFL's
-bundling conditions are not triggered; the license is included here for
-attribution and transparency.
+Because the Noto font binaries are now redistributed in this repository, the
+OFL's bundling condition applies and is satisfied: the full license text ships at
+[`OFL-1.1.txt`](licenses/OFL-1.1.txt), this file provides attribution, and the
+fonts are not sold on their own nor distributed under any OFL Reserved Font Name.

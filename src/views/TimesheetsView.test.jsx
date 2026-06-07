@@ -367,7 +367,7 @@ describe('TimesheetsView — print timesheet', () => {
     expect(html).toContain("font-family: 'Noto Sans', sans-serif")
     expect(html).toContain("'Noto Sans Mono', monospace")
     expect(html).toContain("'Noto Sans Display'")
-    expect(html).toContain('fonts.googleapis.com')
+    expect(html).toContain('/fonts/noto-sans-latin-wght-normal.woff2')
     expect(html).not.toContain('-apple-system')
     expect(html).not.toContain('SF Mono')
   })

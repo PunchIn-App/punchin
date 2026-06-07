@@ -5,14 +5,14 @@ import { manifest } from '../config/manifest.base.js'
 // Defense-in-depth response headers for the app shell (issue #129). The CSP in
 // particular blunts XSS / a compromised dependency trying to exfiltrate the
 // sync tokens that live in same-origin IndexedDB. Origins are the exact set the
-// app uses: Google Fonts (style/font), and the sync APIs it fetches
-// (api.github.com, gist raw content, Google Drive, Microsoft Graph). The built
-// index.html has no inline scripts, so script-src can stay 'self'.
+// app uses: the sync APIs it fetches (api.github.com, gist raw content, Google
+// Drive, Microsoft Graph). Fonts are self-hosted (no CDN), so font/style stay
+// 'self'. The built index.html has no inline scripts, so script-src stays 'self'.
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
   "img-src 'self' data: blob:",
   "connect-src 'self' https://api.github.com https://gist.githubusercontent.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com",
   "manifest-src 'self'",

@@ -7,12 +7,14 @@
 // on the fallback face. Both print paths share this markup + window logic so the
 // brand stays in sync (and so self-hosting the fonts later is a one-file change).
 
-// Injected into the <head> of every print document: load the three Noto brand
-// webfonts. Mirrors the Google Fonts source used by app/index.html today; when
-// the fonts are self-hosted this is the single place to switch to @font-face.
-export const PRINT_FONT_HEAD = `<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Display:wght@700;800&family=Noto+Sans+Mono&display=swap">`
+// Injected into the <head> of every print document: declare the self-hosted Noto
+// brand webfonts. The print popup is same-origin (opened from the app), so the
+// absolute /fonts/*.woff2 URLs resolve against the app origin — no CDN needed.
+export const PRINT_FONT_HEAD = `<style>
+@font-face { font-family: 'Noto Sans'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('/fonts/noto-sans-latin-wght-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Noto Sans Display'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('/fonts/noto-sans-display-latin-wght-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Noto Sans Mono'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('/fonts/noto-sans-mono-latin-wght-normal.woff2') format('woff2'); }
+</style>`
 
 // Open a print window, write the document, and print once the brand webfonts
 // have loaded. Falls back to a short fixed delay where document.fonts is absent

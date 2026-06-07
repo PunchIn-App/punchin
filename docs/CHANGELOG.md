@@ -12,6 +12,7 @@ _Brand refresh (`design/brand-refresh`) — in progress._
 ### Changed
 - **New default accent — PunchIn Blue.** New installs now default to `#2D5BF5` (dark) / `#2348DB` (light), replacing the old `#1f6feb`. The default accent automatically uses the slightly darker blue in light mode for contrast; a custom accent is used as-is in both themes. ([brand refresh](https://github.com/PunchIn-App/punchin))
 - **Labor-type colour presets** are now the design-system **pastel rainbow** (10 soft hues) instead of the older saturated set — you can still pick any custom colour. ([brand refresh](https://github.com/PunchIn-App/punchin))
+- **Brand fonts are now self-hosted** (no Google Fonts CDN): the Noto Sans / Display / Mono variable webfonts ship with the app and render offline, so there's no third-party font request and the brand shows instantly. ([brand refresh](https://github.com/PunchIn-App/punchin))
 
 ### Added
 - Design-system **token layer** in `index.css` — type scale, weights, tracking, radii, spacing, elevation/shadows (incl. an accent glow), per-theme status colours, and the pastel preset palette — plus an `--accent` (raw hex) token alongside `--accent-rgb`. ([brand refresh](https://github.com/PunchIn-App/punchin))

@@ -63,6 +63,9 @@ export default defineConfig({
         // silently fails inside the installed PWA (issue #79). Let any /oauth/*
         // navigation fall through to the network instead of the app shell.
         navigateFallbackDenylist: [/^\/oauth\//],
+        // Precache the self-hosted brand fonts (woff2 isn't in the plugin's
+        // default glob) so the brand renders offline with no CDN dependency.
+        globPatterns: ['**/*.{js,css,html,woff2}'],
         // The per-accent install-icon sets under /icons/ (issue #228) are
         // install-time assets fetched on demand; keep them out of the precache
         // so they don't bloat the service worker.

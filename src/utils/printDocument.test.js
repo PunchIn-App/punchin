@@ -7,11 +7,12 @@ describe('printDocument', () => {
     vi.useRealTimers()
   })
 
-  it('PRINT_FONT_HEAD loads the three Noto brand webfonts (not a system-UI fallback)', () => {
-    expect(PRINT_FONT_HEAD).toContain('fonts.googleapis.com')
-    expect(PRINT_FONT_HEAD).toMatch(/Noto\+Sans\b/)
-    expect(PRINT_FONT_HEAD).toMatch(/Noto\+Sans\+Display/)
-    expect(PRINT_FONT_HEAD).toMatch(/Noto\+Sans\+Mono/)
+  it('PRINT_FONT_HEAD declares the self-hosted Noto brand webfonts (not a CDN or system-UI fallback)', () => {
+    expect(PRINT_FONT_HEAD).toContain('@font-face')
+    expect(PRINT_FONT_HEAD).not.toContain('fonts.googleapis.com')
+    expect(PRINT_FONT_HEAD).toContain('/fonts/noto-sans-latin-wght-normal.woff2')
+    expect(PRINT_FONT_HEAD).toContain("'Noto Sans Display'")
+    expect(PRINT_FONT_HEAD).toContain("'Noto Sans Mono'")
   })
 
   it('writes the document and waits for the brand webfonts before printing', async () => {
