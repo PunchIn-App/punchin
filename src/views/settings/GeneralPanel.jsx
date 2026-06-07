@@ -48,10 +48,11 @@ export default function GeneralPanel({ onBack }) {
           right={
             <select
               aria-label="Time format"
-              value={settings.timeFormat || '12h'}
+              value={settings.timeFormat || 'auto'}
               onChange={e => updateSetting('timeFormat', e.target.value)}
               className={selectClass}
             >
+              <option value="auto">Auto (match device)</option>
               <option value="12h">12-hour</option>
               <option value="24h">24-hour</option>
             </select>

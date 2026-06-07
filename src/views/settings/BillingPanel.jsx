@@ -63,7 +63,7 @@ export default function BillingPanel({ onBack }) {
         <SettingsRow
           icon={Hash}
           title="Number invoices"
-          subtitle="Show an invoice number on the printout"
+          subtitle="Print an invoice number; it advances each time you generate one"
           right={
             <Toggle
               ariaLabel="Number invoices"

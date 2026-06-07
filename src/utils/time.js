@@ -85,9 +85,19 @@ export function getEntryDuration(entry) {
   return end.getTime() - new Date(entry.punchIn).getTime()
 }
 
-/** @param {Date|string|number} date @param {'12h'|'24h'} [fmt] @returns {string} */
-export function formatTime(date, fmt = '12h') {
-  return format(new Date(date), fmt === '24h' ? 'HH:mm' : 'h:mm a')
+// The device's 12h/24h preference, used when timeFormat is 'auto' (the default).
+function deviceHour12() {
+  try {
+    return new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12 ?? true
+  } catch {
+    return true
+  }
+}
+
+/** @param {Date|string|number} date @param {'auto'|'12h'|'24h'} [fmt] @returns {string} */
+export function formatTime(date, fmt = 'auto') {
+  const use24 = fmt === '24h' || (fmt !== '12h' && !deviceHour12())
+  return format(new Date(date), use24 ? 'HH:mm' : 'h:mm a')
 }
 
 /** @param {Date|string|number} date @returns {string} */

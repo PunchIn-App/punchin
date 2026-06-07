@@ -67,7 +67,7 @@ export default function TimerCard({ entry, job, laborType }) {
             <div className="flex items-center gap-2 mt-1">
               <LaborTag laborType={laborType} />
               <div className="flex items-center gap-1 text-appTextDarker text-xs font-mono">
-                <span>since {formatTime(entry.punchIn)}</span>
+                <span>since {formatTime(entry.punchIn, settings.timeFormat)}</span>
                 <button
                   onClick={() => setShowEditModal(true)}
                   aria-label="Edit start time and notes"

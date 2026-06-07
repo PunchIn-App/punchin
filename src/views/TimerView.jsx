@@ -115,7 +115,7 @@ export default function TimerView() {
                     <div className="flex items-center gap-2 mt-0.5">
                       <LaborTag laborType={lt} />
                       <span className="text-xs text-appTextMuted font-mono">
-                        {formatTime(lastEntry.punchIn)} – {formatTime(lastEntry.punchOut)}
+                        {formatTime(lastEntry.punchIn, settings.timeFormat)} – {formatTime(lastEntry.punchOut, settings.timeFormat)}
                       </span>
                     </div>
                   </div>
@@ -134,6 +134,7 @@ export default function TimerView() {
         jobs={jobs}
         lastEntry={lastEntry}
         weekStartsMonday={settings.weekStartsMonday !== false}
+        timeFormat={settings.timeFormat}
         onPunch={handleQuickPunch}
       />
 

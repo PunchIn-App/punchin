@@ -13,8 +13,9 @@ vi.mock('../hooks/usePlatformContext', () => ({
 }))
 
 let mockSettings = { weekStartsMonday: true }
+const mockUpdateSetting = vi.fn()
 vi.mock('../hooks/useSettings', () => ({
-  useSettings: () => ({ settings: mockSettings, updateSetting: vi.fn() }),
+  useSettings: () => ({ settings: mockSettings, updateSetting: mockUpdateSetting }),
 }))
 
 // A job with a rate of $100/hr for labor type 1
@@ -277,6 +278,27 @@ describe('InvoiceModal — export and print', () => {
     expect(html).toContain('Jane Doe')
     expect(html).toContain('Billed to')
     expect(html).toContain('PI-7') // prefix + nextInvoiceNumber
+  })
+
+  it('advances nextInvoiceNumber when a numbered invoice is generated', async () => {
+    mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    vi.spyOn(window, 'open').mockReturnValue({ document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() })
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    expect(mockUpdateSetting).toHaveBeenCalledWith('nextInvoiceNumber', 8)
+  })
+
+  it('does not advance the number when the popup is blocked', async () => {
+    mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    vi.spyOn(window, 'open').mockReturnValue(null)
+    global.alert = vi.fn()
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    expect(mockUpdateSetting).not.toHaveBeenCalledWith('nextInvoiceNumber', expect.anything())
   })
 })
 

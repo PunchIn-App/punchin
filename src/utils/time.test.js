@@ -121,6 +121,16 @@ describe('formatTime', () => {
   it('formats noon as 12:00 PM', () => {
     expect(formatTime(new Date(2024, 0, 15, 12, 0))).toBe('12:00 PM')
   })
+  it('honours an explicit 24-hour format', () => {
+    expect(formatTime(new Date(2024, 0, 15, 14, 5), '24h')).toBe('14:05')
+    expect(formatTime(new Date(2024, 0, 15, 0, 0), '24h')).toBe('00:00')
+  })
+  it('honours an explicit 12-hour format regardless of locale', () => {
+    expect(formatTime(new Date(2024, 0, 15, 14, 5), '12h')).toBe('2:05 PM')
+  })
+  it("'auto' resolves to a valid time string (device preference)", () => {
+    expect(formatTime(new Date(2024, 0, 15, 14, 5), 'auto')).toMatch(/^(2:05 PM|14:05)$/)
+  })
 })
 
 // ---------------------------------------------------------------------------

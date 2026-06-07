@@ -189,7 +189,7 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
 | `decimalHours` | boolean | `false` — show timesheet durations as decimal hours (`1.50 h`) instead of `1h 30m` (issue #208) |
 | `roundingMinutes` | number (`0` \| `15` \| `30`) | `0` — round each billable entry in the user's favour (start floored, end ceiled) for timesheets & invoices; `0` = off (issue #208) |
-| `timeFormat` | `"12h"` \| `"24h"` | `"12h"` — clock-time rendering in timesheets & invoices (`formatTime(date, fmt)`) |
+| `timeFormat` | `"auto"` \| `"12h"` \| `"24h"` | `"auto"` (match the device's 12/24h preference) — clock-time rendering in timers, timesheets & invoices (`formatTime(date, fmt)`) |
 | `defaultCurrency` | ISO 4217 string | `"USD"` — formats invoice/CSV amounts via `Intl.NumberFormat` (`utils/format.js`) |
 | `billingName` | string | `""` — Billing profile: your name (the invoice "Billed from" identity) |
 | `billingBusiness` | string | `""` — Billing profile: business name |
@@ -198,9 +198,9 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `billingAddress` | string | `""` — Billing profile: address (multi-line) |
 | `billingPaymentTerms` | string | `""` — Billing profile: payment terms |
 | `billingNotes` | string | `""` — Billing profile: notes / payment instructions |
-| `numberInvoices` | boolean | `false` — show an invoice number on the invoice (display-only; set/bump the counter here) |
+| `numberInvoices` | boolean | `false` — print an invoice number (advances `nextInvoiceNumber` each time an invoice print is generated) |
 | `invoicePrefix` | string | `""` — prefix prepended to the invoice number (e.g. `PI-`) |
-| `nextInvoiceNumber` | number | `1` — the number shown when `numberInvoices` is on (not auto-incremented) |
+| `nextInvoiceNumber` | number | `1` — the next invoice number; printed when `numberInvoices` is on and **auto-incremented when an invoice print is generated** (a blocked popup doesn't burn a number) |
 | `remindersEnabled` | boolean | `false` — master switch for local reminder notifications (issue #54); enabling it requests notification permission |
 | `remindLongRunning` | boolean | `true` — alert when an active timer exceeds the threshold |
 | `remindLongRunningMinutes` | number | `60` — long-running timer threshold (minutes) |

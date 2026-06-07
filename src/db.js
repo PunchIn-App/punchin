@@ -182,7 +182,7 @@ export const DEFAULT_SETTINGS = {
   // Time display + invoice formatting. timeFormat drives clock-time rendering
   // (in-app default is 12h); defaultCurrency is an ISO 4217 code formatted via
   // Intl.NumberFormat in invoices/CSV.
-  timeFormat: '12h',       // '12h' | '24h'
+  timeFormat: 'auto',      // 'auto' (match device) | '12h' | '24h'
   defaultCurrency: 'USD',  // ISO 4217
   // Billing profile — the invoice "Billed from" identity. Flat keys (the
   // useSettings merge is shallow, so a nested object wouldn't auto-default new

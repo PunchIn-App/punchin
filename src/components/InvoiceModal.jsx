@@ -40,7 +40,7 @@ function toLocalDateString(d) {
 
 export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab, onClose }) {
   const { isStandalone, os } = usePlatformContext()
-  const { settings } = useSettings()
+  const { settings, updateSetting } = useSettings()
   const wsMon = settings.weekStartsMonday // complete via DEFAULT_SETTINGS merge (issue #134)
   const timeFormat = settings.timeFormat
   const currency = settings.defaultCurrency
@@ -228,7 +228,14 @@ ${bandHtml}
     // returns false when the popup is blocked (window.open → null); without this
     // guard the throw inside the onClick is uncatchable and the button silently
     // dies, so we alert and leave CSV as the fallback (issue #150).
-    if (!openPrintWindow(html, { width: 800, height: 600 })) {
+    if (openPrintWindow(html, { width: 800, height: 600 })) {
+      // The invoice was generated — advance the counter so the next invoice gets
+      // the next number. Only on a successful open (a blocked popup won't burn a
+      // number); re-generating the same invoice intentionally takes a new number.
+      if (settings.numberInvoices) {
+        updateSetting('nextInvoiceNumber', (settings.nextInvoiceNumber ?? 1) + 1)
+      }
+    } else {
       alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use Export CSV instead.')
     }
   }

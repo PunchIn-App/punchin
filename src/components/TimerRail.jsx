@@ -15,7 +15,7 @@ function Overline({ children }) {
   )
 }
 
-export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMonday, onPunch }) {
+export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMonday, timeFormat, onPunch }) {
   const completed = useLiveQuery(() => db.entries.filter(e => !!e.punchOut).toArray(), [])
 
   const week = useMemo(() => {
@@ -52,7 +52,7 @@ export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMo
                   {lt && <LaborTag laborType={lt} className="mt-1" />}
                   <div className="flex items-center justify-between mt-1 gap-2">
                     <span className="text-xs text-appTextMuted font-mono truncate">
-                      {formatTime(lastEntry.punchIn)}–{formatTime(lastEntry.punchOut)}
+                      {formatTime(lastEntry.punchIn, timeFormat)}–{formatTime(lastEntry.punchOut, timeFormat)}
                     </span>
                     <span className="font-mono text-appTextMuted text-xs flex-shrink-0">{formatDurationHM(getEntryDuration(lastEntry))}</span>
                   </div>
