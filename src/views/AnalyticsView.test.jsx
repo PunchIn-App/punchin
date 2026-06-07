@@ -4,6 +4,9 @@ import AnalyticsView from './AnalyticsView'
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({ db: {} }))
+// useSettings calls useLiveQuery internally; mock it so the 3-call queue below
+// stays aligned with AnalyticsView's own entries/jobs/laborTypes queries.
+vi.mock('../hooks/useSettings', () => ({ useSettings: () => ({ settings: {} }) }))
 vi.mock('recharts', () => ({
   BarChart: ({ children }) => <div data-testid="bar-chart">{children}</div>,
   Bar: () => null,
@@ -214,5 +217,31 @@ describe('AnalyticsView — with entries', () => {
   it('renders the "By labor type" section label', () => {
     render(<AnalyticsView />)
     expect(screen.getByText('By labor type')).toBeInTheDocument()
+  })
+})
+
+describe('AnalyticsView — billable earnings', () => {
+  const now = new Date()
+  const hoursAgo = h => new Date(now.getTime() - h * 3600000)
+
+  it('shows total earnings when the job has a rate for the entry', () => {
+    setupMocks({
+      entries: [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: hoursAgo(2), punchOut: now }],
+      jobs: [{ id: 1, name: 'Acme', laborRates: { 1: 50 } }],
+      laborTypes: [{ id: 1, name: 'Design', color: '#5FD08A' }],
+    })
+    render(<AnalyticsView />)
+    expect(screen.getByText('Billable earnings')).toBeInTheDocument()
+    expect(screen.getByText(/100/)).toBeInTheDocument() // 2h × 50
+  })
+
+  it('hides the earnings card when no rate is set', () => {
+    setupMocks({
+      entries: [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: hoursAgo(1), punchOut: now }],
+      jobs: [{ id: 1, name: 'Acme', laborRates: {} }],
+      laborTypes: [{ id: 1, name: 'Design', color: '#5FD08A' }],
+    })
+    render(<AnalyticsView />)
+    expect(screen.queryByText('Billable earnings')).toBeNull()
   })
 })

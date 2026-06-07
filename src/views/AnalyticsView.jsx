@@ -8,6 +8,8 @@ import {
   formatDurationHM, sumDurations,
 } from '../utils/time'
 import { LaborGlyphChip } from '../components/LaborGlyph'
+import { formatMoney } from '../utils/format'
+import { useSettings } from '../hooks/useSettings'
 
 const TOOLTIP = {
   backgroundColor: 'var(--bg-tertiary)',
@@ -20,6 +22,7 @@ const TOOLTIP = {
 export default function AnalyticsView() {
   const [period, setPeriod] = useState('7d')
   const days = period === '7d' ? 7 : 30
+  const { settings } = useSettings()
 
   // Anchor the window to the start of the earliest day shown rather than a
   // rolling `days`×24h instant. That way the chart's `days` calendar buckets
@@ -38,10 +41,20 @@ export default function AnalyticsView() {
   // Derive every chart dataset in one memo so the O(days×entries) bucketing and
   // the per-job / per-labor-type filter passes only re-run when the data or the
   // period changes, not on unrelated re-renders (issue #138).
-  const { total, dailyData, jobData, ltData } = useMemo(() => {
-    if (!entries || !jobs || !laborTypes) return { total: 0, dailyData: [], jobData: [], ltData: [] }
+  const { total, dailyData, jobData, ltData, earnings, ratedCount } = useMemo(() => {
+    if (!entries || !jobs || !laborTypes) return { total: 0, dailyData: [], jobData: [], ltData: [], earnings: 0, ratedCount: 0 }
 
     const total = sumDurations(entries)
+
+    // Billable earnings: hours × the job's per-labor-type rate. Entries with no
+    // rate set are excluded; ratedCount lets the UI note "from N of M entries".
+    const jobMap = new Map(jobs.map(j => [j.id, j]))
+    let earnings = 0
+    let ratedCount = 0
+    for (const e of entries) {
+      const rate = jobMap.get(e.jobId)?.laborRates?.[e.laborTypeId]
+      if (rate != null) { earnings += (getEntryDuration(e) / 3600000) * rate; ratedCount++ }
+    }
 
     // Daily bar chart. Each entry is clipped to the local day (issue #140) so a
     // shift that crosses midnight is split across both days instead of dumped
@@ -73,7 +86,7 @@ export default function AnalyticsView() {
       glyph: lt.glyph,
     })).filter(d => d.value > 0)
 
-    return { total, dailyData, jobData, ltData }
+    return { total, dailyData, jobData, ltData, earnings, ratedCount }
   }, [entries, jobs, laborTypes, days])
 
   if (!entries || !jobs || !laborTypes) {
@@ -115,6 +128,17 @@ export default function AnalyticsView() {
           </p>
         </div>
       </div>
+
+      {/* Billable earnings — only when per-job rates are set (Analytics is hours-first) */}
+      {ratedCount > 0 && (
+        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+          <p className="text-[10px] text-appTextMuted uppercase tracking-widest mb-1">Billable earnings</p>
+          <p className="font-mono text-2xl font-semibold text-appText">{formatMoney(earnings, settings.defaultCurrency)}</p>
+          {ratedCount < entries.length && (
+            <p className="text-xs text-appTextMuted mt-1">From {ratedCount} of {entries.length} {entries.length === 1 ? 'entry' : 'entries'} with a rate set</p>
+          )}
+        </div>
+      )}
 
       {/* Daily chart */}
       <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
