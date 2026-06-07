@@ -15,6 +15,12 @@ const PRESET_COLORS = [
 
 const PRESET_COLOR_OBJECTS = PRESET_COLORS.map(hex => ({ hex }))
 
+// Job colours use the design system's bold brand/accent preset set
+// (pc-brand.jsx), distinct from the labor-type pastel rainbow above — jobs read
+// strong on the ticket card's left rail.
+const JOB_PRESET_COLORS = ['#2D5BF5', '#0EA66B', '#8257E6', '#E8590C', '#D6336C']
+const JOB_PRESET_COLOR_OBJECTS = JOB_PRESET_COLORS.map(hex => ({ hex }))
+
 function JobForm({ job, laborTypes, onDone }) {
   const [name, setName]           = useState(job?.name || '')
   const [clientName, setClientName] = useState(job?.clientName || '')
@@ -75,7 +81,7 @@ function JobForm({ job, laborTypes, onDone }) {
       <div className="space-y-1.5">
         <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Color</p>
         <ColorPicker
-          presets={PRESET_COLOR_OBJECTS}
+          presets={JOB_PRESET_COLOR_OBJECTS}
           value={color}
           onChange={setColor}
           size="lg"
