@@ -63,7 +63,7 @@ punchin/
 │   ├── iconPalette.js      # The pre-rendered install-icon "crayon box": ~65 swatches (presets + an HSL grid) and nearestPaletteKey(). Shared by scripts/icons.mjs (renders the sets) and worker/oauth.js (nearest-swatch fallback when the on-demand render fails) (issue #228)
 │   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131)
 │   ├── components/
-│   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell; shows update badge on Settings icon
+│   │   ├── Layout.jsx          # Responsive app shell: phone = top header + bottom tab nav; tablet (md) = collapsed icon sidebar; desktop (lg) = labelled left sidebar (rehomes brand/version/update-badge + a live "On the clock" status). Reuses one NAV array + navigate wrapper; logo taps → timer
 │   │   ├── BrandMark.jsx       # Shared brand identity: PunchMark (stopwatch glyph on the accent tile, ink via inkOnAccent) + Wordmark ("PunchIn", capital I tinted with the accent); used by Layout (and the desktop sidebar)
 │   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
 │   │   ├── TimerCard.jsx       # Live running timer card (1s interval)

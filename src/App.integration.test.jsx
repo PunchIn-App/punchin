@@ -5,7 +5,7 @@
 // expectations that the fully-mocked suite can't see. Deliberately lightweight:
 // render the default view, then navigate to another real view over real data.
 import 'fake-indexeddb/auto'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import App from './App'
 import { db } from './db'
 
@@ -26,8 +26,10 @@ describe('App ↔ views integration (real views + fake-indexeddb)', () => {
     expect(screen.getByRole('button', { name: /punch in/i })).toBeInTheDocument()
 
     // Navigate via the real bottom-nav Layout to the real JobsView, which reads
-    // the seeded job from the real db via useLiveQuery.
-    fireEvent.click(screen.getByRole('button', { name: 'Jobs' }))
+    // the seeded job from the real db via useLiveQuery. (The desktop sidebar also
+    // carries a "Jobs" button, so scope to the phone bottom nav.)
+    const bottomNav = within(screen.getByRole('navigation', { name: /main navigation/i }))
+    fireEvent.click(bottomNav.getByRole('button', { name: 'Jobs' }))
     expect(await screen.findByText('Integration Co')).toBeInTheDocument()
   })
 })

@@ -16,6 +16,7 @@ _Brand refresh (`design/brand-refresh`) — in progress._
 - **New brand mark — a stopwatch.** The clock-in-a-square mark is now a stopwatch (crown + clock hands), and the **wordmark** tints its capital "I" with your accent. The mark glyph automatically flips between white and dark ink so it stays crisp on any accent — including light pastels — across the header, browser-tab favicon, and home-screen icon. ([brand refresh](https://github.com/PunchIn-App/punchin))
 
 ### Added
+- **Desktop & tablet layout.** On wider screens PunchIn now uses a persistent left navigation instead of the phone's bottom tab bar: a labelled sidebar on desktop (with the brand, a live "On the clock" status, and the app version) and a compact icon rail on tablets. The phone layout is unchanged. ([brand refresh](https://github.com/PunchIn-App/punchin))
 - Design-system **token layer** in `index.css` — type scale, weights, tracking, radii, spacing, elevation/shadows (incl. an accent glow), per-theme status colours, and the pastel preset palette — plus an `--accent` (raw hex) token alongside `--accent-rgb`. ([brand refresh](https://github.com/PunchIn-App/punchin))
 
 ### Fixed
