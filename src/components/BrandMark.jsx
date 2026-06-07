@@ -28,11 +28,13 @@ export function StopwatchGlyph({ className = 'w-4 h-4', color }) {
   )
 }
 
-// The accent tile holding the stopwatch mark (the app logo badge).
-export function PunchMark({ accent, className = 'w-7 h-7', glyphClassName = 'w-4 h-4' }) {
+// The accent tile holding the stopwatch mark (the app logo badge). `className`
+// carries the size + rounding so callers can use it small (header) or large
+// (empty states); it defaults to the header badge.
+export function PunchMark({ accent, className = 'w-7 h-7 rounded-lg', glyphClassName = 'w-4 h-4' }) {
   return (
     <div
-      className={`${className} rounded-lg bg-appAccent flex items-center justify-center`}
+      className={`${className} bg-appAccent flex items-center justify-center`}
       aria-hidden="true"
     >
       <StopwatchGlyph className={glyphClassName} color={readableInk(accent)} />

@@ -1,5 +1,7 @@
 import { useCallback, useId } from 'react'
-import { X, MonitorDown, Share, Plus, Compass } from 'lucide-react'
+import { X, Share, Plus, Compass } from 'lucide-react'
+import { PunchMark } from './BrandMark'
+import { DEFAULT_ACCENT } from '../accentPresets'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 import { useSettings } from '../hooks/useSettings'
@@ -60,7 +62,7 @@ export default function InstallPromptModal({ mode = 'native', onInstall, onClose
 
         <div className="flex items-center justify-between px-5 py-4 border-b border-appBorder">
           <div className="flex items-center gap-2.5">
-            <MonitorDown className="w-5 h-5 text-appAccent" aria-hidden="true" />
+            <PunchMark accent={settings.accentColor || DEFAULT_ACCENT} className="w-7 h-7 rounded-lg" glyphClassName="w-4 h-4" />
             <h2 id={titleId} className="font-display font-semibold text-appText text-lg">Install PunchIn</h2>
           </div>
           <button

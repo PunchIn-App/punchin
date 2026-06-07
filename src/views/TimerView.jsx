@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Clock } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { db, startTimer } from '../db'
 import TimerCard from '../components/TimerCard'
 import StartTimerModal from '../components/StartTimerModal'
 import TimerRail from '../components/TimerRail'
 import { LaborTag } from '../components/LaborGlyph'
+import { PunchMark } from '../components/BrandMark'
+import { DEFAULT_ACCENT } from '../accentPresets'
 import { useSettings } from '../hooks/useSettings'
 import { formatDurationHM, formatTime } from '../utils/time'
 
@@ -78,8 +80,9 @@ export default function TimerView() {
         {/* Empty state */}
         {active?.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-appCard border border-appBorderLight flex items-center justify-center mb-5">
-              <Clock className="w-9 h-9 text-appTextDisabled" />
+            <div className="relative mb-6">
+              <PunchMark accent={settings.accentColor || DEFAULT_ACCENT} className="w-20 h-20 rounded-2xl shadow-lg shadow-appAccent/30" glyphClassName="w-10 h-10" />
+              <div className="absolute -inset-2 rounded-[28px] border border-dashed border-appAccent/40" aria-hidden="true" />
             </div>
             <p className="font-display font-semibold text-appTextMuted text-xl">Nothing running</p>
             <p className="text-appTextDisabled text-sm mt-1.5">Tap Punch In to start tracking time</p>
