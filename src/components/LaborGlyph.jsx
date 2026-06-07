@@ -36,7 +36,7 @@ export function LaborGlyphChip({ laborType, className = 'w-5 h-5' }) {
       style={{ backgroundColor: `${color}26` }}
       aria-hidden="true"
     >
-      <Glyph className="w-[58%] h-[58%]" style={{ color }} strokeWidth={2.2} />
+      <Glyph className="w-1/2 h-1/2" style={{ color }} strokeWidth={2} />
     </span>
   )
 }

@@ -404,16 +404,16 @@ export default function JobsView() {
               </div>
             )}
 
-            <div className="space-y-2.5">
+            <div className="space-y-2">
             {laborTypes?.filter(lt => !lt.isArchived).map(lt => {
               if (editingLT?.id === lt.id)
                 return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
               return (
                 <div key={lt.id}
-                  className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-3 py-2.5 transition-all duration-200">
+                  className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-4 py-3.5 transition-all duration-200">
                   <div className="flex items-center gap-3">
-                    <LaborGlyphChip laborType={lt} />
-                    <span className="font-medium text-appText text-sm">{lt.name}</span>
+                    <LaborGlyphChip laborType={lt} className="w-9 h-9" />
+                    <span className="font-bold text-appText text-[14.5px]">{lt.name}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setEditingLT(lt)}
@@ -466,10 +466,10 @@ export default function JobsView() {
                       return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
                     return (
                       <div key={lt.id}
-                        className="flex items-center justify-between rounded-xl border border-appBorderLight bg-appCard px-3 py-2.5 opacity-60 transition-all duration-200">
+                        className="flex items-center justify-between rounded-xl border border-appBorderLight bg-appCard px-4 py-3.5 opacity-60 transition-all duration-200">
                         <div className="flex items-center gap-3">
-                          <LaborGlyphChip laborType={lt} />
-                          <span className="font-medium text-appText text-sm">{lt.name}</span>
+                          <LaborGlyphChip laborType={lt} className="w-9 h-9" />
+                          <span className="font-bold text-appText text-[14.5px]">{lt.name}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <button onClick={() => toggleArchiveLaborType(lt)}
