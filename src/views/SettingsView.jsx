@@ -101,7 +101,7 @@ export default function SettingsView() {
             Kept a plain div, not a nav landmark, so it adds no third navigation
             region to the page. */}
         {(activePanel === null || isWide) && (
-          <div className="lg:sticky lg:top-4">
+          <div className="lg:sticky lg:top-0">
             <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
               <CategoryRow icon={SlidersHorizontal} title="General" subtitle="Timers, week start, haptics" active={effectivePanel === 'general'} onClick={() => openPanel('general')} />
               <CategoryRow icon={Palette} title="Appearance" subtitle="Theme and accent color" active={effectivePanel === 'appearance'} onClick={() => openPanel('appearance')} />
