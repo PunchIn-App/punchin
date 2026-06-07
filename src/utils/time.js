@@ -71,7 +71,10 @@ function roundLocalTime(date, increment, dir) {
  * @param {Entry} entry @param {number} [roundingMinutes] @returns {Entry}
  */
 export function roundEntry(entry, roundingMinutes) {
-  if (!roundingMinutes || !entry.punchOut) return entry
+  // No rounding when it's off, the entry is still running, or it's under a minute
+  // ("0m"): flooring punch-in and ceiling punch-out would inflate a ~0-duration
+  // entry up to a full increment (e.g. 0m → 0.25 h), which is a bug, not a favour.
+  if (!roundingMinutes || !entry.punchOut || getEntryDuration(entry) < 60000) return entry
   return {
     ...entry,
     punchIn:  roundLocalTime(entry.punchIn,  roundingMinutes, 'floor'),

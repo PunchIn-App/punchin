@@ -15,9 +15,11 @@ describe('applyInstallIcon (#228)', () => {
     expect(link('manifest').getAttribute('href')).toBe('/icons/2d5bf5/manifest.webmanifest')
   })
 
-  it('points a custom colour at the worker exact-render route', () => {
+  it('points a custom colour at the nearest STATIC swatch (never the worker /icons/i/ route, which 404s without the Worker and breaks the install prompt)', () => {
     applyInstallIcon('#7C3AED')
-    expect(link('manifest').getAttribute('href')).toBe('/icons/i/7c3aed/manifest.webmanifest')
+    const href = link('manifest').getAttribute('href')
+    expect(href).toMatch(/^\/icons\/[0-9a-f]{6}\/manifest\.webmanifest$/) // a committed swatch folder
+    expect(href).not.toContain('/icons/i/')
   })
 
   it('sets an exact-colour apple-touch-icon for iOS', () => {

@@ -54,9 +54,10 @@ describe('db — populate seed', () => {
     expect(s?.value).toBe(false)
   })
 
-  it('seeds weekStartsMonday = true', async () => {
+  it('seeds weekStartsMonday from the device locale (matches the computed default)', async () => {
     const s = await db.settings.get('weekStartsMonday')
-    expect(s?.value).toBe(true)
+    expect(s?.value).toBe(DEFAULT_SETTINGS.weekStartsMonday)
+    expect(typeof s?.value).toBe('boolean')
   })
 
   it('seeds theme = "auto"', async () => {

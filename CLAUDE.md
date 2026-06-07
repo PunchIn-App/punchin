@@ -183,7 +183,7 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | Key | Type | Default |
 |-----|------|---------|
 | `allowConcurrentTimers` | boolean | `false` |
-| `weekStartsMonday` | boolean | `true` |
+| `weekStartsMonday` | boolean | device-locale default — Sunday-start locales (e.g. en-US) seed `false`, Monday-start locales (e.g. en-GB) seed `true`; falls back to `false` where the locale's week info is unavailable (`localeWeekStartsMonday()` in `db.js`) |
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
 | `accentColor` | hex string | `"#2D5BF5"` (PunchIn Blue; light theme renders the default as the darker `#2348DB`) |
 | `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
@@ -404,7 +404,7 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `formatDurationHM(ms)` → `"Xh Ym"` for summaries
 - `formatDecimalHours(ms)` → `"1.50 h"` decimal-hours string for billing display (issue #208)
 - `formatDuration(ms, decimal)` → decimal hours when `decimal` is set, else `"Xh Ym"` (issue #208)
-- `roundEntry(entry, roundingMinutes)` → entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off or still running (issue #208)
+- `roundEntry(entry, roundingMinutes)` → entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off, still running, or under a minute (a "0m" entry must not inflate to a full increment, e.g. 0.25 h) (issue #208)
 - `getEntryDuration(entry)` → milliseconds (handles active entries)
 - `formatTime(date)` → `"h:mm a"` time-only string (date-fns)
 - `formatDate(date)` → `"EEE, MMM d"` date-only string (date-fns)

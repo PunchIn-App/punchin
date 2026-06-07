@@ -162,6 +162,19 @@ export async function startTimer({ jobId, laborTypeId, notes = null, allowConcur
   })
 }
 
+// Default the week start to the device locale's first day of week: Sunday-start
+// locales (e.g. en-US) → false, Monday-start locales (e.g. en-GB) → true. Falls
+// back to false (Sunday) where the locale's week info isn't available.
+function localeWeekStartsMonday() {
+  try {
+    const loc = new Intl.Locale((typeof navigator !== 'undefined' && navigator.language) || 'en-US')
+    const info = typeof loc.getWeekInfo === 'function' ? loc.getWeekInfo() : loc.weekInfo
+    return info?.firstDay === 1
+  } catch {
+    return false
+  }
+}
+
 // Single source of truth for default settings (issues #131/#134). Seeded on a
 // fresh install (populate) and restored by factoryReset, and merged under the
 // live rows by useSettings so every consumer reads a complete, typed object.
@@ -169,7 +182,7 @@ export async function startTimer({ jobId, laborTypeId, notes = null, allowConcur
 // matches a factory reset (no undefined-vs-null branching in consumers).
 export const DEFAULT_SETTINGS = {
   allowConcurrentTimers: false,
-  weekStartsMonday: true,
+  weekStartsMonday: localeWeekStartsMonday(),
   theme: 'auto',
   accentColor: '#2D5BF5',
   hapticFeedback: true,

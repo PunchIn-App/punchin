@@ -511,4 +511,14 @@ describe('roundEntry', () => {
     const r = roundEntry(e, 15)
     expect(r.punchOut).toEqual(new Date(2024, 0, 15, 8, 45))
   })
+
+  it('does NOT inflate a 0-minute (sub-minute) entry to a full increment', () => {
+    // Punch in and straight back out: 0 minutes must stay 0, not become 0.25 h.
+    const zero = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: new Date(2024, 0, 15, 8, 7) }
+    expect(roundEntry(zero, 15)).toBe(zero)
+    expect(getEntryDuration(roundEntry(zero, 15))).toBe(0)
+    // A 30-second entry is still "0m" — leave it untouched rather than bill 15 min.
+    const subMinute = { punchIn: new Date(2024, 0, 15, 8, 7, 0), punchOut: new Date(2024, 0, 15, 8, 7, 30) }
+    expect(roundEntry(subMinute, 15)).toBe(subMinute)
+  })
 })

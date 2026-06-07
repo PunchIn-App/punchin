@@ -1,4 +1,5 @@
 import { accentIconKey } from '../accentPresets'
+import { nearestPaletteKey } from '../iconPalette'
 import { drawFaviconDataUrl } from './favicon'
 
 // Point the install / home-screen icon at the user's accent BEFORE they install
@@ -31,12 +32,14 @@ export function applyInstallIcon(hex) {
   const dataUrl = drawFaviconDataUrl(hex, 180)
   if (dataUrl) setLink('apple-touch-icon', dataUrl)
 
-  const presetKey = accentIconKey(hex)
-  const norm = String(hex || '').trim().toLowerCase().replace('#', '')
-  setLink(
-    'manifest',
-    presetKey
-      ? `/icons/${presetKey}/manifest.webmanifest` // preset: pre-rendered static set
-      : `/icons/i/${norm}/manifest.webmanifest`,    // custom: worker on-demand exact render
-  )
+  // Point the manifest at a pre-rendered STATIC swatch folder that always exists:
+  // the exact preset, or the nearest committed palette swatch for a custom colour.
+  // This keeps the manifest valid without depending on the worker's on-demand
+  // /icons/i/<hex>/ route — which 404s wherever the Worker isn't serving (local
+  // dev/preview, and any SPA fallback returns index.html), producing an invalid
+  // manifest that silently disables the install prompt (the colour you picked
+  // broke "Add to Home Screen"). iOS still gets the exact colour via the
+  // apple-touch-icon data URL above.
+  const key = accentIconKey(hex) || nearestPaletteKey(hex)
+  setLink('manifest', `/icons/${key}/manifest.webmanifest`)
 }

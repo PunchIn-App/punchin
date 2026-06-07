@@ -27,6 +27,9 @@ PunchIn brand refresh — new identity (PunchIn Blue + stopwatch mark), self-hos
 - Design-system **token layer** in `index.css` — type scale, weights, tracking, radii, spacing, elevation/shadows (incl. an accent glow), per-theme status colours, and the pastel preset palette — plus an `--accent` (raw hex) token alongside `--accent-rgb`. ([brand refresh](https://github.com/PunchIn-App/punchin))
 
 ### Fixed
+- **0-minute entries no longer round up to 0.25 h.** With "round billed time" on, a timer under a minute stays `0m` instead of being inflated to a full 15-minute increment. ([brand refresh](https://github.com/PunchIn-App/punchin))
+- **Changing your accent colour no longer breaks "Add to Home Screen."** The install icon now always points at a valid, pre-rendered icon set (the exact preset, or the nearest swatch for a custom colour), so a custom accent can't leave the install prompt with an invalid manifest. ([brand refresh](https://github.com/PunchIn-App/punchin))
+- **Week start now follows your device.** New installs default the "week starts Monday" preference from your locale (e.g. Sunday for the US, Monday for the UK) instead of always starting on Monday. ([brand refresh](https://github.com/PunchIn-App/punchin))
 - **Buttons and toggles on the accent colour now keep legible text** on any accent: the on-accent text/icon ink automatically flips between white and dark so primary buttons (Punch In, Save, Print, …) stay readable even when you pick a light or pastel accent. ([brand refresh](https://github.com/PunchIn-App/punchin))
 - Printed and PDF-exported **invoices and timesheets now render in the brand Noto font** instead of falling back to the OS's system-UI face. The print document loads the Noto webfonts and waits for them before printing, so exports match the app. ([brand refresh](https://github.com/PunchIn-App/punchin))
 
