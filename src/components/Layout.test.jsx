@@ -9,13 +9,14 @@ vi.mock('../hooks/useSettings', () => ({
   useSettings: () => ({ settings: { hapticFeedback: true }, updateSetting: vi.fn() }),
 }))
 
-// The sidebar shows a live "On the clock" count; mock the query (and stub db,
-// whose access is short-circuited by the mocked useLiveQuery).
-const live = vi.hoisted(() => ({ activeCount: 0 }))
-vi.mock('dexie-react-hooks', () => ({ useLiveQuery: () => live.activeCount }))
+// The sidebar shows a live "On the clock" status from the running entries; mock
+// the query to return that array (and stub db, whose access is short-circuited
+// by the mocked useLiveQuery).
+const live = vi.hoisted(() => ({ activeEntries: [] }))
+vi.mock('dexie-react-hooks', () => ({ useLiveQuery: () => live.activeEntries }))
 vi.mock('../db', () => ({ db: {} }))
 
-beforeEach(() => { live.activeCount = 0 })
+beforeEach(() => { live.activeEntries = [] })
 
 // The phone header (banner) and the desktop sidebar (complementary) both carry a
 // "go to Timer" logo + nav; jsdom doesn't apply Tailwind's responsive `hidden`,
@@ -98,15 +99,16 @@ describe('Layout — desktop sidebar', () => {
     expect(onNavigate).toHaveBeenCalledWith('analytics')
   })
 
-  it('shows the privacy-first "On the clock" status when timers are running', () => {
-    live.activeCount = 2
+  it('shows the privacy-first "On the clock" status + timer count when running', () => {
+    live.activeEntries = [{ punchIn: new Date() }, { punchIn: new Date() }]
     render(<Layout activeView="timer" onNavigate={vi.fn()}><div /></Layout>)
-    expect(screen.getByText(/on the clock/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/on the clock/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/2 timers/i)).toBeInTheDocument()
     expect(screen.queryByText(/\bREC\b|recording/i)).toBeNull()
   })
 
   it('shows "Off the clock" when nothing is running', () => {
-    live.activeCount = 0
+    live.activeEntries = []
     render(<Layout activeView="timer" onNavigate={vi.fn()}><div /></Layout>)
     expect(screen.getByText(/off the clock/i)).toBeInTheDocument()
   })

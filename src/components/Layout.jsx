@@ -8,6 +8,7 @@ import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 import { hasWaitingUpdate } from '../utils/pwa'
 import { PunchMark, Wordmark } from './BrandMark'
 import { DEFAULT_ACCENT } from '../accentPresets'
+import { formatDurationHM } from '../utils/time'
 
 const NAV = [
   { id: 'timer',      label: 'Timer',     Icon: Clock      },
@@ -35,9 +36,19 @@ export default function Layout({ activeView, onNavigate, children }) {
   const hapticsOn = isStandalone && settings.hapticFeedback !== false
   const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
   const accentColor = settings.accentColor || DEFAULT_ACCENT
-  // Live "On the clock" status for the desktop sidebar (privacy-first wording —
-  // never "REC"/"recording"). undefined while loading; a count once resolved.
-  const activeCount = useLiveQuery(() => db.entries.filter(e => !e.punchOut).count(), [])
+  // Live "On the clock" status for the chrome (privacy-first wording — never
+  // "REC"/"recording"): the running entries, their count, and their combined
+  // elapsed time. A coarse 30s ticker keeps the duration fresh without a global
+  // per-second re-render.
+  const activeEntries = useLiveQuery(() => db.entries.filter(e => !e.punchOut).toArray(), [])
+  const activeCount = activeEntries?.length
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!activeCount) return
+    const id = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(id)
+  }, [activeCount])
+  const activeMs = (activeEntries || []).reduce((s, e) => s + (now - new Date(e.punchIn).getTime()), 0)
 
   // Fire the tap haptic synchronously in the click handler (iOS needs the
   // gesture context) before delegating to the parent's navigation.
@@ -74,7 +85,7 @@ export default function Layout({ activeView, onNavigate, children }) {
           <Wordmark className="hidden lg:block text-xl" />
         </button>
 
-        <nav aria-label="Primary" className="flex flex-col gap-0.5 px-2">
+        <nav aria-label="Primary" className="flex flex-col gap-0.5 px-2 mt-3">
           {NAV.map(({ id, label, Icon }) => {
             const active = activeView === id
             return (
@@ -85,10 +96,12 @@ export default function Layout({ activeView, onNavigate, children }) {
                 aria-label={id === 'settings' && hasUpdate ? `${label} — update available` : label}
                 className={`relative flex items-center gap-3 rounded-lg py-2.5 justify-center lg:justify-start lg:px-3 transition-colors
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent
-                  ${active ? 'bg-appAccent/15 text-appAccent' : 'text-appTextMuted hover:text-appText hover:bg-appInput'}`}
+                  ${active ? 'bg-appInput text-appText' : 'text-appTextMuted hover:text-appText hover:bg-appInput'}`}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={active ? 2 : 1.5} aria-hidden="true" />
-                <span className="hidden lg:block text-sm font-medium">{label}</span>
+                {/* 3px accent left-rail on the active item (sits at the sidebar's inner edge) */}
+                {active && <span aria-hidden="true" className="absolute -left-2 top-2 bottom-2 w-[3px] rounded-r bg-appAccent" />}
+                <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={active ? 2.2 : 1.5} aria-hidden="true" />
+                <span className="hidden lg:block text-sm font-semibold">{label}</span>
                 {id === 'settings' && hasUpdate && (
                   <span aria-hidden="true" className="absolute top-1.5 right-1.5 lg:static lg:ml-auto w-2 h-2 rounded-full bg-red-500" />
                 )}
@@ -97,29 +110,38 @@ export default function Layout({ activeView, onNavigate, children }) {
           })}
         </nav>
 
-        {/* Live "On the clock" status + version */}
-        <div className="mt-auto px-3 lg:px-4 py-3 border-t border-appBorderLight">
-          <div className="flex items-center gap-2 justify-center lg:justify-start">
+        {/* Live "On the clock" status card (amber 'on the clock' hue per the design) */}
+        <div className="mt-auto p-2 lg:p-3">
+          <div className="hidden lg:flex items-center gap-2.5 rounded-xl border border-appBorder bg-appCard px-3 py-3">
             <span
               aria-hidden="true"
-              className={`w-2 h-2 rounded-full flex-shrink-0 ${activeCount ? 'bg-appAccent animate-pulse' : 'bg-appTextDisabled'}`}
+              className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${activeCount ? 'animate-pulse' : ''}`}
+              style={{ backgroundColor: activeCount ? 'var(--amber)' : 'var(--text-disabled)' }}
             />
-            <span className="hidden lg:block text-xs text-appTextMuted">
-              {activeCount === undefined
-                ? ' '
-                : activeCount > 0
-                  ? `On the clock · ${activeCount}`
-                  : 'Off the clock'}
-            </span>
+            <div className="min-w-0">
+              {activeCount
+                ? <>
+                    <p className="text-[13px] font-bold text-appText leading-tight">On the clock</p>
+                    <p className="text-[11px] text-appTextMuted">{activeCount} timer{activeCount === 1 ? '' : 's'} · {formatDurationHM(activeMs)}</p>
+                  </>
+                : <p className="text-[13px] font-medium text-appTextMuted">Off the clock</p>}
+            </div>
           </div>
-          <span className="hidden lg:block font-mono text-[10px] text-appTextMuted select-none mt-2">v{__APP_VERSION__}</span>
+          {/* md icon-rail: just the status dot */}
+          <div className="lg:hidden flex justify-center py-2">
+            <span
+              aria-hidden="true"
+              className={`w-2.5 h-2.5 rounded-full ${activeCount ? 'animate-pulse' : ''}`}
+              style={{ backgroundColor: activeCount ? 'var(--amber)' : 'var(--text-disabled)' }}
+            />
+          </div>
         </div>
       </aside>
 
       {/* Phone header */}
       <header
         style={adaptive.header}
-        className="md:hidden flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-appBorderLight"
+        className="md:hidden flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-appBorderLight bg-appNav"
       >
         <button
           onClick={() => navigate('timer')}
@@ -129,7 +151,15 @@ export default function Layout({ activeView, onNavigate, children }) {
           <PunchMark accent={accentColor} />
           <Wordmark className="text-xl" />
         </button>
-        <span className="font-mono text-[10px] text-appTextMuted select-none">v{__APP_VERSION__}</span>
+        {activeCount > 0 && (
+          <span
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--amber) 14%, transparent)', color: 'var(--amber)' }}
+          >
+            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--amber)' }} />
+            On the clock
+          </span>
+        )}
       </header>
 
       {/* Main content */}
