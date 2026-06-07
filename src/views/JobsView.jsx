@@ -287,12 +287,12 @@ export default function JobsView() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
               {jobs?.filter(j => j.isActive !== false).map(job => {
                 const lt = laborTypes?.find(l => l.id === job.laborTypeId)
                 const rateCount = Object.keys(job.laborRates || {}).length
                 if (editingJob?.id === job.id)
-                  return <div key={job.id} className="lg:col-span-2"><JobForm job={job} laborTypes={laborTypes} onDone={() => setEditingJob(null)} /></div>
+                  return <div key={job.id} className="col-span-full"><JobForm job={job} laborTypes={laborTypes} onDone={() => setEditingJob(null)} /></div>
                 return (
                   <div key={job.id} className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden transition-all duration-200">
                     {/* ticket left-rail in the job's labor colour */}
@@ -419,10 +419,10 @@ export default function JobsView() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
             {laborTypes?.filter(lt => !lt.isArchived).map(lt => {
               if (editingLT?.id === lt.id)
-                return <LaborTypeForm key={lt.id} lt={lt} onDone={() => setEditingLT(null)} />
+                return <div key={lt.id} className="col-span-full"><LaborTypeForm lt={lt} onDone={() => setEditingLT(null)} /></div>
               return (
                 <div key={lt.id}
                   className="flex items-center justify-between rounded-xl border border-appBorder bg-appCard px-4 py-3.5 transition-all duration-200">

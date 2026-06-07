@@ -42,7 +42,9 @@ export default function TimerCard({ entry, job, laborType }) {
     await db.entries.update(entry.id, { punchOut: new Date() })
   }
 
-  const color = laborType?.color || '#6366F1'
+  // The card's accent (left rail + live clock) is the job's identity colour,
+  // falling back to its labor type's colour, then the default.
+  const color = job?.color || laborType?.color || '#6366F1'
   const isOvernight = elapsed > 43200000 // 12 hours in milliseconds
 
   return (
