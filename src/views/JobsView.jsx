@@ -19,6 +19,7 @@ function JobForm({ job, laborTypes, onDone }) {
   const [clientName, setClientName] = useState(job?.clientName || '')
   const [laborTypeId, setLaborTypeId] = useState(job?.laborTypeId ? String(job.laborTypeId) : '')
   const [laborRates, setLaborRates]   = useState(job?.laborRates || {})
+  const [color, setColor]             = useState(job?.color || '')
   const [showRates, setShowRates]     = useState(false)
 
   const setRate = (ltId, val) => {
@@ -40,6 +41,7 @@ function JobForm({ job, laborTypes, onDone }) {
       clientName: clientName.trim() || null,
       laborTypeId: laborTypeId ? Number(laborTypeId) : null,
       laborRates,
+      color: color || null,
     }
     if (job?.id) {
       await db.jobs.update(job.id, data)
@@ -66,6 +68,19 @@ function JobForm({ job, laborTypes, onDone }) {
           <option key={lt.id} value={lt.id}>{lt.name}{lt.isArchived ? ' (archived)' : ''}</option>
         ))}
       </select>
+
+      {/* Job colour — drives the card's left rail; falls back to the labor type's
+          colour when unset (so existing jobs keep their derived colour). */}
+      <div className="space-y-1.5">
+        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Color</p>
+        <ColorPicker
+          presets={PRESET_COLOR_OBJECTS}
+          value={color}
+          onChange={setColor}
+          size="lg"
+          label="Job color"
+        />
+      </div>
 
       {/* Hourly rates per labor type */}
       {activeLTs.length > 0 && (
@@ -281,7 +296,7 @@ export default function JobsView() {
                 return (
                   <div key={job.id} className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden transition-all duration-200">
                     {/* ticket left-rail in the job's labor colour */}
-                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: lt?.color || 'transparent' }} aria-hidden="true" />
+                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: job.color || lt?.color || 'transparent' }} aria-hidden="true" />
                     <div className="pl-4 pr-3 py-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">

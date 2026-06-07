@@ -42,6 +42,7 @@ export function genUuid() {
  *   laborTypeId: number,
  *   isActive: boolean,
  *   laborRates?: Record<number, number>,
+ *   color?: string,
  *   updatedAt?: number,
  * }} Job
  *
