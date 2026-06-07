@@ -209,6 +209,30 @@ describe('JobsView — add job', () => {
   })
 })
 
+describe('JobsView — default labor type picker', () => {
+  it('selects a default labor type via the EntitySelect picker', () => {
+    setupMocks(
+      JOBS,
+      [
+        { id: 1, name: 'Design', color: '#6366F1', isArchived: false },
+        { id: 3, name: 'Dev',    color: '#3B82F6', isArchived: false },
+      ],
+    )
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: /add job/i }))
+
+    // The default-labor-type control is now a bespoke EntitySelect, not a
+    // native <select>. Open it by its trigger, then click an option by role.
+    fireEvent.click(screen.getByRole('button', { name: /default labor type/i }))
+    fireEvent.click(screen.getByRole('option', { name: /design/i }))
+
+    // The trigger's accessible name reflects the chosen labor type.
+    expect(
+      screen.getByRole('button', { name: /default labor type, design/i })
+    ).toBeInTheDocument()
+  })
+})
+
 describe('JobsView — job color', () => {
   it('renders a color picker in the job add form', () => {
     setupMocks()

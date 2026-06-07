@@ -4,6 +4,7 @@ import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, Che
 import { db } from '../db'
 import ColorPicker from '../components/ColorPicker'
 import GlyphPicker from '../components/GlyphPicker'
+import EntitySelect from '../components/EntitySelect'
 import { LaborGlyphChip, LaborTag, DEFAULT_LABOR_COLOR } from '../components/LaborGlyph'
 
 // Suggested labor-type colours — the PunchIn design-system pastel rainbow. Users
@@ -71,12 +72,18 @@ function JobForm({ job, laborTypes, onDone }) {
         placeholder="Job name *" className={inputCls} onKeyDown={e => e.key === 'Enter' && save()} />
       <input value={clientName} onChange={e => setClientName(e.target.value)}
         placeholder="Client name (optional)" className={inputCls} />
-      <select value={laborTypeId} onChange={e => setLaborTypeId(e.target.value)} className={inputCls}>
-        <option value="">Default labor type (optional)...</option>
-        {laborTypes?.filter(lt => !lt.isArchived || String(lt.id) === laborTypeId).map(lt => (
-          <option key={lt.id} value={lt.id}>{lt.name}{lt.isArchived ? ' (archived)' : ''}</option>
-        ))}
-      </select>
+      <EntitySelect
+        label="Default labor type"
+        value={laborTypeId}
+        onChange={setLaborTypeId}
+        options={(laborTypes ?? []).filter(lt => !lt.isArchived || String(lt.id) === laborTypeId).map(lt => ({
+          value: lt.id,
+          label: lt.name + (lt.isArchived ? ' (archived)' : ''),
+          glyph: lt.glyph,
+          color: lt.color,
+        }))}
+        emptyOption={{ label: 'No default labor type' }}
+      />
 
       {/* Job colour — drives the card's left rail; falls back to the labor type's
           colour when unset (so existing jobs keep their derived colour). */}
