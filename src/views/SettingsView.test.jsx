@@ -564,7 +564,7 @@ describe('SettingsView — About', () => {
     render(<SettingsView />)
     expand('About')
     const link = screen.getByRole('link', { name: /support the app/i })
-    expect(link).toHaveAttribute('href', 'https://www.buymeacoffee.com/PunchIn-App')
+    expect(link).toHaveAttribute('href', 'https://www.buymeacoffee.com/punchin')
   })
 
   it('shows "Already up to date" after clicking Check for updates (no service worker)', async () => {
