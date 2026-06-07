@@ -5,6 +5,23 @@
 // the geometry mirrors src/iconSvg.js (the favicon / install-icon source).
 import { readableInk } from '../utils/inkOnAccent'
 
+// The stopwatch path geometry (crown + stem + body + clock hands), mirroring
+// src/iconSvg.js. Stroke + the centre dot use `currentColor` so the colour is
+// driven by the SVG's resolved text colour — set it via the `color` prop on
+// StopwatchGlyph, or an inline `style`/inherited colour on PunchGlyph.
+function StopwatchPaths() {
+  return (
+    <>
+      <path d="M9.5 2.6h5" />
+      <path d="M12 2.6v2.4" />
+      <circle cx="12" cy="13.4" r="8.2" />
+      <path d="M12 13.4V8.6" />
+      <path d="M12 13.4l3 1.9" />
+      <circle cx="12" cy="13.4" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  )
+}
+
 // The stopwatch glyph (crown + stem + body + clock hands), stroked in `color`.
 export function StopwatchGlyph({ className = 'w-4 h-4', color }) {
   return (
@@ -12,18 +29,35 @@ export function StopwatchGlyph({ className = 'w-4 h-4', color }) {
       viewBox="0 0 24 24"
       className={className}
       fill="none"
-      stroke={color}
+      stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      style={{ color }}
       aria-hidden="true"
     >
-      <path d="M9.5 2.6h5" />
-      <path d="M12 2.6v2.4" />
-      <circle cx="12" cy="13.4" r="8.2" />
-      <path d="M12 13.4V8.6" />
-      <path d="M12 13.4l3 1.9" />
-      <circle cx="12" cy="13.4" r="0.9" fill={color} stroke="none" />
+      <StopwatchPaths />
+    </svg>
+  )
+}
+
+// A Lucide-compatible adapter that draws the PunchIn stopwatch mark, so the brand
+// can be used anywhere a labor-type glyph is rendered (chip, tag, picker). Like a
+// Lucide icon it strokes in `currentColor` and accepts `className` / `strokeWidth`
+// / passthrough props (e.g. `style={{ color }}`, `aria-hidden`).
+export function PunchGlyph({ className = 'w-4 h-4', strokeWidth = 2, ...rest }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...rest}
+    >
+      <StopwatchPaths />
     </svg>
   )
 }

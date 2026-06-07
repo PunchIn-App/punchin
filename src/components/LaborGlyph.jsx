@@ -3,16 +3,19 @@
 // Shared by the editor (glyph picker) and every surface a labor type appears on.
 import {
   Code, Paintbrush, MessageSquare, Wrench, Book, FlaskConical, Camera, Truck,
-  Leaf, Briefcase, Pencil, BarChart2, DollarSign, Clock, Bell, Settings, Tag,
+  Leaf, Briefcase, Pencil, BarChart2, DollarSign, Clock, Bell, Settings,
   Megaphone, PenTool, Hammer, Scissors, Music, Video, Mail, Phone, Globe, Map,
   Zap, Coffee, Package, Plane, Users, GraduationCap,
 } from 'lucide-react'
+import { PunchGlyph } from './BrandMark'
 
-// Glyph set (string id → Lucide component). Stored as the id string on
-// laborTypes.glyph; mapped here so render sites import one component. The first
-// few are the quick-picks shown in the picker row; the rest are reachable via
-// the picker's search ("more") dropdown.
+// Glyph set (string id → component). Stored as the id string on laborTypes.glyph;
+// mapped here so render sites import one component. `punchin` (the PunchIn brand
+// stopwatch) leads — it's the default glyph and the first quick-pick. The next
+// few are the remaining quick-picks shown in the picker row; the rest are
+// reachable via the picker's search ("more") dropdown.
 export const LABOR_GLYPHS = {
+  punchin: PunchGlyph,
   code: Code, brush: Paintbrush, chat: MessageSquare, wrench: Wrench,
   book: Book, beaker: FlaskConical, camera: Camera, truck: Truck,
   leaf: Leaf, briefcase: Briefcase, pencil: Pencil, chart: BarChart2,
@@ -25,10 +28,10 @@ export const LABOR_GLYPHS = {
 export const LABOR_GLYPH_IDS = Object.keys(LABOR_GLYPHS)
 export const DEFAULT_LABOR_COLOR = '#6366F1'
 
-// Resolve a glyph id to its component; unknown / unset falls back to Tag so
-// existing records (no glyph field) render without a migration.
+// Resolve a glyph id to its component; unknown / unset falls back to the PunchIn
+// brand mark so existing records (no glyph field) render without a migration.
 export function glyphComponent(id) {
-  return LABOR_GLYPHS[id] || Tag
+  return LABOR_GLYPHS[id] || PunchGlyph
 }
 
 // A solid colour chip holding the glyph (ink flipped for contrast). Replaces the

@@ -4,11 +4,21 @@ import GlyphPicker from './GlyphPicker'
 describe('GlyphPicker', () => {
   it('renders a single row of quick-pick glyphs plus a "more" button', () => {
     render(<GlyphPicker value="" onChange={() => {}} />)
-    expect(screen.getByRole('radio', { name: 'code' })).toBeInTheDocument()   // first quick-pick
-    expect(screen.getByRole('radio', { name: 'camera' })).toBeInTheDocument() // 7th quick-pick
+    expect(screen.getByRole('radio', { name: 'punchin' })).toBeInTheDocument() // brand default
+    expect(screen.getByRole('radio', { name: 'code' })).toBeInTheDocument()    // a quick-pick
     expect(screen.getByRole('button', { name: /more glyphs/i })).toBeInTheDocument()
     // The full set is NOT all shown inline (it lives behind "more")
     expect(screen.queryByRole('radio', { name: 'plane' })).not.toBeInTheDocument()
+  })
+
+  it('shows the PunchIn brand glyph as the first quick-pick (the default)', () => {
+    render(<GlyphPicker value="" onChange={() => {}} />)
+    expect(screen.getAllByRole('radio')[0]).toHaveAttribute('aria-label', 'punchin')
+  })
+
+  it('marks the PunchIn brand glyph aria-checked when it is the selected value', () => {
+    render(<GlyphPicker value="punchin" onChange={() => {}} />)
+    expect(screen.getByRole('radio', { name: 'punchin' })).toHaveAttribute('aria-checked', 'true')
   })
 
   it('calls onChange when a quick-pick is clicked', () => {
