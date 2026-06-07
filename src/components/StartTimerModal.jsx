@@ -276,7 +276,7 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
                        disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Play className="w-4 h-4 flex-shrink-0" fill="currentColor" aria-hidden="true" />
-            {submitting ? 'Starting…' : 'Punch In'}
+            {submitting ? 'Starting…' : 'PunchIn'}
           </button>
         </div>
 

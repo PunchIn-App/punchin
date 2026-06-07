@@ -80,7 +80,7 @@ describe('StartTimerModal — rendering', () => {
 
   it('renders the Punch In button', () => {
     render(<StartTimerModal onClose={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /punch in/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /punchin/i })).toBeInTheDocument()
   })
 
   it('renders a job picker trigger', () => {
@@ -135,7 +135,7 @@ describe('StartTimerModal — validation', () => {
 
   it('shows an error when submitting with no job selected', async () => {
     render(<StartTimerModal onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+    fireEvent.click(screen.getByRole('button', { name: /punchin/i }))
     await waitFor(() =>
       expect(screen.getByText('Please select a job')).toBeInTheDocument()
     )
@@ -150,7 +150,7 @@ describe('StartTimerModal — validation', () => {
     render(<StartTimerModal onClose={vi.fn()} />)
 
     pickJob('Job A')
-    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+    fireEvent.click(screen.getByRole('button', { name: /punchin/i }))
 
     await waitFor(() =>
       expect(screen.getByText('Please select a labor type')).toBeInTheDocument()
@@ -172,7 +172,7 @@ describe('StartTimerModal — punch flow (delegates to db.startTimer)', () => {
 
     // Selecting a job auto-fills laborTypeId via useEffect (job.laborTypeId = 1)
     pickJob('Job A')
-    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+    fireEvent.click(screen.getByRole('button', { name: /punchin/i }))
 
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(mockStartTimer).toHaveBeenCalledWith(
@@ -186,7 +186,7 @@ describe('StartTimerModal — punch flow (delegates to db.startTimer)', () => {
     render(<StartTimerModal onClose={onClose} />)
 
     pickJob('Job A')
-    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+    fireEvent.click(screen.getByRole('button', { name: /punchin/i }))
 
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(mockStartTimer).toHaveBeenCalledWith(
@@ -278,7 +278,7 @@ describe('StartTimerModal — error handling', () => {
 
     // Select a job — auto-fills laborTypeId via useEffect (job.laborTypeId = 1)
     pickJob('Job A')
-    fireEvent.click(screen.getByRole('button', { name: /punch in/i }))
+    fireEvent.click(screen.getByRole('button', { name: /punchin/i }))
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toBeInTheDocument()
