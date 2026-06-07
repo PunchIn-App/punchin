@@ -324,6 +324,7 @@ The UI uses Google's **Noto** type family, mapped to Tailwind tokens in `tailwin
 | `text-appTextMuted` | `--text-muted` | `#6B7280` | `#6B7280` |
 | `text-appTextDisabled` | `--text-disabled` | `#374151` | `#D1D5DB` |
 | `bg-appAccent` / `text-appAccent` | `--accent-rgb` | `#2D5BF5` (user-configurable) | `#2348DB` (default; user-configurable) |
+| `text-appOnAccent` | `--on-accent` | `#FFFFFF` (legible ink ON the accent) | flips to `#0F1117` on a light/pastel accent |
 
 Two additional CSS variables exist in `index.css` but have **no Tailwind token** — use them via `var()` in CSS files or Recharts style props only, not via Tailwind utilities:
 
@@ -332,7 +333,7 @@ Two additional CSS variables exist in `index.css` but have **no Tailwind token**
 | `--text-secondary` | `#E2E8F0` | `#374151` | secondary labels, axis text |
 | `--text-darker` | `#4B5563` | `#9CA3AF` | tertiary/dimmed text |
 
-The accent color is stored as a hex string in the `accentColor` setting. `App.jsx` converts it to space-separated RGB values and writes them to `--accent-rgb` on the root element. The Tailwind token uses `rgb(var(--accent-rgb) / <alpha-value>)` so opacity modifiers like `bg-appAccent/30` work correctly. **Never use hardcoded `amber-*` Tailwind classes** — always use `appAccent` so the user's chosen color is respected.
+The accent color is stored as a hex string in the `accentColor` setting. `App.jsx` converts it to space-separated RGB values and writes them to `--accent-rgb` on the root element (plus `--accent` as raw hex, and `--on-accent` = `readableInk(accent)` for legible on-accent text). The Tailwind token uses `rgb(var(--accent-rgb) / <alpha-value>)` so opacity modifiers like `bg-appAccent/30` work correctly. **Never use hardcoded `amber-*` Tailwind classes** — always use `appAccent` so the user's chosen color is respected. **For text/icons sitting ON an accent fill, use `text-appOnAccent`** (never a hardcoded `text-[#0F1117]` / `text-white`) so the foreground stays legible when the user picks a light/pastel accent.
 
 In JSX, use Tailwind token classes rather than raw hex values or inline `var()` calls — except for `--text-secondary` and `--text-darker` which have no token. `color-scheme: dark/light` is set on `:root`/`.light` in `index.css` so browser-native controls (date/time pickers, caret, scrollbars) render in the correct scheme.
 

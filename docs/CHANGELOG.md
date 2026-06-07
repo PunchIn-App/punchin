@@ -19,6 +19,7 @@ _Brand refresh (`design/brand-refresh`) — in progress._
 - Design-system **token layer** in `index.css` — type scale, weights, tracking, radii, spacing, elevation/shadows (incl. an accent glow), per-theme status colours, and the pastel preset palette — plus an `--accent` (raw hex) token alongside `--accent-rgb`. ([brand refresh](https://github.com/PunchIn-App/punchin))
 
 ### Fixed
+- **Buttons and toggles on the accent colour now keep legible text** on any accent: the on-accent text/icon ink automatically flips between white and dark so primary buttons (Punch In, Save, Print, …) stay readable even when you pick a light or pastel accent. ([brand refresh](https://github.com/PunchIn-App/punchin))
 - Printed and PDF-exported **invoices and timesheets now render in the brand Noto font** instead of falling back to the OS's system-UI face. The print document loads the Noto webfonts and waits for them before printing, so exports match the app. ([brand refresh](https://github.com/PunchIn-App/punchin))
 
 ---

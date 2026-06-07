@@ -108,7 +108,7 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
         href="https://www.buymeacoffee.com/punchin"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-appAccent text-[#0F1117] font-display font-bold text-sm hover:brightness-110 active:brightness-90 transition-all focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:outline-none"
+        className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-appAccent text-appOnAccent font-display font-bold text-sm hover:brightness-110 active:brightness-90 transition-all focus-visible:ring-2 focus-visible:ring-appAccent focus-visible:outline-none"
       >
         <Heart className="w-4 h-4" aria-hidden="true" />
         Support the App

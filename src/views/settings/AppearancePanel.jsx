@@ -26,7 +26,7 @@ export default function AppearancePanel({ onBack }) {
                   onClick={() => updateSetting('theme', value)}
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors
                     ${(settings.theme || 'auto') === value
-                      ? 'bg-appAccent text-[#0F1117]'
+                      ? 'bg-appAccent text-appOnAccent'
                       : 'text-appTextMuted hover:text-appText'}`}
                 >
                   <Icon className="w-3 h-3" />

@@ -49,7 +49,7 @@ export default function TimerView() {
             onClick={() => setShowModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl
                        bg-appAccent hover:brightness-110 active:brightness-90
-                       text-[#0F1117] font-display font-bold text-sm transition-all"
+                       text-appOnAccent font-display font-bold text-sm transition-all"
           >
             <Plus className="w-4 h-4" strokeWidth={2.5} />
             Punch In

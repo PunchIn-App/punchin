@@ -121,6 +121,24 @@ describe('App — accent color CSS variable', () => {
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#FF0000')
   })
 
+  it('writes --on-accent = white for legible text on a dark accent', () => {
+    mockUseSettings.mockReturnValue({
+      settings: { theme: 'dark', accentColor: '#2D5BF5' },
+      updateSetting: vi.fn(),
+    })
+    render(<App />)
+    expect(document.documentElement.style.getPropertyValue('--on-accent')).toBe('#FFFFFF')
+  })
+
+  it('flips --on-accent to dark ink on a light accent', () => {
+    mockUseSettings.mockReturnValue({
+      settings: { theme: 'dark', accentColor: '#FFD66B' },
+      updateSetting: vi.fn(),
+    })
+    render(<App />)
+    expect(document.documentElement.style.getPropertyValue('--on-accent')).toBe('#0F1117')
+  })
+
   it('defaults to PunchIn Blue #2D5BF5 (dark) when accentColor is missing', () => {
     mockUseSettings.mockReturnValue({ settings: { theme: 'dark' }, updateSetting: vi.fn() })
     render(<App />)

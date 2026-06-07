@@ -79,7 +79,7 @@ export function WeekdayPicker({ value, onChange, label }) {
             aria-pressed={on}
             aria-label={WEEKDAYS[d]}
             className={`w-7 h-7 rounded-full text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-appAccent/50
-              ${on ? 'bg-appAccent text-[#0F1117]' : 'bg-appBg text-appText border border-appBorder hover:bg-appInput'}`}
+              ${on ? 'bg-appAccent text-appOnAccent' : 'bg-appBg text-appText border border-appBorder hover:bg-appInput'}`}
           >
             {initial}
           </button>

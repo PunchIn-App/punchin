@@ -94,7 +94,7 @@ export default function AnalyticsView() {
           <button key={p} onClick={() => setPeriod(p)}
             aria-pressed={period === p}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-              ${period === p ? 'bg-appAccent text-[#0F1117]' : 'bg-appCard border border-appBorder text-appTextMuted'}`}>
+              ${period === p ? 'bg-appAccent text-appOnAccent' : 'bg-appCard border border-appBorder text-appTextMuted'}`}>
             Last {p === '7d' ? '7 days' : '30 days'}
           </button>
         ))}

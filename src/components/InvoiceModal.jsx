@@ -262,7 +262,7 @@ ${PRINT_FONT_HEAD}
                   onClick={() => setPreset(i)}
                   aria-pressed={preset === i}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-                    ${preset === i ? 'bg-appAccent text-[#0F1117]' : 'bg-appInput border border-appBorder text-appTextMuted hover:text-appText'}`}
+                    ${preset === i ? 'bg-appAccent text-appOnAccent' : 'bg-appInput border border-appBorder text-appTextMuted hover:text-appText'}`}
                 >
                   {p.label}
                 </button>
@@ -374,7 +374,7 @@ ${PRINT_FONT_HEAD}
             onClick={exportCsv}
             disabled={!lineItems.length}
             aria-disabled={!lineItems.length}
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90 text-[#0F1117] text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90 text-appOnAccent text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" aria-hidden="true" />
             Export CSV

@@ -16,6 +16,7 @@
      at runtime from the user's chosen colour (and the light-mode default). */
   --accent: #2D5BF5;
   --accent-rgb: 45 91 245;
+  --on-accent: #FFFFFF; /* legible ink on the accent; App.jsx recomputes per accent */
   --bg-primary: #0F1117;
   --bg-secondary: #161923;
   --bg-tertiary: #1E2232;

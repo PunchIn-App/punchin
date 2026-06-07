@@ -17,6 +17,7 @@ import { useReminders } from './hooks/useReminders'
 import { updateFavicon } from './utils/favicon'
 import { applyInstallIcon } from './utils/installIcon'
 import { DEFAULT_ACCENT, DEFAULT_ACCENT_LIGHT } from './accentPresets'
+import { readableInk } from './utils/inkOnAccent'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
@@ -225,6 +226,9 @@ export default function App() {
     const rootStyle = document.documentElement.style
     rootStyle.setProperty('--accent', effectiveAccent)
     rootStyle.setProperty('--accent-rgb', hexToRgb(effectiveAccent))
+    // Legible foreground for text/glyphs ON the accent (white, or dark ink on a
+    // light/pastel accent) — used via the appOnAccent token on accent buttons.
+    rootStyle.setProperty('--on-accent', readableInk(effectiveAccent))
   }, [accentColor, resolvedTheme])
 
   // The favicon / install icon follow the stored accent (theme-independent — the

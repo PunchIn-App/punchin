@@ -104,7 +104,7 @@ function JobForm({ job, laborTypes, onDone }) {
 
       <div className="flex gap-2 pt-1">
         <button onClick={save}
-          className="flex-1 py-2 rounded-lg bg-appAccent hover:brightness-110 text-[#0F1117] font-bold text-sm transition-all">
+          className="flex-1 py-2 rounded-lg bg-appAccent hover:brightness-110 text-appOnAccent font-bold text-sm transition-all">
           {job ? 'Save' : 'Add Job'}
         </button>
         <button onClick={onDone}
@@ -146,7 +146,7 @@ function LaborTypeForm({ lt, onDone }) {
       />
       <div className="flex gap-2 pt-1">
         <button onClick={save}
-          className="flex-1 py-2 rounded-lg bg-appAccent hover:brightness-110 text-[#0F1117] font-bold text-sm transition-all">
+          className="flex-1 py-2 rounded-lg bg-appAccent hover:brightness-110 text-appOnAccent font-bold text-sm transition-all">
           {lt ? 'Save' : 'Add Type'}
         </button>
         <button onClick={onDone}

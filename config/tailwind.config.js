@@ -19,6 +19,7 @@ export default {
         appTextMuted:    'var(--text-muted)',
         appTextDisabled: 'var(--text-disabled)',
         appAccent:       'rgb(var(--accent-rgb) / <alpha-value>)',
+        appOnAccent:     'var(--on-accent)',
       },
     },
   },

@@ -284,7 +284,7 @@ export default function EditEntryModal({ entry, onClose }) {
             <button
               onClick={handleSave}
               className="w-full py-3.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90
-                         text-[#0F1117] font-display font-bold text-base transition-colors"
+                         text-appOnAccent font-display font-bold text-base transition-colors"
             >
               {isEditMode ? 'Save Changes' : 'Add Time Entry'}
             </button>

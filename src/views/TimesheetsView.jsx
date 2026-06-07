@@ -563,7 +563,7 @@ ${PRINT_FONT_HEAD}
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-appAccent hover:brightness-110 active:brightness-90 text-[#0F1117] text-xs font-bold transition-all"
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-appAccent hover:brightness-110 active:brightness-90 text-appOnAccent text-xs font-bold transition-all"
           >
             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
             Log Manual

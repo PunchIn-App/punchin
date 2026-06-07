@@ -170,7 +170,7 @@ export default function LicenseModal({ onClose }) {
               aria-pressed={tab === t.id}
               onClick={() => setTab(t.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-                ${tab === t.id ? 'bg-appAccent text-[#0F1117]' : 'text-appTextMuted hover:text-appText'}`}
+                ${tab === t.id ? 'bg-appAccent text-appOnAccent' : 'text-appTextMuted hover:text-appText'}`}
             >
               {t.label}
             </button>
