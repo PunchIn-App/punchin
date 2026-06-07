@@ -173,7 +173,10 @@ async function captureDevice(browser, device, theme) {
   // Wait for the nav to appear — signals Dexie has finished opening/upgrading the DB.
   // Use preview build (npm run preview) rather than dev server: the dev server's root=app/
   // configuration causes Chromium to 404 on the ../src/main.jsx module script path.
-  await page.waitForSelector('nav[aria-label="Main navigation"]')
+  // Which nav is visible depends on the responsive layout: the phone bottom tab
+  // bar below md, the desktop/tablet left sidebar (aria-label "Primary") at md+.
+  const navLabel = width >= 768 ? 'Primary' : 'Main navigation'
+  await page.waitForSelector(`nav[aria-label="${navLabel}"]`)
   await page.evaluate(seedData, theme)
   // Suppress the first-run install nudge: with a mobile UA it becomes eligible
   // once the reload below bumps the open count past the threshold, and would
@@ -183,10 +186,12 @@ async function captureDevice(browser, device, theme) {
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(600)
 
-  const nav = page.locator('nav[aria-label="Main navigation"]')
+  const nav = page.locator(`nav[aria-label="${navLabel}"]`)
 
   async function goTab(label) {
-    await nav.locator('button').filter({ hasText: label }).click()
+    // Match by accessible name so it works for both the bottom nav (text label)
+    // and the tablet icon rail (aria-label, where the text label is hidden).
+    await nav.getByRole('button', { name: label, exact: true }).click()
     await page.waitForTimeout(350)
   }
 
