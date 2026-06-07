@@ -12,103 +12,22 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 ## Repository Structure
 
+> **The full annotated file-by-file map lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** Read it to learn what a specific module does, and before adding, moving, or renaming any file — then update the tree there (see Documentation Maintenance). Top-level layout:
+
 ```
 punchin/
-├── README.md               # Product intro, screenshots, getting started
-├── wrangler.jsonc          # Cloudflare Workers deployment; deploy via `npm run deploy`; routes OAuth requests to worker/oauth.js and static assets via ASSETS binding
-├── .env.example            # Documents all VITE_* OAuth env vars with setup instructions for each provider
-├── worker/
-│   ├── oauth.js            # Cloudflare Worker: handles GitHub OAuth code→token exchange; renders on-demand exact-colour accent install icons at /icons/i/<hex>/* (issue #228, falls back to the nearest static palette swatch on render failure); falls through to static assets for all other routes. Wraps every response with CSP/hardening headers
-│   └── iconRender.js       # SVG→PNG render of the brand mark via the @resvg/resvg-wasm WASM renderer (Cloudflare Workers can't use sharp/canvas); used by oauth.js for /icons/i/<hex>/* (issue #228). Isolated so the worker tests can mock it without loading the wasm
-├── app/
-│   ├── index.html          # App shell (viewport, fonts, theme color, apple-touch-icon link); Vite root is app/
-│   └── public/             # Static assets copied verbatim to dist/ root; holds the PWA/home-screen icons
-│       ├── icon-192.png        # Manifest icon (192×192, purpose any)
-│       ├── icon-512.png        # Manifest icon (512×512, purpose any)
-│       ├── icon-512-maskable.png # Manifest icon (512×512, purpose maskable) for Android adaptive icons
-│       └── apple-touch-icon.png  # iOS home-screen icon (180×180), linked from index.html
-├── config/
-│   ├── vite.config.js      # Vite + Vitest + PWA config; root=app/, outDir=../dist, test.root=..; PWA manifest imported from manifest.base.js; workbox globIgnores `icons/**` (issue #228)
-│   ├── manifest.base.js    # Canonical PWA manifest object, shared by vite.config.js and scripts/icons.mjs so the per-accent manifest copies never drift (issue #228)
-│   ├── postcss.config.js   # PostCSS pipeline (Tailwind + autoprefixer)
-│   └── tailwind.config.js  # Custom fonts (Noto Sans, Noto Sans Display, Noto Sans Mono) + CSS-variable-backed color tokens
-├── scripts/
-│   ├── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
-│   ├── icons.mjs           # Generates the PWA install-icon sets (Clock mark on accent square) via sharp: the default (blue) root set + a per-accent "crayon box" under app/public/icons/<key>/ for every colour in src/iconPalette.js (issue #228). sharp is not a committed dep (`npm install --no-save sharp && node scripts/icons.mjs`)
-│   └── social-preview.py   # Regenerates docs/social-preview*.svg + .png (Noto wordmark/tagline as outlined paths via fontTools; PNG via sharp). Build-time only — no font binary committed
-├── docs/
-│   ├── CHANGELOG.md        # Version history; imported at build time by ChangelogModal via ?raw import
-│   ├── THIRD-PARTY-LICENSES.md # Attribution + license terms for bundled/used third-party assets (the Noto fonts, OFL-1.1)
-│   ├── social-preview.svg      # GitHub README header / repo social card (dark); transparent bg, Noto wordmark outlined
-│   ├── social-preview-light.svg # Light-mode variant of the header card
-│   ├── social-preview.png      # Raster repo social card (1280×640) flattened on brand navy
-│   ├── licenses/
-│   │   └── OFL-1.1.txt     # SIL Open Font License 1.1 — covers Noto Sans / Display / Mono
-│   └── screenshots/
-│       ├── phone-dark/     # Phone · dark theme (412×916 CSS px @2.625×) — 7 views
-│       ├── phone-light/    # Phone · light theme — 7 views
-│       ├── tablet-dark/    # Tablet landscape · dark theme (1194×834 CSS px @2×) — 7 views
-│       ├── tablet-light/   # Tablet landscape · light theme — 7 views
-│       ├── desktop-dark/   # 1920×1080 @1× · dark theme — 7 views
-│       └── desktop-light/  # 1920×1080 @1× · light theme — 7 views
-├── src/
-│   ├── main.jsx            # React entry point; registers service worker and PWA install prompt listener
-│   ├── App.jsx             # Root: tab state, theme application, accent → CSS var + dynamic favicon, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated)
-│   ├── sync/
-│   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
-│   │   ├── oauthState.js       # OAuth CSRF protection (issue #125): createOAuthState (mint+store a nonce in sessionStorage), consumeOAuthState (verify the returned nonce, fail closed). The nonce is embedded in the OAuth `state` and checked in App.jsx's callback handler
-│   │   ├── tokenStore.js       # At-rest encryption of the sync token (issue #126): setSyncToken/getSyncToken/clearSyncToken, backed by the `secrets` table (non-extractable AES-GCM key). Lazily migrates a legacy plaintext settings.syncToken. runSync/disconnectSync/App.jsx go through this — the token is never in plaintext IndexedDB
-│   │   ├── pkce.js             # PKCE helpers for OneDrive's Auth Code flow (issue #128): createPkceChallenge (verifier→sessionStorage, returns the S256 challenge), consumePkceVerifier (one-time read)
-│   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), importSnapshot (public merge for transfer links, issue #77), runSync (pull→merge→push), disconnectSync
-│   │   └── providers/
-│   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, fetchGitHubUser, findExistingPunchInGist, createGist (marker + device file), fetchAllDeviceData (reads all punchin-data-*.json + legacy file), pushDeviceData (writes marker + own device file), deleteDeviceFile (nulls file on disconnect), updateGist/fetchGist (legacy, kept for backward compat)
-│   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope — stays implicit; see the #128 comment for why), pushToDrive, pullFromDrive
-│   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (Auth Code + PKCE, AppFolder scope, issue #128) + exchangeOneDriveCode (client-side token exchange, token never in URL), pushToOneDrive, pullFromOneDrive
-│   ├── index.css           # CSS variables (dark/light), scrollbar utils
-│   ├── accentPresets.js    # Single source of truth for the accent presets (the AppearancePanel swatches) + accentIconKey(); shared by the settings UI, installIcon.js, and iconPalette.js (issue #228)
-│   ├── iconSvg.js          # The brand mark as an SVG string (Clock on a rounded accent square). Single source of truth for the mark, shared by scripts/icons.mjs (build) and worker/iconRender.js (on-demand render) (issue #228)
-│   ├── iconPalette.js      # The pre-rendered install-icon "crayon box": ~65 swatches (presets + an HSL grid) and nearestPaletteKey(). Shared by scripts/icons.mjs (renders the sets) and worker/oauth.js (nearest-swatch fallback when the on-demand render fails) (issue #228)
-│   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131)
-│   ├── components/
-│   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell; shows update badge on Settings icon
-│   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
-│   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
-│   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
-│   │   ├── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
-│   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
-│   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
-│   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
-│   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets; centered reading-modal — closes on device Back (pushes {modal:true} history entry)
-│   │   ├── LicenseModal.jsx     # Centered reading-modal showing the app license (LICENSE ?raw, BUSL-1.1) and third-party attributions (docs/THIRD-PARTY-LICENSES.md ?raw, rendered via a small built-in markdown renderer); two-way section switch via aria-pressed buttons; closes on device Back
-│   │   ├── DataTransfer.jsx     # Account-free device-to-device transfer (issue #77): "Create share link" snapshots the DB → compressed #import= link + QR (qrcode-generator); "Import from a link" pastes a link/code and merges via importSnapshot
-│   │   └── InstallPromptModal.jsx # First-run install bottom sheet; mode = 'native' (Chrome/Edge one-tap), 'ios-safari' (Share→Add-to-Home-Screen), or 'ios-other' (open-in-Safari guidance for Chrome/Firefox on iOS)
-│   ├── views/
-│   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
-│   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
-│   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
-│   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
-│   │   ├── SettingsView.jsx    # Thin router for the iOS-style drill-in Settings (issue #144): CategoryRow root list → per-panel components under views/settings/; device Back / re-tapping the Settings tab returns to root. Owns the routing + the two signals the root badges also need (notifPerm, usePwaUpdate) and passes them down
-│   │   └── settings/           # Per-panel components (issue #144): components.jsx (Toggle/SettingsRow/ReminderRow/WeekdayPicker/CategoryRow/Panel/PanelGroup) + GeneralPanel/AppearancePanel/RemindersPanel/InstallPanel/DataSyncPanel/AboutPanel + LongRunningMinutesInput (the long-running-timer threshold control — a custom **24h wrap-around scroll-wheel**: two 3-row scroll-snap "wheels" (hours 0–23, minutes 0–55 on a 5-min grid), each an ARIA spinbutton for keyboard/SR use. Built custom because `<input type="time">`'s 12h/24h display is OS-locale-owned and can't be forced — AM/PM is meaningless on a *duration*. Modelled as a single TOTAL minute count (mod a 24h cycle): each wheel reports a step delta (minutes ±5, hours ±60), so **spinning the minutes past 55→00 carries into the hours** (and 00→55 borrows back), and the hours **wrap** 23→0. The carry is **live** — the minutes wheel also reports its in-progress delta on every scroll frame (`onLiveStep` → a `liveMin` preview the hours wheel reads), so the hour rolls over the instant you cross 55↔00 mid-spin, not only on release (the committed value still updates once on settle). Both wheels are rendered as REPEAT stacked copies recentred on scroll-settle (and step on arrow keys) for the seamless wrap. Stores h*60+m minutes, snaps off-grid values, switches the reminder off at 0h 0m. Wheel CSS (`.wheel-col`, with a fade mask) in `index.css`. Issue #111). Panels self-serve settings/platform/install via hooks rather than long prop lists (issue #148)
-│   ├── hooks/
-│   │   ├── useSettings.js          # Reactive Dexie KV settings hook; merges live rows over DEFAULT_SETTINGS so consumers read a complete typed object (issue #134)
-│   │   ├── usePwaUpdate.js         # PWA "update available" coordination (issue #149): updateAvailable/updateStatus/checkForUpdates across window flag + SW reg.waiting + pwa:update-ready event
-│   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web) + isIOSSafari (true only in iOS Safari, where Add to Home Screen works) + isIPad (treats a touch-capable "Macintosh" UA — iPadOS Safari's default desktop mode — as iOS, and distinguishes iPad from iPhone)
-│   │   ├── useInstallPrompt.js     # PWA install state: canInstall/isInstalled/isIOS/isIOSSafari + promptInstall(); shared by SettingsView and the install nudge
-│   │   ├── useFocusTrap.js         # Shared modal a11y (issue #151): initial focus ([data-autofocus]/first/opts), container-scoped Tab trap (#154), focus restoration on close (#152), Escape→onClose. Consumed by every modal
-│   │   ├── useBottomSheet.jsx      # Shared bottom-sheet plumbing (issue #151): useSwipeDismiss / useAndroidBackDismiss / useSheetStyles for StartTimerModal + InstallPromptModal
-│   │   ├── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
-│   │   └── useReminders.js        # Reminder scheduler (issue #54): watches settings + live timers, evaluates evaluateReminders on a 30s interval (and on tab focus), fires local notifications while reminders are enabled and permission granted. No backend / Web Push
-│   └── utils/
-│       ├── time.js             # Date/time helpers (format, range, sum)
-│       ├── backup.js           # exportBackup() (full JSON) + exportCsv() (completed entries) — data plumbing kept out of the settings view (issue #144)
-│       ├── issueUrl.js         # buildBugReportUrl + buildFeatureRequestUrl (GitHub new-issue links) + userAgent sniffing for the bug template (issue #146)
-│       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon). drawFaviconDataUrl is reused by installIcon.js for the iOS apple-touch-icon
-│       ├── installIcon.js      # Points the install/home-screen icon at the chosen accent before install (issue #228): exact data-URL apple-touch-icon for iOS; <link rel="manifest"> pointed at a preset's pre-rendered static set (/icons/<key>/) or, for a custom colour, the worker's exact on-demand render (/icons/i/<hex>/). Called from App.jsx's accent effect
-│       ├── notifications.js    # Browser Notification API wrappers: notificationsSupported, notificationPermission, requestNotificationPermission, showNotification (prefers the SW registration, falls back to the Notification constructor)
-│       ├── reminders.js        # Pure evaluateReminders({now, settings, activeEntries, jobs, state}) → {fire, state}; the testable reminder rules (long-running timer, idle, still-running, daily/weekly timesheet) + parseHHMM/dayKey helpers
-│       ├── transfer.js         # Device-to-device transfer codec (issue #77): encodeSnapshot/decodeSnapshot (gzip via CompressionStream + base64url, 'g'/'r' flag), buildShareUrl, parseImportCode, parseImportFromHash
-│       ├── deviceId.js         # Stable per-device identifier: getDeviceId() generates an 8-char hex ID on first call and persists it in localStorage (pi.deviceId); survives factory resets intentionally
-│       └── pwa.js              # PWA state bridge: beforeinstallprompt capture, update notification, applyUpdate(), hasWaitingUpdate() (detects an already-downloaded SW waiting to activate)
+├── worker/     # Cloudflare Worker — GitHub OAuth code→token exchange + on-demand accent install-icon render (oauth.js, iconRender.js)
+├── app/        # Vite root — index.html app shell + public/ (PWA / home-screen icons)
+├── config/     # vite.config.js (+ Vitest), manifest.base.js, postcss.config.js, tailwind.config.js
+├── scripts/    # build/asset tooling — screenshots.mjs, icons.mjs, social-preview.py
+├── docs/       # CHANGELOG, THIRD-PARTY-LICENSES, ARCHITECTURE.md, TEST-COVERAGE.md, RELEASING.md, screenshots/, licenses/
+└── src/        # app source
+    ├── main.jsx, App.jsx    # entry point; root tab/theme/accent + OAuth-callback shell
+    ├── sync/                # cloud sync: config, oauthState, tokenStore, pkce, syncManager + providers/ (github, google, onedrive)
+    ├── components/          # modals, cards, pickers (TimerCard, EditEntryModal, ConfirmModal, ColorPicker, ChangelogModal, …)
+    ├── views/               # Timer, Jobs, Timesheets, Analytics, Settings (+ settings/ drill-in panels)
+    ├── hooks/               # useSettings, usePwaUpdate, usePlatformContext, useInstallPrompt, useFocusTrap, useReminders, …
+    └── utils/               # time, backup, transfer, notifications, reminders, favicon, installIcon, deviceId, pwa, issueUrl
 ```
 
 ---
@@ -136,64 +55,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 
 #### Current test coverage
 
-| File | What's tested |
-|------|---------------|
-| `src/utils/time.test.js` | All helpers: `formatElapsed`, `formatDurationHM`, `formatDecimalHours`/`formatDuration` + `roundEntry` (issue #208: favour-rounding the 8:07→8:00 / 8:20→8:30 example, half-hour, exact-boundary no-op, off, still-running, seconds-ceil), `getEntryDuration`, `formatTime`, `formatDate`, `getDayRange`, `getWeekRange`, `getWeekDays`, `isEntryInRange`, `sumDurations` |
-| `src/utils/pwa.test.js` | `getInstallPrompt`, `notifyUpdateAvailable`, `setPwaUpdateFn`, `applyUpdate`, `initPwaInstallPrompt`, `hasWaitingUpdate` (reg.waiting detection) |
-| `src/utils/favicon.test.js` | `drawFaviconDataUrl` (accent color, null-context fallback), `updateFavicon` (link creation, static-link replacement, idempotent updates) |
-| `src/iconPalette.test.js` | Install-icon palette (issue #228): every preset is an exact swatch, `nearestPaletteKey` snaps presets to themselves / near colours close / always returns a generated key, `paletteKey` normalisation, palette density |
-| `src/utils/installIcon.test.js` | `applyInstallIcon` (issue #228): points `<link rel="manifest">` at a preset's static set or the worker exact-render route for a custom colour, sets an exact data-URL `apple-touch-icon`, reuses the existing manifest link rather than duplicating |
-| `worker/oauth.test.js` | Security headers + GitHub OAuth exchange paths; accent-icon routes (issue #228): dynamic manifest (no render), exact-colour PNG render (size + maskable), `nearestSwatchPath` fallback, invalid-hex pass-through to ASSETS |
-| `src/utils/notifications.test.js` | `notificationsSupported`, `notificationPermission`, `requestNotificationPermission`, `showNotification` (permission gate, SW-registration path, constructor fallback) |
-| `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `dayAllowed`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules, day-of-week gating + back-compat when day arrays absent) |
-| `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |
-| `src/utils/deviceId.test.js` | `getDeviceId` — generates 8-char hex, persists across calls, falls back to `'default'` when localStorage is unavailable |
-| `src/db.test.js` | Schema validation, default settings seed (29 keys incl. the sync keys seeded as null, the per-reminder weekday defaults = all 7 days, and the time-display defaults `decimalHours`/`roundingMinutes`; matches `DEFAULT_SETTINGS`), indexed `punchIn` range queries (`between`/`aboveOrEqual`, issue #132), `deleteEntry` tombstones, basic CRUD for jobs/labor types/entries |
-| `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
-| `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), `isIOSSafari` (Safari vs CriOS/FxiOS/EdgiOS), `isIPad` incl. desktop-mode iPad (touch-capable "Macintosh" → iOS) vs real Mac, standalone mode detection |
-| `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
-| `src/hooks/useReminders.test.js` | fires a notification when an enabled reminder condition is met; no-ops when reminders disabled or permission not granted |
-| `src/hooks/useInstallPrompt.test.js` | `canInstall`/`isInstalled` state from `pwa:install-ready`/`pwa:installed`; `promptInstall` accept/dismiss outcomes |
-| `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap, device-Back (popstate) dismiss |
-| `src/components/LicenseModal.test.jsx` | Dialog a11y, default app-license (BUSL) tab, switch to third-party (aria-pressed), close button/Escape/backdrop, device-Back (popstate) dismiss |
-| `src/components/InstallPromptModal.test.jsx` | All three modes (native / ios-safari / ios-other), dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
-| `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
-| `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management, unique title id per instance (#156) |
-| `src/hooks/useFocusTrap.test.jsx` | Initial focus (first / `[data-autofocus]` / `opts.initialFocus`), Escape→onClose, focus restoration on unmount (#152), focus pulled back into the dialog on Tab (#154) |
-| `src/components/DataTransfer.test.jsx` | Share-link + QR generation, "Includes N jobs/entries" summary, import junk rejection, end-to-end import of a real encoded link with count (issue #77) |
-| `src/components/EditEntryModal.test.jsx` | Add/edit/active-timer modes, validation, save/delete flows, keyboard |
-| `src/components/EditEntryModal.helpers.test.js` | `formatDateToYYYYMMDD`, `formatTimeToHHMM`, `combineDateAndTime` |
-| `src/components/ErrorBoundary.test.jsx` | Children render, fallback UI on throw, "Try again" reset |
-| `src/components/InvoiceModal.test.jsx` | Line-item calc, period presets, CSV export, print, empty state, billable rounding (issue #208) |
-| `src/components/Layout.test.jsx` | Logo button, nav items, `aria-current`, tab callbacks |
-| `src/components/StartTimerModal.test.jsx` | Render, form validation, concurrent-timer guard |
-| `src/components/TimerCard.test.jsx` | Job/labor-type display, stop timer, open/close EditEntryModal |
-| `src/views/AnalyticsView.test.jsx` | Loading state, period toggle, summary cards, empty state, charts |
-| `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
-| `src/views/SettingsView.test.jsx` | Drill-in root list + sub-pages, device-Back/Settings-tab-reselect returns to root, Data & Sync consolidation, toggles, theme, export/import, sync UI, danger zone, About rows (help-improve, License modal, Support link) |
-| `src/utils/issueUrl.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` (template/scope/URL) — browser/OS/device/install-type detection |
-| `src/utils/backup.test.js` | `exportBackup` JSON shape (version + 3 tables); `exportCsv` header + skips running entries |
-| `src/hooks/usePwaUpdate.test.js` | Initial state from window flag, `pwa:update-ready` event, on-mount `reg.waiting` re-surface (#57), apply-when-available, no-registration "latest" path |
-| `src/views/SettingsView.syncUnconfigured.test.jsx` | Sync section with empty client IDs: friendly "not set up" message, no env-var jargon, no provider buttons (issue #59) |
-| `src/views/SettingsView.haptics.test.jsx` | `hapticFeedback` toggle shown on iPhone/Android, hidden on iPad (no vibration motor) and web, toggles the setting (issue #65) |
-| `src/views/SettingsView.reminders.test.jsx` | Reminders section (issue #54): unsupported message, master toggle requests permission + gates the setting on grant/deny, per-reminder options render when enabled, minutes input + sub-toggles, per-reminder `WeekdayPicker` (renders, toggling a day, clearing the last day turns the reminder off + restores all days) |
-| `src/views/settings/LongRunningMinutesInput.test.jsx` | Long-running threshold 24h wheel (issue #111): splits the stored minutes across two ARIA spinbutton wheels, steps hours by 1 / minutes by 5 via arrow keys, snaps an off-grid value, caps minutes at 55, **carries minutes into the hour** (55→00 = +1h) and **borrows back** (00→55 = −1h), **flips the hour live mid-spin** (scroll event before settle, no commit yet), wraps the hours (23→0) wheel, turns the reminder off at 0h 0m |
-| `src/views/settings/RemindersPanel.test.jsx` | Reminders panel local-delivery messaging (issue #112): explains reminders are local and a fully closed app can't alert at an exact time, no longer implies installed-but-closed delivery, hides the note until reminders are enabled |
-| `src/views/settings/GeneralPanel.test.jsx` | Time display & billing controls (issue #208): toggles decimal hours, reflects the current state, sets the rounding increment from the select, defaults to Off |
-| `src/views/TimerView.test.jsx` | Empty state, active timers, last session, punch-in modal |
-| `src/views/TimesheetsView.test.jsx` | Daily/weekly tabs, period nav, search/filter, CSV/print, edit/delete |
-| `src/App.test.jsx` | Accent color CSS variable, theme class, default view, OAuth callbacks (incl. GitHub username fetch + Settings navigation, issue #83), first-run install nudge gating (mobile-only, ios-other mode, desktop suppression), back-button history navigation (seed/push/popstate, issue #65), transfer-link import prompt (confirm/cancel/corrupt, issue #77) |
-| `src/App.integration.test.jsx` | Integration (issue #170): mounts the REAL App over real views + real Dexie (fake-indexeddb) — renders the default Timer view, then navigates the bottom nav to the real Jobs view reading seeded data; catches App↔view prop-contract drift the fully-mocked `App.test.jsx` can't |
-| `src/sync/config.test.js` | `SYNC_CONFIG` shape and env-var fallbacks |
-| `src/sync/oauthState.test.js` | OAuth CSRF nonce (issue #125): `createOAuthState` (32-char hex, stored, unique per call), `consumeOAuthState` (one-time use, clears, fails closed on mismatched/empty/missing) |
-| `src/sync/pkce.test.js` | Auth Code + PKCE helpers (issue #128): `createPkceChallenge` (stores verifier, returns base64url S256 challenge ≠ verifier), `consumePkceVerifier` (one-time read, null when none stored) |
-| `src/sync/tokenStore.test.js` | Encrypted at-rest sync token (issue #126): `setSyncToken`/`getSyncToken` round-trip, no plaintext in `secrets` + non-extractable key, `clearSyncToken`, null when empty, lazy migration of a legacy plaintext `settings.syncToken` (removes the plaintext) |
-| `src/sync/providers/github.test.js` | `buildGitHubOAuthUrl`, `fetchGitHubUser`, `findExistingPunchInGist` (pagination, marker file, device prefix, legacy file), `getDeviceFilename`, `createGist` (marker + device file), `fetchAllDeviceData` (multi-device, truncated, legacy, malformed), `pushDeviceData`, `deleteDeviceFile`, `updateGist`, `fetchGist` |
-| `src/sync/providers/google.test.js` | `buildGoogleOAuthUrl`, `pushToDrive` (create + update path), `pullFromDrive` |
-| `src/sync/providers/onedrive.test.js` | `buildOneDriveOAuthUrl`, `pushToOneDrive`, `pullFromOneDrive` (404 → null) |
-| `src/sync/syncManager.test.js` | `exportSnapshot`, `disconnectSync` (deletes device file, clears all settings incl. syncUsername), `runSync` (auth guards, per-provider dispatch, multi-device merge via `fetchAllDeviceData`, existing-gist discovery, per-device push, create with marker) |
-
-When adding new behaviour to any source file, add a test alongside it.
+> The full per-file coverage table lives in [`docs/TEST-COVERAGE.md`](docs/TEST-COVERAGE.md). **Consult it before adding or changing tests, and add a row there when you add a new test file.** When adding new behaviour to any source file, add a test alongside it.
 
 ### Deploy
 
@@ -212,101 +74,11 @@ When opening a PR via the GitHub API or MCP tools (i.e. not through the GitHub w
 - Work through every item in the **Checklist** — check it if done, or check it and append `— N/A` if it genuinely does not apply to this PR. Do not omit sections.
 - Include the **CLA sign-off** line verbatim.
 
-### Versioning
+### Versioning & Releases
 
-PunchIn follows **semantic versioning** (`MAJOR.MINOR.PATCH`).
+PunchIn uses **semantic versioning** (`MAJOR.MINOR.PATCH`); the canonical version is `package.json` → `"version"` (`vite.config.js` exposes it via `__APP_VERSION__`, so the in-app display needs no manual sync). Quick bump call: **MINOR** = a user-visible new feature or significant UX change · **PATCH** = bug fix, accessibility, performance, or internal refactor with no visible change · **no bump** = tests-only, CI/workflow-only, or documentation-only changes. The BUSL-1.1 **Change Date** `2030-06-02` is fixed and independent of the version.
 
-- **Pre-1.0** (current): `0.MINOR.PATCH` — `MINOR` increments for new user-visible features or significant UX changes; `PATCH` for bug fixes, accessibility improvements, and internal refactors with no visible feature change.
-- **Post-1.0**: standard semver — `MAJOR` for breaking data-model changes or major UX overhauls; `MINOR` for new features; `PATCH` for fixes.
-- The canonical version source is `package.json` → `"version"`. `vite.config.js` reads it automatically via `__APP_VERSION__` — no manual sync needed for the in-app display.
-- The BUSL-1.1 **Change Date** of `2030-06-02` is fixed and independent of version — it does not move when the version number changes.
-
-#### Version increment decision guide
-
-| Change type | Increment |
-|---|---|
-| New view, tab, or modal | `MINOR` |
-| New setting exposed in UI | `MINOR` |
-| New export/import format or data capability | `MINOR` |
-| Significant UX or layout change | `MINOR` |
-| New DB table or field that users interact with | `MINOR` |
-| Bug fix visible to users | `PATCH` |
-| Accessibility improvement | `PATCH` |
-| Performance improvement (no visible change) | `PATCH` |
-| Internal refactor (no visible change) | `PATCH` |
-| Dependency update (no visible change) | `PATCH` |
-| Test additions only | no bump |
-| CI / workflow config change only | no bump |
-| Documentation-only change (`CLAUDE.md`, `README.md`) | no bump |
-
-When in doubt between `MINOR` and `PATCH`: if a user would notice the change without being told about it, it's `MINOR`.
-
-### Release checklist
-
-Every version bump must update all of the following in the **same commit or PR**:
-
-| File | What to change |
-|------|----------------|
-| `package.json` | `"version"` field — **source of truth** |
-| `README.md` | Version badge: `https://img.shields.io/badge/version-{X.Y.Z}-1f6feb...` |
-| `CLAUDE.md` | `**Version:** {X.Y.Z}` in the Project Overview header |
-| `docs/CHANGELOG.md` | New `## [{X.Y.Z}] — {YYYY-MM-DD}` section at the top |
-| `SECURITY.md`        | Update the **Supported Versions** table — bump the supported version to `{X.Y.Z}.x` and mark all prior minor versions as `No` |
-| `docs/screenshots/` | Regenerate if any visible UI changed (see Documentation Maintenance below) |
-
-After the bump commit lands on `main`, also **create a GitHub release** (`gh release create vX.Y.Z …`) — it tags the version and surfaces it in the repo's Releases sidebar. This is a post-merge action (a tag points at a commit on `main`), not a file edit, so it's step 9 in the procedure below rather than a row in this table.
-
-The `wrangler.jsonc` `compatibility_date` is **not** part of the version bump — update it only when intentionally upgrading the Cloudflare Workers runtime.
-
-#### Step-by-step release procedure
-
-1. Decide the new version using the decision guide above
-2. Update `package.json` `"version"`
-3. Add a new section at the top of `docs/CHANGELOG.md` (see format below)
-4. Update the version badge URL in `README.md`
-5. Update `**Version:**` in the `CLAUDE.md` Project Overview header
-6. If any visible UI changed, regenerate screenshots (see Documentation Maintenance below)
-7. Verify `npm run build` and `npm run test:run` both pass
-8. Commit everything in a single commit: `chore: bump to vX.Y.Z` (or fold the bump into the feature PR)
-9. Once the version commit has landed on `main`, create a GitHub release so the version is tagged and shows in the repo's **Releases**:
-   ```bash
-   gh release create vX.Y.Z --target <commit-on-main> --title "vX.Y.Z" --latest --notes "<the new docs/CHANGELOG.md section>"
-   ```
-   The tag `vX.Y.Z` is the canonical marker for the release; `--notes` should mirror that version's `docs/CHANGELOG.md` section. Pass the **full** commit SHA (or a branch name) to `--target` — the API rejects abbreviated SHAs.
-
-   **Create a release for every version increment — major, minor, AND patch.** Publishing a **minor or major** release (`vX.Y.0`) additionally **auto-creates the `vX.Y.0` milestone and assigns every merged PR that doesn't yet have one** (= everything merged since the last minor/major release, including any intervening patch PRs), via `.github/workflows/milestone-on-release.yml`. **Patch (bug-fix) releases publish + tag but get NO milestone** — the workflow no-ops on a non-zero patch tag, and those PRs roll up into the next minor/major milestone (so every PR is milestoned exactly once, at its minor/major grouping). Manual fallback for a minor/major if that workflow is unavailable: `gh api repos/<owner>/<repo>/milestones -f title=vX.Y.0 -f state=closed`, then assign PRs with `gh pr edit <n> --milestone vX.Y.0`.
-
-### Project board automation
-
-`.github/workflows/project-automation.yml` keeps the [PunchIn project board](https://github.com/orgs/PunchIn-App/projects/3) populated as issues/PRs move: on open it auto-adds the item and sets **Labels** (from the conventional-commit type), **Priority** (bug/enhancement → P1, else P2), **Size** (from PR diff), and **Start**/**Target** (+3 days) dates; on close it sets **Completion Date** and **clears any assignees** (finished work shouldn't stay assigned). It deliberately leaves **Status** to the project's built-in workflows (Item added / Item closed / Pull request merged) so it never conflicts with them or the built-in Auto-close rule. **Milestones** are handled at release time (above), on **minor/major releases only** (patch releases get no milestone), not here. Both `project-automation.yml` and `milestone-on-release.yml` live in each repo the board tracks (punchin + punchin-email). Everything runs under the **`ADD_TO_PROJECT_PAT`** secret — the default `GITHUB_TOKEN` is kept read-only (issue #104), so the PAT must grant **Projects: read/write · Issues: read/write · Contents: read/write** on both repos (Projects for the board fields, Issues for labels + milestones, Contents write for the punchin-email → punchin release relay below).
-
-`.github/workflows/project-status-update.yml` (punchin only) is the **single source of truth** for the project's **status updates** (the "Updates" panel): a weekly Monday digest, a "shipped vX.Y.Z" update on a punchin release, and the same on a **punchin-email** release — relayed in via `repository_dispatch` (`type: email-release`) from `punchin-email/notify-status-update.yml`. Every update covers the **whole project** (both repos counted in one post). The status flag is auto-derived — **AT_RISK** if any open P0 items, else **ON_TRACK**. Runs under `ADD_TO_PROJECT_PAT`; the relay additionally needs the PAT to have **Contents: write** on punchin (to send the dispatch).
-
-#### CHANGELOG entry format
-
-Follow [Keep a Changelog](https://keepachangelog.com/) — add a new section at the very top of `docs/CHANGELOG.md`:
-
-```markdown
-## [X.Y.Z] — YYYY-MM-DD
-
-### Added
-- Short description of new capability, written from the user's perspective
-
-### Changed
-- What changed and how it differs from before; internal-only refactors get "(internal)" suffix
-
-### Fixed
-- What was broken and what it does now
-
-### Removed
-- What was removed
-```
-
-Rules:
-- Omit sections that have no entries for that release
-- Write from the user's perspective, not the implementation's: "Timesheets now export..." not "Updated TimesheetsView to..."
-- Start bullets with the feature area for scannability: "Timer — ", "Analytics — ", "Settings — ", etc.
-- Each bullet is one user-observable change; group closely related implementation details into one bullet
+> **Before bumping the version or cutting a release, follow [`docs/RELEASING.md`](docs/RELEASING.md)** — it holds the full increment decision guide, the release checklist (every file to update in the same commit, incl. `SECURITY.md`), the step-by-step GitHub release procedure, the project-board / milestone automation, and the CHANGELOG entry format.
 
 ---
 
@@ -314,18 +86,21 @@ Rules:
 
 Every PR that changes code must update relevant documentation in the **same commit or PR**. The table below maps change types to required updates:
 
-| What changed | `CLAUDE.md` | `README.md` | `docs/CHANGELOG.md` | Screenshots |
+| What changed | Docs to update | `README.md` | `docs/CHANGELOG.md` | Screenshots |
 |---|---|---|---|---|
-| New component | Add to Repository Structure; describe it | — | ✓ if user-visible | ✓ if renders in any view |
-| Component renamed or removed | Update Repository Structure (remove stale entries) | — | ✓ if user-visible | ✓ if renders in any view |
-| New view or tab | Add to Repository Structure + describe it | Consider updating features section | ✓ | ✓ |
-| New or changed hook | Update Repository Structure description | — | — | — |
-| New or changed `time.js` helper | Update Time Utilities list | — | — | — |
-| DB schema change (table, index, or field) | Update Database → Collections table | — | ✓ if user-visible | — |
-| New setting key | Add row to Settings Keys table | — | ✓ | — |
-| New exported helper from any source file | Update the relevant section | — | — | — |
+| New component | Add to the file map in `docs/ARCHITECTURE.md`; describe it | — | ✓ if user-visible | ✓ if renders in any view |
+| Component renamed or removed | Update `docs/ARCHITECTURE.md` (remove stale entries) | — | ✓ if user-visible | ✓ if renders in any view |
+| New view or tab | Add to `docs/ARCHITECTURE.md` + describe it | Consider updating features section | ✓ | ✓ |
+| New or changed hook | Update `docs/ARCHITECTURE.md` description | — | — | — |
+| New or changed test file | Add/update its row in `docs/TEST-COVERAGE.md` | — | — | — |
+| New or changed `time.js` helper | Update Time Utilities list (`CLAUDE.md`) | — | — | — |
+| DB schema change (table, index, or field) | Update Database → Collections table (`CLAUDE.md`) | — | ✓ if user-visible | — |
+| New setting key | Add row to Settings Keys table (`CLAUDE.md`) | — | ✓ | — |
+| New exported helper from any source file | Update the relevant section (`CLAUDE.md` / `docs/ARCHITECTURE.md`) | — | — | — |
 | Any visible UI change | — | — | — | ✓ regenerate |
-| Version bump | Update `**Version:**` in header | Update version badge | Add new section | ✓ if UI changed |
+| Version bump | Update `**Version:**` in header; full checklist in `docs/RELEASING.md` | Update version badge | Add new section | ✓ if UI changed |
+
+> **Enforced by CI.** The **Docs Sync** check (`.github/workflows/docs-sync.yml` → `scripts/check-doc-sync.mjs`, run locally via `npm run check:docs`) fails a PR to `main` when: a new `src/`/`worker/` source file isn't in `docs/ARCHITECTURE.md`; a new test file isn't in `docs/TEST-COVERAGE.md`; a removed/renamed file leaves a stale doc entry; or a `package.json` version bump lacks the matching `docs/CHANGELOG.md` section (and `SECURITY.md`, on minor/major only). Add the **`skip-docs-check`** PR label to bypass it intentionally.
 
 ### Security Policy Maintenance
 
@@ -350,13 +125,13 @@ Keep `SECURITY.md` accurate whenever code changes affect what versions are suppo
 
 **Do not regenerate** for: logic-only changes, hook/utility changes, DB schema changes with no visible rendering effect, test additions, CI changes, or documentation-only updates.
 
-### Keeping CLAUDE.md accurate
+### Keeping CLAUDE.md (and the extracted docs) accurate
 
-CLAUDE.md documents the *current state* of the codebase — it must stay accurate, not just accumulate additions. Apply these rules when making any code change:
+`CLAUDE.md` and its extracted companions — `docs/ARCHITECTURE.md` (file map), `docs/TEST-COVERAGE.md` (test table), `docs/RELEASING.md` (release process) — document the *current state* of the codebase. They must stay accurate, not just accumulate additions. Apply these rules when making any code change:
 
-- **Adding** a component, view, hook, or utility: add an entry to the Repository Structure tree and the relevant detail section
-- **Removing** something: delete its entry — do not leave stale references
-- **Renaming** something: update every mention, including the Repository Structure tree and any section that names it
+- **Adding** a component, view, hook, or utility: add an entry to the file map in `docs/ARCHITECTURE.md` and the relevant detail section
+- **Removing** something: delete its entry (in `docs/ARCHITECTURE.md` and anywhere it's named) — do not leave stale references
+- **Renaming** something: update every mention, including the `docs/ARCHITECTURE.md` file map and any section that names it
 - **Changing an exported function signature**: update the Time Utilities list or whichever section documents that API
 - **Changing the DB schema**: update the Collections table and, if a new setting is added, the Settings Keys table
 - **Changing a convention** (modal pattern, theming rules, accessibility requirements): update the relevant convention section — a stale convention is worse than no convention

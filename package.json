@@ -11,7 +11,8 @@
     "deploy": "npm run build && wrangler deploy",
     "test": "vitest --config config/vite.config.js",
     "test:run": "vitest run --config config/vite.config.js",
-    "coverage": "vitest run --coverage --config config/vite.config.js"
+    "coverage": "vitest run --coverage --config config/vite.config.js",
+    "check:docs": "node scripts/check-doc-sync.mjs"
   },
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",

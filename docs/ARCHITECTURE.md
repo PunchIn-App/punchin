@@ -1,0 +1,105 @@
+# PunchIn — Architecture & File Map
+
+> **Canonical home for the full annotated repository structure**, extracted from `CLAUDE.md` to keep that file lean. **Read this when you need to know what a specific module does, or before adding, moving, or renaming a file.** When you add / rename / remove a file, update the tree here — `CLAUDE.md` → Documentation Maintenance points back to this file.
+
+## Repository structure
+
+```
+punchin/
+├── README.md               # Product intro, screenshots, getting started
+├── wrangler.jsonc          # Cloudflare Workers deployment; deploy via `npm run deploy`; routes OAuth requests to worker/oauth.js and static assets via ASSETS binding
+├── .env.example            # Documents all VITE_* OAuth env vars with setup instructions for each provider
+├── worker/
+│   ├── oauth.js            # Cloudflare Worker: handles GitHub OAuth code→token exchange; renders on-demand exact-colour accent install icons at /icons/i/<hex>/* (issue #228, falls back to the nearest static palette swatch on render failure); falls through to static assets for all other routes. Wraps every response with CSP/hardening headers
+│   └── iconRender.js       # SVG→PNG render of the brand mark via the @resvg/resvg-wasm WASM renderer (Cloudflare Workers can't use sharp/canvas); used by oauth.js for /icons/i/<hex>/* (issue #228). Isolated so the worker tests can mock it without loading the wasm
+├── app/
+│   ├── index.html          # App shell (viewport, fonts, theme color, apple-touch-icon link); Vite root is app/
+│   └── public/             # Static assets copied verbatim to dist/ root; holds the PWA/home-screen icons
+│       ├── icon-192.png        # Manifest icon (192×192, purpose any)
+│       ├── icon-512.png        # Manifest icon (512×512, purpose any)
+│       ├── icon-512-maskable.png # Manifest icon (512×512, purpose maskable) for Android adaptive icons
+│       └── apple-touch-icon.png  # iOS home-screen icon (180×180), linked from index.html
+├── config/
+│   ├── vite.config.js      # Vite + Vitest + PWA config; root=app/, outDir=../dist, test.root=..; PWA manifest imported from manifest.base.js; workbox globIgnores `icons/**` (issue #228)
+│   ├── manifest.base.js    # Canonical PWA manifest object, shared by vite.config.js and scripts/icons.mjs so the per-accent manifest copies never drift (issue #228)
+│   ├── postcss.config.js   # PostCSS pipeline (Tailwind + autoprefixer)
+│   └── tailwind.config.js  # Custom fonts (Noto Sans, Noto Sans Display, Noto Sans Mono) + CSS-variable-backed color tokens
+├── scripts/
+│   ├── screenshots.mjs     # Playwright script: seeds demo data + captures 42 screenshots (7 views × 3 devices × 2 themes)
+│   ├── icons.mjs           # Generates the PWA install-icon sets (Clock mark on accent square) via sharp: the default (blue) root set + a per-accent "crayon box" under app/public/icons/<key>/ for every colour in src/iconPalette.js (issue #228). sharp is not a committed dep (`npm install --no-save sharp && node scripts/icons.mjs`)
+│   ├── social-preview.py   # Regenerates docs/social-preview*.svg + .png (Noto wordmark/tagline as outlined paths via fontTools; PNG via sharp). Build-time only — no font binary committed
+│   └── check-doc-sync.mjs  # CI doc-sync check (`npm run check:docs`): fails a PR when src/test/version changes aren't reflected in ARCHITECTURE.md / TEST-COVERAGE.md / CHANGELOG.md / SECURITY.md. Pure rule engine + git/event wrapper; run by .github/workflows/docs-sync.yml; `skip-docs-check` label bypasses
+├── docs/
+│   ├── CHANGELOG.md        # Version history; imported at build time by ChangelogModal via ?raw import
+│   ├── THIRD-PARTY-LICENSES.md # Attribution + license terms for bundled/used third-party assets (the Noto fonts, OFL-1.1)
+│   ├── social-preview.svg      # GitHub README header / repo social card (dark); transparent bg, Noto wordmark outlined
+│   ├── social-preview-light.svg # Light-mode variant of the header card
+│   ├── social-preview.png      # Raster repo social card (1280×640) flattened on brand navy
+│   ├── licenses/
+│   │   └── OFL-1.1.txt     # SIL Open Font License 1.1 — covers Noto Sans / Display / Mono
+│   └── screenshots/
+│       ├── phone-dark/     # Phone · dark theme (412×916 CSS px @2.625×) — 7 views
+│       ├── phone-light/    # Phone · light theme — 7 views
+│       ├── tablet-dark/    # Tablet landscape · dark theme (1194×834 CSS px @2×) — 7 views
+│       ├── tablet-light/   # Tablet landscape · light theme — 7 views
+│       ├── desktop-dark/   # 1920×1080 @1× · dark theme — 7 views
+│       └── desktop-light/  # 1920×1080 @1× · light theme — 7 views
+├── src/
+│   ├── main.jsx            # React entry point; registers service worker and PWA install prompt listener
+│   ├── App.jsx             # Root: tab state, theme application, accent → CSS var + dynamic favicon, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated)
+│   ├── sync/
+│   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
+│   │   ├── oauthState.js       # OAuth CSRF protection (issue #125): createOAuthState (mint+store a nonce in sessionStorage), consumeOAuthState (verify the returned nonce, fail closed). The nonce is embedded in the OAuth `state` and checked in App.jsx's callback handler
+│   │   ├── tokenStore.js       # At-rest encryption of the sync token (issue #126): setSyncToken/getSyncToken/clearSyncToken, backed by the `secrets` table (non-extractable AES-GCM key). Lazily migrates a legacy plaintext settings.syncToken. runSync/disconnectSync/App.jsx go through this — the token is never in plaintext IndexedDB
+│   │   ├── pkce.js             # PKCE helpers for OneDrive's Auth Code flow (issue #128): createPkceChallenge (verifier→sessionStorage, returns the S256 challenge), consumePkceVerifier (one-time read)
+│   │   ├── syncManager.js      # Core sync logic: exportSnapshot, mergeSnapshot (reuses import dedup), importSnapshot (public merge for transfer links, issue #77), runSync (pull→merge→push), disconnectSync
+│   │   └── providers/
+│   │       ├── github.js       # GitHub Gist API: buildGitHubOAuthUrl, fetchGitHubUser, findExistingPunchInGist, createGist (marker + device file), fetchAllDeviceData (reads all punchin-data-*.json + legacy file), pushDeviceData (writes marker + own device file), deleteDeviceFile (nulls file on disconnect), updateGist/fetchGist (legacy, kept for backward compat)
+│   │       ├── google.js       # Google Drive API: buildGoogleOAuthUrl (implicit flow, appdata scope — stays implicit; see the #128 comment for why), pushToDrive, pullFromDrive
+│   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (Auth Code + PKCE, AppFolder scope, issue #128) + exchangeOneDriveCode (client-side token exchange, token never in URL), pushToOneDrive, pullFromOneDrive
+│   ├── index.css           # CSS variables (dark/light), scrollbar utils
+│   ├── accentPresets.js    # Single source of truth for the accent presets (the AppearancePanel swatches) + accentIconKey(); shared by the settings UI, installIcon.js, and iconPalette.js (issue #228)
+│   ├── iconSvg.js          # The brand mark as an SVG string (Clock on a rounded accent square). Single source of truth for the mark, shared by scripts/icons.mjs (build) and worker/iconRender.js (on-demand render) (issue #228)
+│   ├── iconPalette.js      # The pre-rendered install-icon "crayon box": ~65 swatches (presets + an HSL grid) and nearestPaletteKey(). Shared by scripts/icons.mjs (renders the sets) and worker/oauth.js (nearest-swatch fallback when the on-demand render fails) (issue #228)
+│   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131)
+│   ├── components/
+│   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell; shows update badge on Settings icon
+│   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
+│   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
+│   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
+│   │   ├── EditEntryModal.jsx  # Edit active or completed entry (supports cross-day)
+│   │   ├── InvoiceModal.jsx    # Invoice generator: job + date range → line-item table → CSV/print
+│   │   ├── ConfirmModal.jsx    # Accessible confirmation dialog (focus trap, Escape, Cancel default); replaces window.confirm
+│   │   ├── ColorPicker.jsx     # Preset swatches + custom hex picker (react-colorful); luminance contrast check; sizes: 'md' | 'lg'
+│   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets; centered reading-modal — closes on device Back (pushes {modal:true} history entry)
+│   │   ├── LicenseModal.jsx     # Centered reading-modal showing the app license (LICENSE ?raw, BUSL-1.1) and third-party attributions (docs/THIRD-PARTY-LICENSES.md ?raw, rendered via a small built-in markdown renderer); two-way section switch via aria-pressed buttons; closes on device Back
+│   │   ├── DataTransfer.jsx     # Account-free device-to-device transfer (issue #77): "Create share link" snapshots the DB → compressed #import= link + QR (qrcode-generator); "Import from a link" pastes a link/code and merges via importSnapshot
+│   │   └── InstallPromptModal.jsx # First-run install bottom sheet; mode = 'native' (Chrome/Edge one-tap), 'ios-safari' (Share→Add-to-Home-Screen), or 'ios-other' (open-in-Safari guidance for Chrome/Firefox on iOS)
+│   ├── views/
+│   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle
+│   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs
+│   │   ├── TimesheetsView.jsx  # Daily/weekly time logs + search + CSV/print/invoice export
+│   │   ├── AnalyticsView.jsx   # Charts: daily bars, job bars, labor pie
+│   │   ├── SettingsView.jsx    # Thin router for the iOS-style drill-in Settings (issue #144): CategoryRow root list → per-panel components under views/settings/; device Back / re-tapping the Settings tab returns to root. Owns the routing + the two signals the root badges also need (notifPerm, usePwaUpdate) and passes them down
+│   │   └── settings/           # Per-panel components (issue #144): components.jsx (Toggle/SettingsRow/ReminderRow/WeekdayPicker/CategoryRow/Panel/PanelGroup) + GeneralPanel/AppearancePanel/RemindersPanel/InstallPanel/DataSyncPanel/AboutPanel + LongRunningMinutesInput (the long-running-timer threshold control — a custom **24h wrap-around scroll-wheel**: two 3-row scroll-snap "wheels" (hours 0–23, minutes 0–55 on a 5-min grid), each an ARIA spinbutton for keyboard/SR use. Built custom because `<input type="time">`'s 12h/24h display is OS-locale-owned and can't be forced — AM/PM is meaningless on a *duration*. Modelled as a single TOTAL minute count (mod a 24h cycle): each wheel reports a step delta (minutes ±5, hours ±60), so **spinning the minutes past 55→00 carries into the hours** (and 00→55 borrows back), and the hours **wrap** 23→0. The carry is **live** — the minutes wheel also reports its in-progress delta on every scroll frame (`onLiveStep` → a `liveMin` preview the hours wheel reads), so the hour rolls over the instant you cross 55↔00 mid-spin, not only on release (the committed value still updates once on settle). Both wheels are rendered as REPEAT stacked copies recentred on scroll-settle (and step on arrow keys) for the seamless wrap. Stores h*60+m minutes, snaps off-grid values, switches the reminder off at 0h 0m. Wheel CSS (`.wheel-col`, with a fade mask) in `index.css`. Issue #111). Panels self-serve settings/platform/install via hooks rather than long prop lists (issue #148)
+│   ├── hooks/
+│   │   ├── useSettings.js          # Reactive Dexie KV settings hook; merges live rows over DEFAULT_SETTINGS so consumers read a complete typed object (issue #134)
+│   │   ├── usePwaUpdate.js         # PWA "update available" coordination (issue #149): updateAvailable/updateStatus/checkForUpdates across window flag + SW reg.waiting + pwa:update-ready event
+│   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web) + isIOSSafari (true only in iOS Safari, where Add to Home Screen works) + isIPad (treats a touch-capable "Macintosh" UA — iPadOS Safari's default desktop mode — as iOS, and distinguishes iPad from iPhone)
+│   │   ├── useInstallPrompt.js     # PWA install state: canInstall/isInstalled/isIOS/isIOSSafari + promptInstall(); shared by SettingsView and the install nudge
+│   │   ├── useFocusTrap.js         # Shared modal a11y (issue #151): initial focus ([data-autofocus]/first/opts), container-scoped Tab trap (#154), focus restoration on close (#152), Escape→onClose. Consumed by every modal
+│   │   ├── useBottomSheet.jsx      # Shared bottom-sheet plumbing (issue #151): useSwipeDismiss / useAndroidBackDismiss / useSheetStyles for StartTimerModal + InstallPromptModal
+│   │   ├── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
+│   │   └── useReminders.js        # Reminder scheduler (issue #54): watches settings + live timers, evaluates evaluateReminders on a 30s interval (and on tab focus), fires local notifications while reminders are enabled and permission granted. No backend / Web Push
+│   └── utils/
+│       ├── time.js             # Date/time helpers (format, range, sum)
+│       ├── backup.js           # exportBackup() (full JSON) + exportCsv() (completed entries) — data plumbing kept out of the settings view (issue #144)
+│       ├── issueUrl.js         # buildBugReportUrl + buildFeatureRequestUrl (GitHub new-issue links) + userAgent sniffing for the bug template (issue #146)
+│       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon). drawFaviconDataUrl is reused by installIcon.js for the iOS apple-touch-icon
+│       ├── installIcon.js      # Points the install/home-screen icon at the chosen accent before install (issue #228): exact data-URL apple-touch-icon for iOS; <link rel="manifest"> pointed at a preset's pre-rendered static set (/icons/<key>/) or, for a custom colour, the worker's exact on-demand render (/icons/i/<hex>/). Called from App.jsx's accent effect
+│       ├── notifications.js    # Browser Notification API wrappers: notificationsSupported, notificationPermission, requestNotificationPermission, showNotification (prefers the SW registration, falls back to the Notification constructor)
+│       ├── reminders.js        # Pure evaluateReminders({now, settings, activeEntries, jobs, state}) → {fire, state}; the testable reminder rules (long-running timer, idle, still-running, daily/weekly timesheet) + parseHHMM/dayKey helpers
+│       ├── transfer.js         # Device-to-device transfer codec (issue #77): encodeSnapshot/decodeSnapshot (gzip via CompressionStream + base64url, 'g'/'r' flag), buildShareUrl, parseImportCode, parseImportFromHash
+│       ├── deviceId.js         # Stable per-device identifier: getDeviceId() generates an 8-char hex ID on first call and persists it in localStorage (pi.deviceId); survives factory resets intentionally
+│       └── pwa.js              # PWA state bridge: beforeinstallprompt capture, update notification, applyUpdate(), hasWaitingUpdate() (detects an already-downloaded SW waiting to activate)
+```

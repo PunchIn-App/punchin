@@ -159,17 +159,20 @@ Every PR that changes code must update the relevant documentation in the **same 
 
 ### What needs updating
 
-| What changed in your PR | `CLAUDE.md` | `README.md` | `docs/CHANGELOG.md` | Screenshots |
+| What changed in your PR | Docs to update | `README.md` | `docs/CHANGELOG.md` | Screenshots |
 |---|---|---|---|---|
-| New component | Add to Repository Structure | — | ✓ if user-visible | ✓ if it renders in a view |
-| Renamed or removed component | Update Repository Structure | — | ✓ if user-visible | ✓ if it renders in a view |
-| New view or tab | Add to Repository Structure | Consider feature description update | ✓ | ✓ |
-| New or changed hook | Update Repository Structure | — | — | — |
-| New or changed `time.js` helper | Update Time Utilities list | — | — | — |
-| DB schema change (table, index, field) | Update Database → Collections table | — | ✓ if user-visible | — |
-| New setting key | Add to Settings Keys table | — | ✓ | — |
+| New component | Add to `docs/ARCHITECTURE.md` | — | ✓ if user-visible | ✓ if it renders in a view |
+| Renamed or removed component | Update `docs/ARCHITECTURE.md` | — | ✓ if user-visible | ✓ if it renders in a view |
+| New view or tab | Add to `docs/ARCHITECTURE.md` | Consider feature description update | ✓ | ✓ |
+| New or changed hook | Update `docs/ARCHITECTURE.md` | — | — | — |
+| New or changed test file | Add/update its row in `docs/TEST-COVERAGE.md` | — | — | — |
+| New or changed `time.js` helper | Update Time Utilities list (`CLAUDE.md`) | — | — | — |
+| DB schema change (table, index, field) | Update Database → Collections table (`CLAUDE.md`) | — | ✓ if user-visible | — |
+| New setting key | Add to Settings Keys table (`CLAUDE.md`) | — | ✓ | — |
 | Any visible UI change | — | — | — | ✓ regenerate |
-| Version bump | Update `**Version:**` in header | Update version badge | Add new section | ✓ if UI changed |
+| Version bump | Update `**Version:**` in header; full checklist in `docs/RELEASING.md` | Update version badge | Add new section | ✓ if UI changed |
+
+> A CI check named **Docs Sync** enforces the source/test/version rows above: it fails a PR when a new `src/`/`worker/` file is missing from `docs/ARCHITECTURE.md`, a new test is missing from `docs/TEST-COVERAGE.md`, a removed/renamed file leaves a stale entry, or a version bump lacks its `docs/CHANGELOG.md` section (plus `SECURITY.md` on minor/major). Run it locally with `npm run check:docs`. A maintainer can add the **`skip-docs-check`** label to bypass it.
 
 ### What triggers a screenshot regeneration
 
@@ -218,7 +221,7 @@ Rules:
 ## Testing
 
 - Run `npm run test:run` before opening a PR
-- When you add new behaviour to any source file, add a test alongside it (see the current test coverage table in [`CLAUDE.md`](../CLAUDE.md))
+- When you add new behaviour to any source file, add a test alongside it (see the current test coverage table in [`docs/TEST-COVERAGE.md`](../docs/TEST-COVERAGE.md))
 - Do not remove or weaken existing tests
 
 ---
