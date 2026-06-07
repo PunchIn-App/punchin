@@ -9,7 +9,7 @@ import {
 import { db } from '../db'
 import { getEntryDuration, roundEntry, formatTime } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
-import { PRINT_FONT_HEAD, openPrintWindow } from '../utils/printDocument'
+import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
 import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
@@ -147,7 +147,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     const rows = lineItems.map(li => `
       <tr>
         <td>${format(new Date(li.entry.punchIn), 'MMM d, yyyy')}</td>
-        <td>${li.lt ? `<span class="lt-badge" style="background:${li.lt.color}22;color:${li.lt.color}">${li.lt.name}</span>` : '—'}</td>
+        <td>${laborBadgeHTML(li.lt)}</td>
         <td class="mono">${formatTime(li.entry.punchIn, timeFormat)} – ${formatTime(li.entry.punchOut, timeFormat)}</td>
         <td class="right mono">${li.hours.toFixed(2)}</td>
         <td class="right mono">${li.rate != null ? money(li.rate) : '—'}</td>
@@ -194,7 +194,6 @@ ${PRINT_FONT_HEAD}
   .tfoot td { padding: 10px 8px 4px 0; border-top: 2px solid #111; font-weight: 700; }
   .right { text-align: right; }
   .mono { font-family: 'Noto Sans Mono', monospace; }
-  .lt-badge { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
   .paperfoot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 36px; padding-top: 18px; border-top: 1px solid #e8e8e8; }
   .paperfoot .thanks { font-size: 12px; color: #888; }
   .paperfoot .due { text-align: right; }

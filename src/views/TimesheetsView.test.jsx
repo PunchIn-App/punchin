@@ -4,12 +4,16 @@ import TimesheetsView from './TimesheetsView'
 
 const mockEntriesDelete = vi.fn().mockResolvedValue(undefined)
 const mockDeleteEntry   = vi.fn().mockResolvedValue(undefined)
+// Controls what db.entries.where(...).between(...).toArray() resolves with.
+// Default is []; tests that exercise the print path (which queries db directly)
+// can push entries into this before firing the print button.
+let mockDbEntries = []
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({
   db: {
     entries: {
-      where: vi.fn(() => ({ between: vi.fn(() => ({ toArray: vi.fn().mockResolvedValue([]) })) })),
+      where: vi.fn(() => ({ between: vi.fn(() => ({ toArray: vi.fn(() => Promise.resolve(mockDbEntries)) })) })),
       get delete() { return mockEntriesDelete },
     },
   },
@@ -60,6 +64,7 @@ function setupWithEntries(entries = [AN_ENTRY]) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockDbEntries = []
   useLiveQuery.mockReturnValue([])
   global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
   global.URL.revokeObjectURL = vi.fn()
@@ -370,6 +375,21 @@ describe('TimesheetsView — print timesheet', () => {
     expect(html).toContain('/fonts/noto-sans-latin-wght-normal.woff2')
     expect(html).not.toContain('-apple-system')
     expect(html).not.toContain('SF Mono')
+  })
+
+  it('printed timesheet badge shows the labor glyph (svg) and labor name, not colour-only', async () => {
+    // The print function queries db directly (not via useLiveQuery), so populate
+    // both: useLiveQuery for the on-screen sheet, mockDbEntries for the print path.
+    setupWithEntries()
+    mockDbEntries = [AN_ENTRY]
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
+    await waitFor(() => expect(fakeWin.document.write).toHaveBeenCalled())
+    const html = fakeWin.document.write.mock.calls[0][0]
+    expect(html).toContain('<svg')
+    expect(html).toContain('Design')
   })
 })
 

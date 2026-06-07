@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { PRINT_FONT_HEAD, openPrintWindow } from './printDocument'
+import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from './printDocument'
 
 describe('printDocument', () => {
   afterEach(() => {
@@ -54,5 +54,56 @@ describe('printDocument', () => {
     let result
     expect(() => { result = openPrintWindow('<html>doc</html>') }).not.toThrow()
     expect(result).toBe(false)
+  })
+})
+
+describe('laborBadgeHTML', () => {
+  it('returns a string containing an <svg> and the labor type name', () => {
+    const lt = { name: 'Design', color: '#6366F1', glyph: 'code' }
+    const html = laborBadgeHTML(lt)
+    expect(html).toContain('<svg')
+    expect(html).toContain('Design')
+  })
+
+  it('uses the labor color for the glyph stroke', () => {
+    const lt = { name: 'Dev', color: '#FF0000', glyph: 'code' }
+    const html = laborBadgeHTML(lt)
+    expect(html).toContain('#FF0000')
+  })
+
+  it('uses a neutral pill background (not the labor color as the pill fill)', () => {
+    const lt = { name: 'Dev', color: '#FF0000', glyph: 'code' }
+    const html = laborBadgeHTML(lt)
+    // The pill itself should be white/neutral, not a solid color fill
+    expect(html).toContain('#ffffff')
+    // The pill background should NOT be #FF0000 directly
+    expect(html).not.toMatch(/background:#FF0000(?:[^3]|$)/)
+  })
+
+  it('falls back to the PunchIn brand mark when glyph is unknown/unset', () => {
+    const lt = { name: 'Other', color: '#6366F1', glyph: undefined }
+    const html = laborBadgeHTML(lt)
+    expect(html).toContain('<svg')
+    expect(html).toContain('Other')
+  })
+
+  it('escapes HTML special characters in labor type name', () => {
+    const lt = { name: 'Dev & Ops <special>', color: '#6366F1', glyph: 'code' }
+    const html = laborBadgeHTML(lt)
+    expect(html).toContain('Dev &amp; Ops &lt;special&gt;')
+    expect(html).not.toContain('<special>')
+  })
+
+  it('returns "—" when lt is null or undefined', () => {
+    expect(laborBadgeHTML(null)).toBe('—')
+    expect(laborBadgeHTML(undefined)).toBe('—')
+  })
+
+  it('falls back to DEFAULT_LABOR_COLOR when no color is given', () => {
+    const lt = { name: 'Uncolored', glyph: 'code' }
+    const html = laborBadgeHTML(lt)
+    // Should not throw and should still contain an svg
+    expect(html).toContain('<svg')
+    expect(html).toContain('Uncolored')
   })
 })

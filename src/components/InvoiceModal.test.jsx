@@ -278,7 +278,7 @@ describe('InvoiceModal — export and print', () => {
     expect(html).toContain('Jane Doe')
     expect(html).toContain('Billed to')
     expect(html).toContain('PI-007') // prefix + zero-padded nextInvoiceNumber
-    expect(html).toContain('lt-badge')   // line items carry the colored labor badge
+    expect(html).toContain('<svg')   // line items carry a labor glyph badge
     expect(html).toContain('Amount due') // paperfoot total band
   })
 
@@ -316,6 +316,18 @@ describe('InvoiceModal — export and print', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('nextInvoiceNumber', 8)
+  })
+
+  it('printed invoice badge shows the labor glyph (svg) and labor name, not colour-only', async () => {
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = fakeWin.document.write.mock.calls[0][0]
+    expect(html).toContain('<svg')
+    expect(html).toContain('Design')
   })
 
   it('does not advance the number when the popup is blocked', async () => {

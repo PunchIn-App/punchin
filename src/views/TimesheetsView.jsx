@@ -9,7 +9,7 @@ import {
   getDayRange, getWeekRange, getWeekDays,
   entryOverlapsRange, getEntryDurationInRange, sumDurationsInRange,
 } from '../utils/time'
-import { PRINT_FONT_HEAD, openPrintWindow } from '../utils/printDocument'
+import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
 import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
 import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
@@ -413,7 +413,7 @@ export default function TimesheetsView() {
         return `<tr>
           <td>${format(new Date(e.punchIn), 'EEE, MMM d')}</td>
           <td>${job?.name || '—'}${job?.clientName ? `<br><span class="sub">${job.clientName}</span>` : ''}</td>
-          <td>${lt ? `<span class="badge" style="background:${lt.color}22;color:${lt.color}">${lt.name}</span>` : '—'}</td>
+          <td>${laborBadgeHTML(lt)}</td>
           <td class="mono">${formatTime(e.punchIn, settings.timeFormat)} – ${formatTime(e.punchOut, settings.timeFormat)}</td>
           <td class="right mono">${hrs}</td>
           ${e.notes ? `<td class="notes">${e.notes}</td>` : '<td></td>'}
@@ -437,7 +437,6 @@ ${PRINT_FONT_HEAD}
   .mono { font-family: 'Noto Sans Mono', monospace; font-size: 12px; }
   .sub { font-size: 11px; color: #888; }
   .notes { font-size: 11px; color: #666; font-style: italic; }
-  .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
   .empty { text-align: center; padding: 32px; color: #888; }
   @media print { @page { margin: 24mm 20mm; } body { padding: 0; } }
 </style></head><body>
