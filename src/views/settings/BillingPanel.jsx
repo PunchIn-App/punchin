@@ -6,6 +6,7 @@ import { Panel, SettingsRow, Toggle } from './components'
 
 const inputCls =
   'w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors'
+const labelCls = 'font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted'
 const selectClass =
   'bg-appInput border border-appBorder text-appText rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-appAccent/50'
 
@@ -16,7 +17,7 @@ function Field({ id, label, value, onChange, type = 'text', placeholder, multili
   const props = { id, value: value ?? '', onChange: e => onChange(e.target.value), placeholder, className: inputCls }
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">{label}</label>
+      <label htmlFor={id} className={labelCls}>{label}</label>
       {multiline ? <textarea rows={2} {...props} /> : <input type={type} {...props} />}
     </div>
   )
@@ -37,7 +38,7 @@ export default function BillingPanel({ onBack }) {
     <Panel title="Billing" onBack={onBack}>
       {/* Billed from — the invoice sender identity */}
       <div className="rounded-xl border border-appBorder bg-appCard p-4 space-y-3">
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Billed from</p>
+        <p className={labelCls}>Billed from</p>
         <p className="text-xs text-appTextMuted -mt-1">Appears on the invoice printout. All optional.</p>
 
         {/* Logo */}
@@ -108,11 +109,11 @@ export default function BillingPanel({ onBack }) {
         {settings.numberInvoices && (
           <div className="px-4 pb-4 pt-3 flex items-end gap-3 border-t border-appBorderLight">
             <div className="space-y-1 flex-1">
-              <label htmlFor="invoice-prefix" className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Prefix</label>
+              <label htmlFor="invoice-prefix" className={labelCls}>Prefix</label>
               <input id="invoice-prefix" value={settings.invoicePrefix ?? ''} onChange={e => updateSetting('invoicePrefix', e.target.value)} placeholder="PI-" className={inputCls} />
             </div>
             <div className="space-y-1 w-28">
-              <label htmlFor="invoice-next" className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Next number</label>
+              <label htmlFor="invoice-next" className={labelCls}>Next number</label>
               <input id="invoice-next" type="number" min="1" value={settings.nextInvoiceNumber ?? 1} onChange={e => updateSetting('nextInvoiceNumber', Number(e.target.value) || 1)} className={inputCls} />
             </div>
           </div>

@@ -15,7 +15,7 @@ import { formatDurationHM, formatTime, formatDate, getDayRange, getWeekRange, ge
 function StatTile({ label, value, className = '' }) {
   return (
     <div className={`rounded-xl border border-appBorder bg-appCard px-4 py-3 ${className}`}>
-      <p className="text-[10px] font-mono font-semibold text-appTextMuted uppercase tracking-widest">{label}</p>
+      <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted">{label}</p>
       <p className="font-mono text-2xl font-extrabold text-appText mt-1">{value}</p>
     </div>
   )
@@ -123,7 +123,7 @@ export default function TimerView() {
 
         {/* Active timers */}
         {active && active.length > 0 && (
-          <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2">Active · {active.length}</p>
+          <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-2">Active · {active.length}</p>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {active?.map(entry => (
@@ -144,7 +144,7 @@ export default function TimerView() {
           const duration = new Date(lastEntry.punchOut) - new Date(lastEntry.punchIn)
           return (
             <div className="mt-8 xl:hidden">
-              <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2">Last Session</p>
+              <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-2">Last Session</p>
               <div className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden opacity-70">
                 <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
                 <div className="pl-5 pr-4 py-3 flex items-center justify-between gap-3">

@@ -21,6 +21,8 @@ const PRESET_COLOR_OBJECTS = PRESET_COLORS.map(hex => ({ hex }))
 const JOB_PRESET_COLORS = ['#2D5BF5', '#0EA66B', '#8257E6', '#E8590C', '#D6336C']
 const JOB_PRESET_COLOR_OBJECTS = JOB_PRESET_COLORS.map(hex => ({ hex }))
 
+const labelCls = 'font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted'
+
 function JobForm({ job, laborTypes, onDone }) {
   const [name, setName]           = useState(job?.name || '')
   const [clientName, setClientName] = useState(job?.clientName || '')
@@ -79,7 +81,7 @@ function JobForm({ job, laborTypes, onDone }) {
       {/* Job colour — drives the card's left rail; falls back to the labor type's
           colour when unset (so existing jobs keep their derived colour). */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Color</p>
+        <p className={labelCls}>Color</p>
         <ColorPicker
           presets={JOB_PRESET_COLOR_OBJECTS}
           value={color}
@@ -165,7 +167,7 @@ function LaborTypeForm({ lt, onDone }) {
 
       {/* Glyph — so a type reads by shape, not colour alone */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Glyph</p>
+        <p className={labelCls}>Glyph</p>
         <GlyphPicker value={glyph} onChange={setGlyph} />
       </div>
 

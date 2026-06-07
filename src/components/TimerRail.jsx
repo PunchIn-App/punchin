@@ -10,7 +10,7 @@ import { formatDurationHM, formatTime, getWeekRange, isEntryInRange, getEntryDur
 
 function Overline({ children }) {
   return (
-    <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest mb-2">{children}</p>
+    <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-2">{children}</p>
   )
 }
 
