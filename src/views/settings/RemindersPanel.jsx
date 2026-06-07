@@ -125,6 +125,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                     value={settings.remindIdleDays}
                     onChange={days => setReminderDays('remindIdle', 'remindIdleDays', days)}
                     label="Days for the no-timer reminder"
+                    weekStartsMonday={settings.weekStartsMonday !== false}
                   />
                 </ReminderRow>
 
@@ -149,6 +150,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                     value={settings.remindStillRunningDays}
                     onChange={days => setReminderDays('remindStillRunning', 'remindStillRunningDays', days)}
                     label="Days for the still-running reminder"
+                    weekStartsMonday={settings.weekStartsMonday !== false}
                   />
                 </ReminderRow>
 
@@ -173,6 +175,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                     value={settings.remindTimesheetDailyDays}
                     onChange={days => setReminderDays('remindTimesheetDaily', 'remindTimesheetDailyDays', days)}
                     label="Days for the daily timesheet reminder"
+                    weekStartsMonday={settings.weekStartsMonday !== false}
                   />
                 </ReminderRow>
 
@@ -191,7 +194,8 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                       aria-label="Weekly timesheet reminder day"
                       className={reminderInputClass}
                     >
-                      {WEEKDAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                      {(settings.weekStartsMonday !== false ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6])
+                        .map(i => <option key={i} value={i}>{WEEKDAYS[i]}</option>)}
                     </select>
                   </label>
                   <label className="flex items-center gap-2 text-xs text-appTextMuted">

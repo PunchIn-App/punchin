@@ -277,8 +277,8 @@ export default function DataSyncPanel({ onBack }) {
       <DataTransfer />
       </PanelGroup>
 
-      {/* Danger Zone */}
-      <PanelGroup title="Danger Zone" danger>
+      {/* Danger Zone — collapsed by default so destructive actions aren't a mis-tap away */}
+      <PanelGroup title="Danger Zone" danger collapsible defaultCollapsed>
       <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
         {/* Clear entries */}
         <button onClick={() => setShowClearConfirm(true)}

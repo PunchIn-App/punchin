@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 
 // Shared Settings primitives, extracted from the SettingsView monolith so each
 // panel can compose them (issue #144).
@@ -61,15 +62,19 @@ export function ReminderRow({ icon: Icon, title, subtitle, enabled, onToggle, ch
 // Seven toggle chips (Sun–Sat) letting a time-of-day reminder fire only on the
 // chosen weekdays. `value` is an array of weekday numbers (0=Sun … 6=Sat);
 // undefined is treated as every day so pre-existing reminders are unaffected.
-export function WeekdayPicker({ value, onChange, label }) {
+// `weekStartsMonday` rotates the DISPLAY order only (Mon-first); the stored
+// values stay absolute weekday indices (0=Sun … 6=Sat), so reminder day arrays
+// are unaffected by the display preference.
+export function WeekdayPicker({ value, onChange, label, weekStartsMonday }) {
   const days = Array.isArray(value) ? value : ALL_DAYS
+  const order = weekStartsMonday ? [1, 2, 3, 4, 5, 6, 0] : ALL_DAYS
   const toggle = (d) => {
     const next = days.includes(d) ? days.filter(x => x !== d) : [...days, d].sort((a, b) => a - b)
     onChange(next)
   }
   return (
     <div role="group" aria-label={label} className="flex items-center gap-1">
-      {WEEKDAY_INITIALS.map((initial, d) => {
+      {order.map((d) => {
         const on = days.includes(d)
         return (
           <button
@@ -81,7 +86,7 @@ export function WeekdayPicker({ value, onChange, label }) {
             className={`w-7 h-7 rounded-full text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-appAccent/50
               ${on ? 'bg-appAccent text-appOnAccent' : 'bg-appBg text-appText border border-appBorder hover:bg-appInput'}`}
           >
-            {initial}
+            {WEEKDAY_INITIALS[d]}
           </button>
         )
       })}
@@ -138,11 +143,29 @@ export function Panel({ title, onBack, children }) {
 
 // A labelled group within a sub-page (used inside Data &amp; Sync to keep
 // Backup / Sync / Transfer / Danger Zone visually distinct).
-export function PanelGroup({ title, danger, children }) {
+export function PanelGroup({ title, danger, children, collapsible, defaultCollapsed }) {
+  const [collapsed, setCollapsed] = useState(!!defaultCollapsed)
+  const titleCls = `text-xs font-semibold uppercase tracking-wide ${danger ? 'text-red-400' : 'text-appTextMuted'}`
+  if (!collapsible) {
+    return (
+      <div>
+        <h3 className={`${titleCls} px-1 mb-2`}>{title}</h3>
+        {children}
+      </div>
+    )
+  }
   return (
     <div>
-      <h3 className={`text-xs font-semibold uppercase tracking-wide px-1 mb-2 ${danger ? 'text-red-400' : 'text-appTextMuted'}`}>{title}</h3>
-      {children}
+      <button
+        type="button"
+        onClick={() => setCollapsed(c => !c)}
+        aria-expanded={!collapsed}
+        className={`${titleCls} flex items-center gap-1 px-1 mb-2 hover:opacity-80 transition-opacity`}
+      >
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${collapsed ? '-rotate-90' : ''}`} aria-hidden="true" />
+        {title}
+      </button>
+      {!collapsed && children}
     </div>
   )
 }

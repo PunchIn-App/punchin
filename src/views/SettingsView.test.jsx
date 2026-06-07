@@ -5,8 +5,15 @@ import SettingsView from './SettingsView'
 // per category, and tapping a row reveals that category's sub-page. Each row's
 // accessible name is its title followed by a subtitle, so match on the leading
 // title. Backup / Sync / Transfer / Danger Zone all live inside "Data & Sync".
-const expand = (title) =>
+const expand = (title) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${title}`, 'i') }))
+  // The Danger Zone inside Data & Sync is collapsed by default; open it so its
+  // destructive rows are reachable in these tests.
+  if (/data & sync/i.test(title)) {
+    const dz = screen.queryByRole('button', { name: /^danger zone/i })
+    if (dz) fireEvent.click(dz)
+  }
+}
 
 const mockUpdateSetting       = vi.fn()
 const mockDbJobsToArray       = vi.fn().mockResolvedValue([])
