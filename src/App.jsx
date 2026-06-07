@@ -145,6 +145,12 @@ export default function App() {
   // a long session (issue #80). Modals manage their own {modal:true} entries on
   // top of these and pop themselves, which composes cleanly with this scheme.
   const hasPushedRef = useRef(false)
+  // When we leave a drilled-in Settings sub-panel for another tab we can't just
+  // replaceState — that would swap the panel entry but strand the {piView:'settings'}
+  // entry beneath it, so the next Back would resurface Settings. Instead we unwind
+  // the panel entry with history.back() and finish the tab swap once popstate lands;
+  // this ref carries the pending target view across that async hop.
+  const pendingNavRef = useRef(null)
   const navigate = useCallback((view) => {
     if (view === activeViewRef.current) {
       // Re-tapping the already-active tab lets a view reset its own internal
@@ -165,6 +171,15 @@ export default function App() {
         return
       }
     } else if (hasPushedRef.current) {
+      if (history.state?.settingsPanel) {
+        // We're sitting on a Settings sub-panel entry. Unwind it first so the
+        // stale {piView:'settings'} entry beneath doesn't survive the swap and
+        // get the user thrown back to Settings on the next Back. popstate (below)
+        // completes the swap onto the target tab.
+        pendingNavRef.current = view
+        history.back()
+        return
+      }
       // Already on the pushed entry: swap views in place, don't grow the stack.
       history.replaceState({ piView: view }, '')
     } else {
@@ -180,6 +195,17 @@ export default function App() {
       history.replaceState({ piView: DEFAULT_VIEW }, '')
     }
     const onPop = (e) => {
+      if (pendingNavRef.current) {
+        // This popstate is the unwind we triggered when leaving a Settings panel
+        // for another tab. Land the swap on the target tab in place of the entry
+        // we just backed onto, regardless of what state it carried.
+        const target = pendingNavRef.current
+        pendingNavRef.current = null
+        history.replaceState({ piView: target }, '')
+        setActiveView(target)
+        hasPushedRef.current = target !== DEFAULT_VIEW
+        return
+      }
       const view = e.state?.piView
       if (view) {
         setActiveView(view)

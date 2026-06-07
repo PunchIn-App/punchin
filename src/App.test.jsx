@@ -240,6 +240,26 @@ describe('App — back-button navigation (#65)', () => {
     fireEvent.click(screen.getByText('go-timer'))
     expect(goSpy).toHaveBeenCalledWith(-2)
   })
+
+  it('does not resurface Settings on Back after switching tabs from a drilled-in Settings panel', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('go-settings'))
+    // Drill into a sub-panel — SettingsView pushes a {settingsPanel} entry on top
+    // of our {piView:'settings'} tab entry.
+    act(() => history.pushState({ settingsPanel: 'billing' }, ''))
+    // Switch to another tab from inside the panel. A bare replaceState here would
+    // swap the panel entry but leave {piView:'settings'} beneath it, so the next
+    // Back would throw the user to Settings. The fix unwinds the panel entry first.
+    fireEvent.click(screen.getByText('go-jobs'))
+    // The browser performs the pending Back unwind, firing popstate. (Its state is
+    // the {piView:'settings'} entry that used to sit beneath the panel.)
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { piView: 'settings' } }))
+    })
+    // We end up on Jobs — NOT thrown back to Settings.
+    expect(screen.getByText('JobsView')).toBeInTheDocument()
+    expect(screen.queryByText('SettingsView')).not.toBeInTheDocument()
+  })
 })
 
 describe('App — OAuth callback handling', () => {
