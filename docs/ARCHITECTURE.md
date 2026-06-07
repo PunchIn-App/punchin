@@ -59,11 +59,12 @@ punchin/
 │   │       └── onedrive.js     # Microsoft Graph API: buildOneDriveOAuthUrl (Auth Code + PKCE, AppFolder scope, issue #128) + exchangeOneDriveCode (client-side token exchange, token never in URL), pushToOneDrive, pullFromOneDrive
 │   ├── index.css           # CSS variables (dark/light), scrollbar utils
 │   ├── accentPresets.js    # Single source of truth for the accent presets (the AppearancePanel swatches) + accentIconKey(); shared by the settings UI, installIcon.js, and iconPalette.js (issue #228)
-│   ├── iconSvg.js          # The brand mark as an SVG string (Clock on a rounded accent square). Single source of truth for the mark, shared by scripts/icons.mjs (build) and worker/iconRender.js (on-demand render) (issue #228)
+│   ├── iconSvg.js          # The brand mark as an SVG string (stopwatch glyph on a rounded accent square; glyph tinted white/dark-ink via utils/inkOnAccent for contrast). Single source of truth for the mark, shared by scripts/icons.mjs (build) and worker/iconRender.js (on-demand render) (issue #228)
 │   ├── iconPalette.js      # The pre-rendered install-icon "crayon box": ~65 swatches (presets + an HSL grid) and nearestPaletteKey(). Shared by scripts/icons.mjs (renders the sets) and worker/oauth.js (nearest-swatch fallback when the on-demand render fails) (issue #228)
 │   ├── db.js               # Dexie schema, seed data, migrations; exports DEFAULT_SETTINGS + defaultSettingsRows() (single source of truth for default settings, consumed by populate + factoryReset, issue #131)
 │   ├── components/
 │   │   ├── Layout.jsx          # Fixed header (logo taps → timer) + bottom nav shell; shows update badge on Settings icon
+│   │   ├── BrandMark.jsx       # Shared brand identity: PunchMark (stopwatch glyph on the accent tile, ink via inkOnAccent) + Wordmark ("PunchIn", capital I tinted with the accent); used by Layout (and the desktop sidebar)
 │   │   ├── ErrorBoundary.jsx   # Class component; wraps each view in App.jsx
 │   │   ├── TimerCard.jsx       # Live running timer card (1s interval)
 │   │   ├── StartTimerModal.jsx # Punch-in form modal; auto-punches-out running timers when concurrent timers is off
@@ -95,7 +96,8 @@ punchin/
 │       ├── time.js             # Date/time helpers (format, range, sum)
 │       ├── backup.js           # exportBackup() (full JSON) + exportCsv() (completed entries) — data plumbing kept out of the settings view (issue #144)
 │       ├── issueUrl.js         # buildBugReportUrl + buildFeatureRequestUrl (GitHub new-issue links) + userAgent sniffing for the bug template (issue #146)
-│       ├── favicon.js          # Renders the brand mark in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon). drawFaviconDataUrl is reused by installIcon.js for the iOS apple-touch-icon
+│       ├── favicon.js          # Renders the brand mark (stopwatch, canvas port of iconSvg.js; ink via inkOnAccent) in the current accent color to a canvas PNG and installs it as the browser-tab favicon (updateFavicon). drawFaviconDataUrl is reused by installIcon.js for the iOS apple-touch-icon
+│       ├── inkOnAccent.js      # readableInk(hex) — picks white or dark ink (#0F1117) for the mark glyph so it stays legible on any accent (WCAG 3:1 graphic-contrast guard). Pure JS, shared by iconSvg.js, favicon.js, BrandMark.jsx (and mirrored in scripts/social-preview.py)
 │       ├── installIcon.js      # Points the install/home-screen icon at the chosen accent before install (issue #228): exact data-URL apple-touch-icon for iOS; <link rel="manifest"> pointed at a preset's pre-rendered static set (/icons/<key>/) or, for a custom colour, the worker's exact on-demand render (/icons/i/<hex>/). Called from App.jsx's accent effect
 │       ├── notifications.js    # Browser Notification API wrappers: notificationsSupported, notificationPermission, requestNotificationPermission, showNotification (prefers the SW registration, falls back to the Notification constructor)
 │       ├── reminders.js        # Pure evaluateReminders({now, settings, activeEntries, jobs, state}) → {fire, state}; the testable reminder rules (long-running timer, idle, still-running, daily/weekly timesheet) + parseHHMM/dayKey helpers

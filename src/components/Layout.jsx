@@ -4,6 +4,8 @@ import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 import { hasWaitingUpdate } from '../utils/pwa'
+import { PunchMark, Wordmark } from './BrandMark'
+import { DEFAULT_ACCENT } from '../accentPresets'
 
 const NAV = [
   { id: 'timer',      label: 'Timer',     Icon: Clock      },
@@ -30,6 +32,7 @@ export default function Layout({ activeView, onNavigate, children }) {
 
   const hapticsOn = isStandalone && settings.hapticFeedback !== false
   const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
+  const accentColor = settings.accentColor || DEFAULT_ACCENT
 
   // Fire the tap haptic synchronously in the click handler (iOS needs the
   // gesture context) before delegating to the parent's navigation.
@@ -63,10 +66,8 @@ export default function Layout({ activeView, onNavigate, children }) {
           aria-label="PunchIn — go to Timer"
           className="flex items-center gap-2 rounded-lg transition-opacity active:opacity-70"
         >
-          <div className="w-7 h-7 rounded-lg bg-appAccent flex items-center justify-center" aria-hidden="true">
-            <Clock className="w-4 h-4 text-[#0F1117]" strokeWidth={2.5} />
-          </div>
-          <span className="font-display font-bold text-appText tracking-tight text-xl" aria-hidden="true">PunchIn</span>
+          <PunchMark accent={accentColor} />
+          <Wordmark className="text-xl" />
         </button>
         <span className="font-mono text-[10px] text-appTextMuted select-none">v{__APP_VERSION__}</span>
       </header>
