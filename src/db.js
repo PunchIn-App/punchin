@@ -195,6 +195,7 @@ export const DEFAULT_SETTINGS = {
   billingAddress: '',
   billingPaymentTerms: '',
   billingNotes: '',
+  billingLogo: '',         // optional business logo (downscaled PNG data URL) for the invoice band
   numberInvoices: false,
   invoicePrefix: '',
   nextInvoiceNumber: 1,

@@ -46,6 +46,11 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   const currency = settings.defaultCurrency
   const money = (n) => formatMoney(n, currency)
 
+  // Editable invoice number: defaults to the next number, but the user can
+  // override it (manual / per-client / reset). Generation advances the counter.
+  const [numOverride, setNumOverride] = useState(null)
+  const invoiceNum = numOverride ?? (settings.nextInvoiceNumber ?? 1)
+
   const uid      = useId()
   const titleId  = `${uid}-title`
   const jobSelId = `${uid}-job`
@@ -153,11 +158,13 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     // invoice number (display-only). Escape the free-text billing fields.
     const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
     const fromLines = [settings.billingBusiness, settings.billingEmail, settings.billingPhone, settings.billingAddress].filter(Boolean)
-    const hasFrom = settings.billingName || fromLines.length
-    const invNo = settings.numberInvoices ? `${settings.invoicePrefix || ''}${settings.nextInvoiceNumber ?? 1}` : ''
+    const logo = (settings.billingLogo || '').startsWith('data:image/') ? settings.billingLogo : ''
+    const hasFrom = settings.billingName || fromLines.length || logo
+    const invNo = settings.numberInvoices ? `${settings.invoicePrefix || ''}${String(invoiceNum).padStart(3, '0')}` : ''
     const bandHtml = hasFrom ? `
 <div class="band">
   <div class="party">
+    ${logo ? `<img class="logo" src="${logo}" alt="">` : ''}
     <div class="cap">Billed from</div>
     ${settings.billingName ? `<div class="pname">${esc(settings.billingName)}</div>` : ''}
     ${fromLines.map(l => `<div class="pline">${esc(l).replace(/\n/g, '<br>')}</div>`).join('')}
@@ -196,6 +203,7 @@ ${PRINT_FONT_HEAD}
   .party .cap { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
   .party .pname { font-weight: 700; font-size: 13px; }
   .party .pline { color: #555; font-size: 12px; margin-top: 1px; }
+  .party .logo { max-height: 52px; max-width: 200px; margin-bottom: 8px; display: block; }
   .party.to { text-align: right; }
   @media print { @page { margin: 24mm 20mm; } body { padding: 0; } }
 </style></head><body>
@@ -233,7 +241,8 @@ ${bandHtml}
       // the next number. Only on a successful open (a blocked popup won't burn a
       // number); re-generating the same invoice intentionally takes a new number.
       if (settings.numberInvoices) {
-        updateSetting('nextInvoiceNumber', (settings.nextInvoiceNumber ?? 1) + 1)
+        updateSetting('nextInvoiceNumber', invoiceNum + 1)
+        setNumOverride(null) // next time, show the new auto number
       }
     } else {
       alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use Export CSV instead.')
@@ -299,6 +308,27 @@ ${bandHtml}
               ))}
             </select>
           </div>
+
+          {/* Invoice number — editable; defaults to the next number */}
+          {settings.numberInvoices && (
+            <div>
+              <label htmlFor={`${uid}-invno`} className="block text-xs text-appTextMuted mb-1.5">Invoice number</label>
+              <div className="flex items-center">
+                {settings.invoicePrefix && (
+                  <span className="px-3 py-2 text-sm font-mono rounded-l-lg border border-r-0 border-appBorder bg-appInput text-appTextMuted select-none">{settings.invoicePrefix}</span>
+                )}
+                <input
+                  id={`${uid}-invno`}
+                  type="number"
+                  min="1"
+                  value={invoiceNum}
+                  onChange={e => setNumOverride(Math.max(1, Number(e.target.value) || 1))}
+                  className={`w-28 font-mono ${inputCls} ${settings.invoicePrefix ? 'rounded-l-none' : ''}`}
+                />
+              </div>
+              <p className="text-[11px] text-appTextMuted mt-1">Edit for a manual or per-client number; advances after you generate the invoice.</p>
+            </div>
+          )}
 
           {/* Date range presets */}
           <div>

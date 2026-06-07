@@ -1,5 +1,7 @@
-import { DollarSign, Hash } from 'lucide-react'
+import { useRef } from 'react'
+import { DollarSign, Hash, Image as ImageIcon } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
+import { fileToLogoDataUrl } from '../../utils/image'
 import { Panel, SettingsRow, Toggle } from './components'
 
 const inputCls =
@@ -23,6 +25,13 @@ function Field({ id, label, value, onChange, type = 'text', placeholder, multili
 export default function BillingPanel({ onBack }) {
   const { settings, updateSetting } = useSettings()
   const set = k => v => updateSetting(k, v)
+  const logoInputRef = useRef(null)
+
+  const onLogoFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file
+    if (file) updateSetting('billingLogo', await fileToLogoDataUrl(file))
+  }
 
   return (
     <Panel title="Billing" onBack={onBack}>
@@ -30,6 +39,30 @@ export default function BillingPanel({ onBack }) {
       <div className="rounded-xl border border-appBorder bg-appCard p-4 space-y-3">
         <p className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Billed from</p>
         <p className="text-xs text-appTextMuted -mt-1">Appears on the invoice printout. All optional.</p>
+
+        {/* Logo */}
+        <div className="flex items-center gap-3">
+          {settings.billingLogo ? (
+            <img src={settings.billingLogo} alt="Business logo" className="w-14 h-14 rounded-lg object-contain bg-appBg border border-appBorder flex-shrink-0" />
+          ) : (
+            <div className="w-14 h-14 rounded-lg border border-dashed border-appBorder grid place-items-center text-appTextMuted flex-shrink-0">
+              <ImageIcon className="w-5 h-5" aria-hidden="true" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-appText">Logo</p>
+            <div className="flex gap-3 mt-1">
+              <button type="button" onClick={() => logoInputRef.current?.click()} className="text-xs text-appAccent hover:underline">
+                {settings.billingLogo ? 'Replace' : 'Upload'}
+              </button>
+              {settings.billingLogo && (
+                <button type="button" onClick={() => updateSetting('billingLogo', '')} className="text-xs text-appTextMuted hover:text-red-400 transition-colors">Remove</button>
+              )}
+            </div>
+          </div>
+          <input ref={logoInputRef} type="file" accept="image/*" className="sr-only" aria-label="Upload business logo" onChange={onLogoFile} />
+        </div>
+
         <Field id="billing-name"     label="Your name"     value={settings.billingName}         onChange={set('billingName')}         placeholder="Jane Doe" />
         <Field id="billing-business" label="Business"      value={settings.billingBusiness}     onChange={set('billingBusiness')}     placeholder="Optional" />
         <Field id="billing-email"    label="Email"   type="email" value={settings.billingEmail} onChange={set('billingEmail')}        placeholder="you@example.com" />

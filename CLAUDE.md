@@ -198,6 +198,7 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | `billingAddress` | string | `""` — Billing profile: address (multi-line) |
 | `billingPaymentTerms` | string | `""` — Billing profile: payment terms |
 | `billingNotes` | string | `""` — Billing profile: notes / payment instructions |
+| `billingLogo` | string | `""` — Billing profile: optional business logo as a downscaled PNG data URL (`utils/image.js`); rendered in the invoice "Billed from" band |
 | `numberInvoices` | boolean | `false` — print an invoice number (advances `nextInvoiceNumber` each time an invoice print is generated) |
 | `invoicePrefix` | string | `""` — prefix prepended to the invoice number (e.g. `PI-`) |
 | `nextInvoiceNumber` | number | `1` — the next invoice number; printed when `numberInvoices` is on and **auto-incremented when an invoice print is generated** (a blocked popup doesn't burn a number) |

@@ -106,6 +106,7 @@ punchin/
 │       ├── transfer.js         # Device-to-device transfer codec (issue #77): encodeSnapshot/decodeSnapshot (gzip via CompressionStream + base64url, 'g'/'r' flag), buildShareUrl, parseImportCode, parseImportFromHash
 │       ├── deviceId.js         # Stable per-device identifier: getDeviceId() generates an 8-char hex ID on first call and persists it in localStorage (pi.deviceId); survives factory resets intentionally
 │       ├── format.js           # Money formatting: formatMoney(amount, currency) + currencySymbol() via Intl.NumberFormat, guarded against an invalid/empty currency code. Used by invoices/CSV
+│       ├── image.js            # fileToLogoDataUrl(file, maxDim) — reads an uploaded image and returns a downscaled PNG data URL (canvas), so a business logo can live inline in settings; falls back to the raw data URL where canvas is unavailable. Used by BillingPanel
 │       ├── printDocument.js    # Shared print/PDF helpers: PRINT_FONT_HEAD (loads the Noto brand webfonts into a print popup) + openPrintWindow() (writes the doc and prints once document.fonts is ready, falling back to a short delay; returns false when the popup is blocked). Used by InvoiceModal + TimesheetsView so printouts render in the brand font
 │       └── pwa.js              # PWA state bridge: beforeinstallprompt capture, update notification, applyUpdate(), hasWaitingUpdate() (detects an already-downloaded SW waiting to activate)
 ```

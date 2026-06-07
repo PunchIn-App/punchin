@@ -277,7 +277,33 @@ describe('InvoiceModal — export and print', () => {
     expect(html).toContain('Billed from')
     expect(html).toContain('Jane Doe')
     expect(html).toContain('Billed to')
-    expect(html).toContain('PI-7') // prefix + nextInvoiceNumber
+    expect(html).toContain('PI-007') // prefix + zero-padded nextInvoiceNumber
+  })
+
+  it('renders the business logo in the print band when set', async () => {
+    mockSettings = { weekStartsMonday: true, billingName: 'Jane Doe', billingLogo: 'data:image/png;base64,LOGO123' }
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = fakeWin.document.write.mock.calls[0][0]
+    expect(html).toContain('data:image/png;base64,LOGO123')
+  })
+
+  it('lets the user override the invoice number; the printout + counter follow it', async () => {
+    mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+    renderModal()
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.change(screen.getByLabelText('Invoice number'), { target: { value: '50' } })
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = fakeWin.document.write.mock.calls[0][0]
+    expect(html).toContain('PI-050')                                    // printed number follows the edit
+    expect(mockUpdateSetting).toHaveBeenCalledWith('nextInvoiceNumber', 51) // counter advances to edited + 1
   })
 
   it('advances nextInvoiceNumber when a numbered invoice is generated', async () => {

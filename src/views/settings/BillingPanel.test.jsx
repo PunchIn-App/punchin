@@ -35,3 +35,18 @@ it('toggling "Number invoices" updates the setting', () => {
   fireEvent.click(screen.getByRole('switch', { name: /number invoices/i }))
   expect(h.updateSetting).toHaveBeenCalledWith('numberInvoices', true)
 })
+
+it('shows the logo preview + Remove when a logo is set, and clears it on Remove', () => {
+  h.settings = { numberInvoices: false, billingLogo: 'data:image/png;base64,LOGO' }
+  render(<BillingPanel onBack={vi.fn()} />)
+  expect(screen.getByAltText('Business logo')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+  expect(h.updateSetting).toHaveBeenCalledWith('billingLogo', '')
+})
+
+it('shows Upload (no preview) when no logo is set', () => {
+  h.settings = { numberInvoices: false }
+  render(<BillingPanel onBack={vi.fn()} />)
+  expect(screen.queryByAltText('Business logo')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument()
+})
