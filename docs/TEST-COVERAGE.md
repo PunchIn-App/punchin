@@ -34,6 +34,7 @@
 | `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap, device-Back (popstate) dismiss |
 | `src/components/LicenseModal.test.jsx` | Dialog a11y, default app-license (BUSL) tab, switch to third-party (aria-pressed), close button/Escape/backdrop, device-Back (popstate) dismiss |
 | `src/components/InstallPromptModal.test.jsx` | All three modes (native / ios-safari / ios-other), dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
+| `src/components/FirstRunImport.test.jsx` | Renders the carry-over prompt; import/sync/dismiss actions; valid-backup import → importSnapshot + dismiss; invalid file → alert, no import |
 | `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
 | `src/components/GlyphPicker.test.jsx` | Quick-pick row + "more" button, `onChange` on pick, `aria-checked` selection, search-chosen glyph stays visible, search filter + select, empty-state |
 | `src/components/EntitySelect.test.jsx` | Placeholder + visible label, selected label/sublabel on trigger, opens listbox, `onChange` with string value + close, `aria-selected`, glyph rendering, configurable empty/clear row, filter-style empty label, capture-Escape without bubbling, absent-value fallback |

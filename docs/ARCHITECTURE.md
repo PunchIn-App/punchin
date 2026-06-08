@@ -46,7 +46,7 @@ punchin/
 │       └── desktop-light/  # 1920×1080 @1× · light theme — 7 views
 ├── src/
 │   ├── main.jsx            # React entry point; registers service worker and PWA install prompt listener
-│   ├── App.jsx             # Root: tab state, theme application, accent → CSS var + dynamic favicon, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated)
+│   ├── App.jsx             # Root: tab state, theme application, accent → CSS var + dynamic favicon, OAuth callback handling (reads window.location.hash on mount), first-run install nudge (after ≥2 opens, localStorage-gated), and the first-run import nudge (FirstRunImport, shown once when the install has no data yet)
 │   ├── sync/
 │   │   ├── config.js           # Reads VITE_GITHUB_CLIENT_ID, VITE_GOOGLE_CLIENT_ID, VITE_ONEDRIVE_CLIENT_ID from build env
 │   │   ├── oauthState.js       # OAuth CSRF protection (issue #125): createOAuthState (mint+store a nonce in sessionStorage), consumeOAuthState (verify the returned nonce, fail closed). The nonce is embedded in the OAuth `state` and checked in App.jsx's callback handler
@@ -79,7 +79,8 @@ punchin/
 │   │   ├── ChangelogModal.jsx  # Parses docs/CHANGELOG.md (?raw import) at build time; renders version sections with dates + bullets; centered reading-modal — closes on device Back (pushes {modal:true} history entry)
 │   │   ├── LicenseModal.jsx     # Centered reading-modal showing the app license (LICENSE ?raw, BUSL-1.1) and third-party attributions (docs/THIRD-PARTY-LICENSES.md ?raw, rendered via a small built-in markdown renderer); two-way section switch via aria-pressed buttons; closes on device Back
 │   │   ├── DataTransfer.jsx     # Account-free device-to-device transfer (issue #77): "Create share link" snapshots the DB → compressed #import= link + QR (qrcode-generator); "Import from a link" pastes a link/code and merges via importSnapshot
-│   │   └── InstallPromptModal.jsx # First-run install bottom sheet; mode = 'native' (Chrome/Edge one-tap), 'ios-safari' (Share→Add-to-Home-Screen), or 'ios-other' (open-in-Safari guidance for Chrome/Firefox on iOS)
+│   │   ├── InstallPromptModal.jsx # First-run install bottom sheet; mode = 'native' (Chrome/Edge one-tap), 'ios-safari' (Share→Add-to-Home-Screen), or 'ios-other' (open-in-Safari guidance for Chrome/Firefox on iOS)
+│   │   └── FirstRunImport.jsx # First-run carry-over nudge on an empty install (an installed PWA gets a separate data store): restore a backup (brings preferences too, via importSnapshot) or connect cloud sync. One-shot, localStorage-gated (pi.firstRunImportDismissed); surfaced by App.jsx when jobs+entries+laborTypes are all empty
 │   ├── views/
 │   │   ├── TimerView.jsx       # Active timers list; shows last completed entry when idle; on xl+ renders the TimerRail beside it
 │   │   ├── JobsView.jsx        # Jobs & labor types CRUD; per-labor-type hourly rates on jobs

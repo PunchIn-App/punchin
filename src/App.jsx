@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import Layout from './components/Layout'
 import ErrorBoundary  from './components/ErrorBoundary'
 import InstallPromptModal from './components/InstallPromptModal'
+import FirstRunImport from './components/FirstRunImport'
 import ConfirmModal from './components/ConfirmModal'
 import TimerView      from './views/TimerView'
 import JobsView       from './views/JobsView'
@@ -31,6 +32,7 @@ import { db } from './db'
 // localStorage keys for the first-run install nudge. Kept out of the Dexie
 // data model so a factory reset doesn't wipe (or re-trigger) them.
 const INSTALL_DISMISSED_KEY = 'pi.installNudgeDismissed'
+const FIRSTRUN_DISMISSED_KEY = 'pi.firstRunImportDismissed'
 const OPEN_COUNT_KEY        = 'pi.opens'
 // Show the nudge once the user has opened the app at least this many times —
 // after they've seen some value, which converts far better than a cold first paint.
@@ -452,6 +454,29 @@ export default function App() {
     dismissInstall()
   }
 
+  // --- First-run import nudge --------------------------------------------
+  // An installed PWA / fresh browser gets a clean data store, so a returning
+  // user lands on an empty app. If there's no data yet (and they haven't
+  // dismissed), offer to restore a backup or connect cloud sync. One-shot check
+  // on mount; guarded so a stubbed db (tests) never throws.
+  const [showFirstRun, setShowFirstRun] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        if (localStorage.getItem(FIRSTRUN_DISMISSED_KEY)) return
+        const [j, e, l] = await Promise.all([db.jobs.count(), db.entries.count(), db.laborTypes.count()])
+        if (!cancelled && j === 0 && e === 0 && l === 0) setShowFirstRun(true)
+      } catch { /* storage/db unavailable — skip the nudge gracefully */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const dismissFirstRun = () => {
+    try { localStorage.setItem(FIRSTRUN_DISMISSED_KEY, '1') } catch { /* ignore */ }
+    setShowFirstRun(false)
+  }
+
   const views = {
     timer:      <TimerView />,
     jobs:       <JobsView />,
@@ -476,6 +501,12 @@ export default function App() {
           mode={installMode}
           onInstall={handleInstall}
           onClose={dismissInstall}
+        />
+      )}
+      {showFirstRun && (
+        <FirstRunImport
+          onDismiss={dismissFirstRun}
+          onConnectSync={() => { navigate('settings'); dismissFirstRun() }}
         />
       )}
       {importPrompt && (
