@@ -176,7 +176,7 @@ export default function AnalyticsView() {
       </div>
 
       {/* Hours by job + Labor type — side by side on desktop */}
-      {(jobData.length > 0 || ltData.length > 1) && (
+      {(jobData.length > 0 || ltData.length > 0) && (
         <div className="flex flex-col lg:flex-row gap-4">
           {jobData.length > 0 && (
             <div className="flex-1 min-w-0 rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
@@ -212,7 +212,7 @@ export default function AnalyticsView() {
             </div>
           )}
 
-          {ltData.length > 1 && (
+          {ltData.length > 0 && (
             <div className="lg:w-72 flex-shrink-0 rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
               <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-4" id="lt-chart-label">By labor type</p>
               <div className="flex items-center gap-5">
