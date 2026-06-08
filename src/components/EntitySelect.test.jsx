@@ -77,6 +77,20 @@ describe('EntitySelect', () => {
     expect(opt.querySelector('span.rounded-full')).toBeTruthy()  // a colour dot
   })
 
+  it('plain mode renders neither a dot nor a glyph (settings value lists)', () => {
+    // Settings selects (time format, currency, rounding, weekday) carry no
+    // colour/glyph identity, so `plain` suppresses the leading visual and the
+    // control reads as a normal dropdown — just label + chevron.
+    const OPTS = [{ value: 'auto', label: 'Auto (match device)' }, { value: '12h', label: '12-hour' }]
+    render(<EntitySelect plain label="Time format" value="auto" onChange={() => {}} options={OPTS} />)
+    const trigger = screen.getByRole('button', { name: /time format/i })
+    expect(trigger.querySelector('span.rounded-full')).toBeFalsy()  // no colour dot
+    fireEvent.click(trigger)
+    const opt = screen.getByRole('option', { name: '12-hour' })
+    expect(opt.querySelector('svg')).toBeFalsy()                    // no glyph
+    expect(opt.querySelector('span.rounded-full')).toBeFalsy()      // no dot
+  })
+
   it('renders a configurable empty/clear row and selects it with value ""', () => {
     const onChange = vi.fn()
     render(<EntitySelect label="Job" value="1" onChange={onChange} options={JOB_OPTS} emptyOption={{ label: 'All Jobs' }} />)

@@ -16,7 +16,8 @@ it('edits a billing-profile field', () => {
 
 it('changes the default currency', () => {
   render(<BillingPanel onBack={vi.fn()} />)
-  fireEvent.change(screen.getByLabelText('Default currency'), { target: { value: 'EUR' } })
+  fireEvent.click(screen.getByRole('button', { name: /default currency/i }))
+  fireEvent.click(screen.getByRole('option', { name: 'EUR' }))
   expect(h.updateSetting).toHaveBeenCalledWith('defaultCurrency', 'EUR')
 })
 

@@ -56,6 +56,9 @@ export default function EntitySelect({
   hideLabel = false,  // keep `label` as the accessible name but hide the overline
   buttonClassName = '',
   compact = false,    // toolbar-chip trigger (the floating menu is the same in both modes)
+  plain = false,      // plain value list (no colour/glyph identity) — suppress the
+                      // leading dot/glyph so it reads as a normal dropdown. Use for
+                      // settings selects (time format, currency, rounding, weekday).
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState(null)   // { left, width, top? , bottom? } in viewport coords
@@ -151,7 +154,7 @@ export default function EntitySelect({
           ${compact ? 'px-2.5 py-2 rounded-lg text-xs bg-appCard' : 'px-4 py-3 rounded-xl text-[15px] bg-appBg'}
           ${open ? 'border-appAccent ring-2 ring-appAccent/20' : 'border-appBorder hover:border-appAccent/40'} ${buttonClassName}`}
       >
-        <OptionVisual opt={selected} small={compact} />
+        {!plain && <OptionVisual opt={selected} small={compact} />}
         {display ? (
           <>
             <span className={`${compact ? 'text-xs' : 'text-[15px]'} truncate ${selected ? 'font-bold text-appText' : 'text-appTextMuted'}`}>{display}</span>
@@ -184,7 +187,7 @@ export default function EntitySelect({
               onClick={() => pick('')}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-appInput transition-colors"
             >
-              <span className="w-2 h-2 rounded-full flex-shrink-0 bg-appTextDisabled" aria-hidden="true" />
+              {!plain && <span className="w-2 h-2 rounded-full flex-shrink-0 bg-appTextDisabled" aria-hidden="true" />}
               <span className="text-sm text-appTextMuted truncate">{emptyOption.label}</span>
               {isEmpty && <Check className="w-4 h-4 ml-auto flex-shrink-0 text-appAccent" aria-hidden="true" />}
             </button>
@@ -200,7 +203,7 @@ export default function EntitySelect({
                 onClick={() => pick(String(o.value))}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-appInput transition-colors"
               >
-                <OptionVisual opt={o} />
+                {!plain && <OptionVisual opt={o} />}
                 <span className="text-sm font-bold text-appText truncate">{o.label}</span>
                 {o.sublabel && <span className="text-xs text-appTextMuted truncate">{o.sublabel}</span>}
                 {sel && <Check className="w-4 h-4 ml-auto flex-shrink-0 text-appAccent" aria-hidden="true" />}

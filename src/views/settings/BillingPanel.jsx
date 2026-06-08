@@ -2,16 +2,16 @@ import { useRef } from 'react'
 import { DollarSign, Hash, Image as ImageIcon } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { fileToLogoDataUrl } from '../../utils/image'
+import EntitySelect from '../../components/EntitySelect'
 import { Panel, SettingsRow, Toggle } from './components'
 
 const inputCls =
   'w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors'
 const labelCls = 'font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted'
-const selectClass =
-  'bg-appInput border border-appBorder text-appText rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-appAccent/50'
 
 // A reasonable shortlist; users can also store any ISO 4217 code another way.
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'INR', 'BRL', 'MXN', 'SEK', 'NZD', 'ZAR', 'SGD']
+const CURRENCY_OPTIONS = CURRENCIES.map(c => ({ value: c, label: c }))
 
 function Field({ id, label, value, onChange, type = 'text', placeholder, multiline }) {
   const props = { id, value: value ?? '', onChange: e => onChange(e.target.value), placeholder, className: inputCls }
@@ -80,14 +80,15 @@ export default function BillingPanel({ onBack }) {
           title="Currency"
           subtitle="Used for invoice & CSV amounts"
           right={
-            <select
-              aria-label="Default currency"
-              value={settings.defaultCurrency || 'USD'}
-              onChange={e => updateSetting('defaultCurrency', e.target.value)}
-              className={selectClass}
-            >
-              {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <div className="w-32 flex-shrink-0">
+              <EntitySelect
+                compact plain hideLabel
+                label="Default currency"
+                value={settings.defaultCurrency || 'USD'}
+                onChange={v => updateSetting('defaultCurrency', v)}
+                options={CURRENCY_OPTIONS}
+              />
+            </div>
           }
         />
       </div>
