@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.21.0] — 2026-06-07
+## [0.23.0] — 2026-06-07
 
 PunchIn brand refresh — new identity (PunchIn Blue + stopwatch mark), self-hosted fonts, a desktop/tablet layout, labor-type glyphs, a billing profile, and more.
 
