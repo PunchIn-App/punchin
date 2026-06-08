@@ -50,6 +50,9 @@ vi.mock('../db', () => ({
     { key: 'accentColor', value: '#2D5BF5' },
     { key: 'syncProvider', value: null },
   ],
+  // exportBackup pulls portable preferences through this (real impl tested in
+  // syncManager.test.js / db.test.js); the export test only needs it to resolve.
+  getPortableSettings: async () => ({}),
   db: {
     jobs: {
       get toArray() { return mockDbJobsToArray },

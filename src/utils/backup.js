@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { db } from '../db'
+import { db, getPortableSettings } from '../db'
 
 // Backup/export helpers, kept out of SettingsView so the data plumbing isn't
 // tangled with rendering and can be tested directly (issue #144). Each reads the
@@ -14,14 +14,17 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(a.href)
 }
 
-// Full JSON backup of jobs, entries and labor types.
+// Full JSON backup of jobs, entries, labor types, and portable preferences
+// (theme, accent, billing profile, currency, … — sync/account keys excluded), so
+// restoring on a fresh install / installed PWA brings your settings across too.
 export async function exportBackup() {
-  const [jobs, entries, laborTypes] = await Promise.all([
+  const [jobs, entries, laborTypes, settings] = await Promise.all([
     db.jobs.toArray(),
     db.entries.toArray(),
     db.laborTypes.toArray(),
+    getPortableSettings(),
   ])
-  const json = JSON.stringify({ version: 1, exportedAt: new Date(), jobs, entries, laborTypes }, null, 2)
+  const json = JSON.stringify({ version: 1, exportedAt: new Date(), jobs, entries, laborTypes, settings }, null, 2)
   downloadBlob(new Blob([json], { type: 'application/json' }), `punchin-${new Date().toISOString().slice(0, 10)}.json`)
 }
 
