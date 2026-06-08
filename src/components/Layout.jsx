@@ -105,8 +105,10 @@ export default function Layout({ activeView, onNavigate, children }) {
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent
                   ${active ? 'bg-appInput text-appText' : 'text-appTextMuted hover:text-appText hover:bg-appInput'}`}
               >
-                {/* 3px accent left-rail on the active item (sits at the sidebar's inner edge) */}
-                {active && <span aria-hidden="true" className="absolute -left-2 top-2 bottom-2 w-[3px] rounded-r bg-appAccent" />}
+                {/* 3px accent left-rail on the active item (full sidebar only — on the
+                    narrow md icon-rail it floats detached left of the highlight, so the
+                    bg + brighter text carry the active state there instead) */}
+                {active && <span aria-hidden="true" className="hidden lg:block absolute -left-2 top-2 bottom-2 w-[3px] rounded-r bg-appAccent" />}
                 <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={active ? 2.2 : 1.5} aria-hidden="true" />
                 {/* Label: under the icon on the tablet icon-rail (md), beside it on the full sidebar (lg+) */}
                 <span className="text-[10px] leading-tight text-center font-semibold lg:text-sm lg:text-left">{label}</span>
