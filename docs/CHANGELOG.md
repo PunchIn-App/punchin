@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.23.2] — 2026-06-08
+
+### Fixed
+- **Pinch-zoom is no longer blocked (accessibility).** The page viewport no longer disables zoom, so you can pinch-to-zoom anywhere in the app — a WCAG 1.4.4 fix for low-vision users. (The tap-delay this used to guard against is handled another way, so nothing feels slower.)
+- **Light theme — the browser chrome bar now matches the app surface** exactly, removing a faint one-shade seam at the top of the screen in light mode.
+- **Printed invoices & timesheets — the labor-type badge now matches the on-screen chip** (same rounded tinted chip with its colour border), so paper and screen read identically.
+
+### Changed
+- Internal: a single shared hex-colour helper and one source for the brand-mark geometry, plus a unified print HTML escaper — de-duplication only, with no change to how anything looks or works. (internal)
+
+---
+
 ## [0.23.1] — 2026-06-08
 
 ### Changed

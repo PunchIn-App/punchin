@@ -6,7 +6,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-2d5bf5?style=flat" alt="License" /></a>
   <a href="../../actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/PunchIn-App/punchin/ci.yml?branch=main&style=flat&label=CI&color=2d5bf5" alt="CI" /></a>
-  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.23.1-2d5bf5?style=flat" alt="Version 0.23.1" /></a>
+  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.23.2-2d5bf5?style=flat" alt="Version 0.23.2" /></a>
 </p>
 
 <p align="center">
@@ -65,7 +65,7 @@ Most time tracking tools are bloated, require an account, or bill you monthly fo
 
 ### Tablet &amp; Desktop
 
-PunchIn adapts from pocket to desktop without a separate codebase. The bottom-nav shell and card layout reflow naturally across breakpoints. When installed as a PWA, it goes further: the app detects the host OS and applies platform-native behaviors automatically — iOS safe-area insets, Apple-style bottom sheets with swipe-to-dismiss and Taptic Engine feedback, and Material Design 3 sheets on Android with hardware back-button support.
+PunchIn adapts from pocket to desktop without a separate codebase, with a **three-tier navigation shell**: on phones, a top brand header + bottom tab bar; on tablets, that bottom bar gives way to a compact left **icon rail**; on desktop, to a full **labelled sidebar** carrying the brand and a live "On the clock" status. The Timer screen adds a right-hand **overview rail** on wide screens — last session, quick-punch shortcuts for your most-recent jobs, and a this-week total with a per-job breakdown. When installed as a PWA, it detects the host OS and applies platform-native behaviors automatically — iOS safe-area insets, Apple-style bottom sheets with swipe-to-dismiss and Taptic Engine feedback, and Material Design 3 sheets on Android with hardware back-button support.
 
 <details>
 <summary><strong>Screenshots</strong></summary>
@@ -137,7 +137,9 @@ Charts powered by [Recharts](https://recharts.org) give you a visual overview of
 <details>
 <summary><strong>Invoice Generator</strong></summary>
 
-Set **hourly rates** per labor type on each job (Jobs tab → edit a job → Hourly rates). Then open the **Invoice** modal from the Timesheets toolbar: pick a job and period, and PunchIn builds a line-item invoice showing hours, rate, and amount for every entry. Export as a formatted **CSV** or use **Print / PDF** to send it directly to a client.
+Set **hourly rates** per labor type on each job (Jobs tab → edit a job → Hourly rates), then open the **Invoice** modal from the Timesheets toolbar. Pick a single **job** or a whole **client** and a period, and PunchIn builds a line-item invoice — hours, rate, and amount for every entry, each line priced at that job's own rate.
+
+The invoice carries your **billing profile** (Settings → **Billing**): a **Billed from / Billed to** band with your name, business, email, phone, and address — plus an optional **business logo** — and the chosen client as "Billed to". Amounts format in your **default currency**, clock times follow your **12/24-hour** preference, and each entry can be **rounded in your favour** to a 15- or 30-minute increment. An optional, editable **invoice number** (prefix + auto-incrementing counter, or a custom alphanumeric code) prints on each invoice. Export as a formatted **CSV** or use **Print / PDF** to send it directly to a client.
 
 </details>
 
@@ -182,10 +184,14 @@ Because there's no backend, reminders fire only while PunchIn is open or install
 
 - **Concurrent timers** — toggle on or off; when off, starting a new timer automatically stops any running one
 - **Week start** — choose whether your week starts on Monday or Sunday
+- **Time format** — show clock times as **12-hour**, **24-hour**, or **Auto** (matches your device's preference) across timers, timesheets, and invoices
+- **Decimal hours** — display durations as decimal hours (`1.50 h`) instead of `1h 30m`
+- **Rounding** — optionally round each billable entry in your favour to a **15- or 30-minute** increment (off by default)
 - **Theme** — switch between **Auto / Light / Dark** (auto follows your OS preference)
 - **Accent color** — choose from preset highlight swatches or pick any custom hex color; updates the entire app (and the browser-tab favicon) instantly
 - **Haptic feedback** — toggle vibration on navigation and punch actions (shown only on phones, where a vibration motor exists)
 - **Install** — add PunchIn to your home screen, with platform-aware guidance for Android, iOS Safari, and other iOS browsers
+- **Billing** — your invoice identity (name, business, email, phone, address, payment terms, optional logo), the **default currency** used to format invoice and CSV amounts, and optional invoice numbering (prefix + counter)
 - **Export JSON** — full backup of all data (jobs, labor types, entries)
 - **Export CSV** — all completed entries as a spreadsheet ready for import into bookkeeping apps
 - **Import JSON** — restore from a backup file (smart deduplication prevents duplicates)
@@ -291,6 +297,11 @@ punchin/
     │   ├── InvoiceModal.jsx    # Invoice generator with CSV/print export
     │   ├── ConfirmModal.jsx    # Accessible confirmation dialog
     │   ├── ColorPicker.jsx     # Preset swatches + custom hex input
+    │   ├── BrandMark.jsx       # Stopwatch mark tile + accent-tinted wordmark
+    │   ├── LaborGlyph.jsx      # Labor-type tag/chip (glyph + colour)
+    │   ├── EntitySelect.jsx    # Bespoke colour/glyph single-select picker
+    │   ├── GlyphPicker.jsx     # Labor-type glyph picker (quick row + search)
+    │   ├── TimerRail.jsx       # Desktop Timer right rail (last session · quick punch · week)
     │   ├── ChangelogModal.jsx  # Changelog viewer (built from docs/CHANGELOG.md)
     │   ├── DataTransfer.jsx    # Account-free device-to-device transfer (link + QR)
     │   └── InstallPromptModal.jsx # First-run install bottom sheet (platform-aware)
@@ -299,7 +310,8 @@ punchin/
     │   ├── JobsView.jsx        # Jobs & Labor Types CRUD
     │   ├── TimesheetsView.jsx  # Daily/weekly logs + search
     │   ├── AnalyticsView.jsx   # Charts
-    │   └── SettingsView.jsx    # Preferences, sync, data management
+    │   ├── SettingsView.jsx    # iOS-style drill-in root (master-detail on desktop)
+    │   └── settings/           # Per-panel UI: General / Appearance / Reminders / Install / Billing / Data & Sync / About panels (+ shared components.jsx)
     ├── hooks/
     │   ├── useSettings.js          # Reactive settings hook
     │   ├── usePlatformContext.js   # Standalone + OS detection
@@ -308,6 +320,7 @@ punchin/
     │   └── useHapticFeedback.jsx  # Platform-routed haptic trigger
     └── utils/
         ├── time.js             # Date/time helpers
+        ├── printDocument.js    # Shared invoice/timesheet print document (self-hosted Noto, fonts-ready gating)
         ├── favicon.js          # Accent-colored tab favicon
         ├── notifications.js    # Browser Notification API wrappers
         ├── reminders.js        # Pure reminder-rule evaluation

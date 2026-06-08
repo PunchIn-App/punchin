@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { PunchGlyph } from './BrandMark'
 import { DEFAULT_JOB_COLOR } from '../accentPresets'
+import { withAlpha } from '../utils/color'
 
 // Glyph set (string id → component). Stored as the id string on laborTypes.glyph;
 // mapped here so render sites import one component. `punchin` (the PunchIn brand
@@ -46,7 +47,7 @@ export function LaborGlyphChip({ laborType, className = 'w-5 h-5' }) {
   return (
     <span
       className={`inline-flex items-center justify-center rounded-[28%] flex-shrink-0 ${className}`}
-      style={{ backgroundColor: `${color}38`, border: `1px solid ${color}6B` }}
+      style={{ backgroundColor: withAlpha(color, '38'), border: `1px solid ${withAlpha(color, '6B')}` }}
       aria-hidden="true"
     >
       <Glyph className="w-1/2 h-1/2" style={{ color }} strokeWidth={2} />
@@ -71,7 +72,7 @@ export function LaborTag({ laborType, className = '' }) {
     >
       <span
         className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-[5px] flex-shrink-0"
-        style={{ backgroundColor: `${color}38`, border: `1px solid ${color}6B` }}
+        style={{ backgroundColor: withAlpha(color, '38'), border: `1px solid ${withAlpha(color, '6B')}` }}
         aria-hidden="true"
       >
         <Glyph className="w-3 h-3" style={{ color }} strokeWidth={2} />

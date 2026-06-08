@@ -5,10 +5,12 @@
 // does NOT inherit the app's stylesheet, so it has to load the webfonts itself
 // AND wait for them before calling print() — otherwise the first print can fire
 // on the fallback face. Both print paths share this markup + window logic so the
-// brand stays in sync (and so self-hosting the fonts later is a one-file change).
+// brand stays in sync — the @font-face rules below point at the self-hosted
+// /fonts/*.woff2 (no CDN).
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { glyphComponent, DEFAULT_LABOR_COLOR } from '../components/LaborGlyph'
+import { withAlpha } from './color'
 
 // Injected into the <head> of every print document: declare the self-hosted Noto
 // brand webfonts. The print popup is same-origin (opened from the app), so the
@@ -20,8 +22,9 @@ export const PRINT_FONT_HEAD = `<style>
 </style>`
 
 // Escape HTML special characters in user-provided strings so they are safe to
-// inject into a print HTML string.
-function escHtml(s) {
+// inject into a print HTML string. Exported as the single escaper for all print
+// paths (the invoice template reuses it) so escaping behaviour can't diverge.
+export function escHtml(s) {
   return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 }
 
@@ -37,14 +40,19 @@ export function laborBadgeHTML(lt) {
   const svgStr = renderToStaticMarkup(
     createElement(Glyph, { width: 13, height: 13, color, strokeWidth: 2, 'aria-hidden': 'true' })
   )
+  // Mirror the on-screen LaborTag chip exactly (LaborGlyph.jsx): an 18px box,
+  // ~22% colour fill, ~42% colour border, 5px radius. box-sizing:border-box so
+  // the 1px border doesn't grow the box (the app gets border-box from Tailwind).
   const chipStyle = [
+    'box-sizing:border-box',
     'display:inline-flex',
     'align-items:center',
     'justify-content:center',
     'width:18px',
     'height:18px',
-    `background:${color}38`,
-    'border-radius:3px',
+    `background:${withAlpha(color, '38')}`,
+    `border:1px solid ${withAlpha(color, '6B')}`,
+    'border-radius:5px',
     'flex-shrink:0',
     'vertical-align:middle',
   ].join(';')

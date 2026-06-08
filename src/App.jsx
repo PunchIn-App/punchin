@@ -19,6 +19,7 @@ import { updateFavicon } from './utils/favicon'
 import { applyInstallIcon } from './utils/installIcon'
 import { DEFAULT_ACCENT, DEFAULT_ACCENT_LIGHT } from './accentPresets'
 import { readableInk } from './utils/inkOnAccent'
+import { hexToRgb } from './utils/color'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
@@ -50,13 +51,6 @@ const SYNC_ERROR_MESSAGES = {
 }
 export function describeSyncError(code) {
   return SYNC_ERROR_MESSAGES[code] || 'Sign-in failed. Please try again.'
-}
-
-function hexToRgb(hex) {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `${r} ${g} ${b}`
 }
 
 const DEFAULT_VIEW = 'timer'
@@ -271,7 +265,9 @@ export default function App() {
 
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', resolvedTheme === 'light' ? '#F3F4F6' : '#0F1117')
+    // Keep in sync with --bg-primary in index.css (#F4F5F7 light / #0F1117 dark)
+    // so the OS chrome bar matches the app surface.
+    if (meta) meta.setAttribute('content', resolvedTheme === 'light' ? '#F4F5F7' : '#0F1117')
   }, [resolvedTheme])
 
   // A snapshot shared from another device via a #import=… transfer link (issue

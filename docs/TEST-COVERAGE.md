@@ -18,7 +18,9 @@
 | `src/utils/deviceId.test.js` | `getDeviceId` — generates 8-char hex, persists across calls, falls back to `'default'` when localStorage is unavailable |
 | `src/utils/printDocument.test.js` | `PRINT_FONT_HEAD` (loads the three Noto webfonts); `openPrintWindow` — waits for `document.fonts.ready` before printing, falls back to a timed print when `document.fonts` is absent, returns `false` without throwing when the popup is blocked |
 | `src/utils/inkOnAccent.test.js` | `readableInk` — white on dark/saturated accents, dark ink (`#0F1117`) on light/pastel accents (matches the design reference tiles), `#`/case tolerant |
+| `src/utils/color.test.js` | `normalizeHex` (6-digit passthrough/case, add `#`, expand 3-digit, fallback on garbage), `hexToRgb` (→ `"r g b"`, no `NaN` on short/invalid), `withAlpha` (→ `#rrggbbaa`) |
 | `src/iconSvg.test.js` | `iconSvg` — draws the stopwatch body + crown (not the old clock polyline), tints the glyph via the contrast guard (white on dark accent, ink on light), fills the tile with the accent |
+| `src/stopwatchGeometry.test.js` | Locks both stopwatch renderers to the shared `STOPWATCH_ELEMENTS` source (4 stroked paths + body circle + filled centre dot): `iconSvg` (SVG-string) and `PunchGlyph` (React) each draw every shared element so the brand mark can't drift |
 | `src/components/TimerRail.test.jsx` | Desktop Timer rail — renders "This week" once entries load, lists only active jobs for quick punch + calls `onPunch` on click, renders the last session when provided |
 | `src/components/LaborGlyph.test.jsx` | `glyphComponent` (Tag fallback for unknown ids), `LaborTag` (glyph + name + `aria-label`, renders nothing without a type), `LaborGlyphChip` (renders with color/glyph fallbacks), curated `LABOR_GLYPH_IDS` |
 | `src/utils/format.test.js` | `formatMoney` (USD default, other ISO currencies, empty for null/NaN, no-throw fallback on an invalid/empty code); `currencySymbol` (symbol + no-throw on bad code) |
