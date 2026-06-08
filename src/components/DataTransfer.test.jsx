@@ -46,6 +46,26 @@ describe('DataTransfer — share', () => {
     expect(screen.getByAltText(/QR code/i)).toBeInTheDocument()
     expect(screen.getByText(/Includes 1 job and 1 entry/i)).toBeInTheDocument()
   })
+
+  it('enlarges the QR in a lightbox and closes it on Escape', async () => {
+    render(<DataTransfer />)
+    fireEvent.click(screen.getByRole('button', { name: /create share link/i }))
+    await screen.findByLabelText('Share link')
+    fireEvent.click(screen.getByRole('button', { name: /enlarge qr code/i }))
+    expect(screen.getByRole('dialog', { name: /share qr code/i })).toBeInTheDocument()
+    expect(screen.getAllByAltText(/QR code/i)).toHaveLength(2) // thumbnail + lightbox
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: /share qr code/i })).not.toBeInTheDocument()
+  })
+
+  it('closes the enlarged QR on a backdrop tap', async () => {
+    render(<DataTransfer />)
+    fireEvent.click(screen.getByRole('button', { name: /create share link/i }))
+    await screen.findByLabelText('Share link')
+    fireEvent.click(screen.getByRole('button', { name: /enlarge qr code/i }))
+    fireEvent.click(screen.getByRole('dialog', { name: /share qr code/i })) // the scrim itself
+    expect(screen.queryByRole('dialog', { name: /share qr code/i })).not.toBeInTheDocument()
+  })
 })
 
 describe('DataTransfer — import', () => {
