@@ -60,7 +60,7 @@ export default function ChangelogModal({ onClose }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -69,7 +69,7 @@ export default function ChangelogModal({ onClose }) {
         aria-modal="true"
         aria-labelledby={TITLE_ID}
         tabIndex={-1}
-        className="w-full max-w-lg bg-appCard rounded-2xl border border-appBorder shadow-xl flex flex-col max-h-[80vh] outline-none"
+        className="w-full max-w-lg bg-appCard rounded-2xl border border-appBorder shadow-xl flex flex-col max-h-full outline-none"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-appBorder flex-shrink-0">
           <p id={TITLE_ID} className="font-display font-semibold text-appText">Changelog</p>
