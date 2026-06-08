@@ -246,6 +246,38 @@ export const DEFAULT_SETTINGS = {
 export const defaultSettingsRows = () =>
   Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({ key, value }))
 
+// Settings that are device-local or account-bound — they must NOT travel in a
+// backup, transfer link, or cloud snapshot (a new device sets up its own sync,
+// and the token lives encrypted in `secrets`, never here). Everything else is a
+// portable user *preference* (theme, accent, billing profile, currency, time
+// format, reminders, …) that should follow your data so a fresh install / the
+// installed PWA isn't stranded at defaults when the browser's data can't carry.
+export const NON_PORTABLE_SETTING_KEYS = [
+  'syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId',
+  'lastSyncedAt', 'syncError', 'syncUsername',
+]
+
+/** The portable preferences as a plain { key: value } object. */
+export async function getPortableSettings() {
+  const rows = await db.settings.toArray()
+  const out = {}
+  for (const { key, value } of rows) {
+    if (!NON_PORTABLE_SETTING_KEYS.includes(key)) out[key] = value
+  }
+  return out
+}
+
+/** Apply a portable-settings object onto the local settings table, defensively
+ *  dropping any sync/account keys so an import can never plant another device's
+ *  credentials. No-op for a missing/empty object. */
+export async function applyPortableSettings(settingsObj) {
+  if (!settingsObj || typeof settingsObj !== 'object') return
+  const rows = Object.entries(settingsObj)
+    .filter(([k]) => !NON_PORTABLE_SETTING_KEYS.includes(k))
+    .map(([key, value]) => ({ key, value }))
+  if (rows.length) await db.settings.bulkPut(rows)
+}
+
 // Seed default settings on first run — no jobs or labor types pre-loaded
 db.on('populate', async () => {
   await db.settings.bulkPut(defaultSettingsRows())

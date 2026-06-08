@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { buildBugReportUrl, buildFeatureRequestUrl } from './issueUrl'
+import { buildBugReportUrl, buildFeatureRequestUrl, buildFeedbackBugUrl, buildFeedbackFeatureUrl } from './issueUrl'
 
 function setUA(ua) {
   Object.defineProperty(navigator, 'userAgent', { value: ua, writable: true, configurable: true })
@@ -183,5 +183,28 @@ describe('buildFeatureRequestUrl', () => {
 
   it('points to the punchin GitHub issues URL', () => {
     expect(buildFeatureRequestUrl('1.2.3')).toMatch(/^https:\/\/github\.com\/PunchIn-App\/punchin\/issues\/new/)
+  })
+})
+
+// ── self-hosted feedback forms (no GitHub account) ─────────────────────────────
+
+describe('buildFeedbackBugUrl', () => {
+  it('points to the feedback bug form with the same prefilled metadata', () => {
+    setUA('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36')
+    const url = buildFeedbackBugUrl('0.21.0', true, 'web')
+    expect(url).toMatch(/^https:\/\/feedback\.trackmytime\.today\/bug\?/)
+    const p = params(url)
+    expect(p.get('version')).toBe('0.21.0')
+    expect(p.get('install-type')).toBe('PWA (installed to home screen)')
+    expect(p.get('browser')).toBe('Chrome 124')
+    expect(p.get('os')).toBe('Windows 10 / 11')
+    expect(p.get('device')).toMatch(/^Desktop \(\d+×\d+\)$/)
+    expect(p.get('template')).toBeNull() // not a GitHub issue form
+  })
+})
+
+describe('buildFeedbackFeatureUrl', () => {
+  it('points to the feedback feature form (no prefill)', () => {
+    expect(buildFeedbackFeatureUrl()).toBe('https://feedback.trackmytime.today/feature')
   })
 })

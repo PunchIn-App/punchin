@@ -3,6 +3,7 @@ import { exportBackup, exportCsv } from './backup'
 const mockJobs       = vi.fn()
 const mockEntries    = vi.fn()
 const mockLaborTypes = vi.fn()
+const mockSettings   = vi.fn()
 
 vi.mock('../db', () => ({
   db: {
@@ -10,6 +11,7 @@ vi.mock('../db', () => ({
     entries:    { toArray: () => mockEntries() },
     laborTypes: { toArray: () => mockLaborTypes() },
   },
+  getPortableSettings: () => mockSettings(),
 }))
 
 let lastBlob
@@ -18,6 +20,7 @@ beforeEach(() => {
   mockJobs.mockResolvedValue([])
   mockEntries.mockResolvedValue([])
   mockLaborTypes.mockResolvedValue([])
+  mockSettings.mockResolvedValue({})
   lastBlob = null
   global.URL.createObjectURL = vi.fn((blob) => { lastBlob = blob; return 'blob:mock' })
   global.URL.revokeObjectURL = vi.fn()
@@ -38,6 +41,13 @@ describe('exportBackup', () => {
     expect(data.jobs).toHaveLength(1)
     expect(data.entries).toHaveLength(1)
     expect(data.laborTypes).toHaveLength(1)
+  })
+
+  it('includes portable preferences so settings carry on restore', async () => {
+    mockSettings.mockResolvedValue({ theme: 'light', defaultCurrency: 'EUR' })
+    await exportBackup()
+    const data = JSON.parse(await lastBlob.text())
+    expect(data.settings).toEqual({ theme: 'light', defaultCurrency: 'EUR' })
   })
 })
 
