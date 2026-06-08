@@ -315,7 +315,7 @@ ${totalAmount != null ? `<div class="paperfoot">
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex ${isMobileSheet ? 'items-center justify-center' : 'items-end sm:items-center'} ${scrimCls}`}
+      className={`fixed inset-0 z-50 flex justify-center ${isMobileSheet ? 'items-center' : 'items-end sm:items-center'} ${scrimCls}`}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
