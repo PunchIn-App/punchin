@@ -12,7 +12,7 @@ import { SYNC_CONFIG } from '../../sync/config'
 import { exportBackup, exportCsv } from '../../utils/backup'
 import ConfirmModal from '../../components/ConfirmModal'
 import DataTransfer from '../../components/DataTransfer'
-import { Panel, PanelGroup, DangerZone } from './components'
+import { Panel, PanelGroup, DangerZone, Toggle } from './components'
 
 const PROVIDER_LABEL = { github: 'GitHub Gist', google: 'Google Drive', onedrive: 'OneDrive' }
 
@@ -26,7 +26,7 @@ function formatLastSync(ts) {
 }
 
 export default function DataSyncPanel({ onBack }) {
-  const { settings } = useSettings()
+  const { settings, updateSetting } = useSettings()
   const fileInputRef = useRef(null)
   // Local to the panel: it unmounts when you leave Data & Sync, so the multi-
   // stage reset flow always re-opens neutral with no extra effect needed.
@@ -191,6 +191,13 @@ export default function DataSyncPanel({ onBack }) {
                   <p className="text-xs text-red-400 mt-0.5 truncate">{settings.syncError}</p>
                 )}
               </div>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-appBorderLight">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-appText font-medium">Auto-sync</p>
+                <p className="text-xs text-appTextMuted mt-0.5">Sync automatically on open, when you make changes, and periodically</p>
+              </div>
+              <Toggle value={settings.autoSync !== false} onChange={(v) => updateSetting('autoSync', v)} ariaLabel="Auto-sync" />
             </div>
             <div className="flex divide-x divide-appBorderLight">
               <button

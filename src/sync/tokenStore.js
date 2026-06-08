@@ -58,6 +58,31 @@ export async function getSyncToken() {
   return null
 }
 
+// Treat a token within this margin of its expiry as already expired, so a sync
+// can't start and then have the (~1h, non-refreshable) Google/OneDrive token
+// die mid-flight, leaving remote state half-updated.
+const EXPIRY_MARGIN_MS = 30_000
+
+/**
+ * The single access-token chokepoint for syncing: returns a usable access token,
+ * or throws `TOKEN_EXPIRED` when the stored one is past (within the safety margin
+ * of) its expiry. Returns null only when there's no token at all (not connected).
+ *
+ * This is where refresh-token support will live: when a refresh token is present
+ * (the planned Google-via-Worker / OneDrive `offline_access` work), an expired
+ * access token will be silently refreshed here instead of throwing — so every
+ * caller (manual `runSync`, the auto-sync engine) becomes seamless at once.
+ */
+export async function getFreshAccessToken() {
+  const token = await getSyncToken()
+  if (!token) return null
+  const expiry = (await db.settings.get('syncTokenExpiry'))?.value
+  if (expiry && Date.now() > expiry - EXPIRY_MARGIN_MS) {
+    throw new Error('TOKEN_EXPIRED')
+  }
+  return token
+}
+
 /** Remove the stored token (the key is kept; it's harmless and reusable). */
 export async function clearSyncToken() {
   await db.secrets.delete(TOKEN_NAME)

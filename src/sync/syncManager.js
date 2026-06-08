@@ -9,7 +9,7 @@ import {
 } from './providers/github'
 import { pushToDrive, pullFromDrive } from './providers/google'
 import { pushToOneDrive, pullFromOneDrive } from './providers/onedrive'
-import { getSyncToken, clearSyncToken } from './tokenStore'
+import { getSyncToken, getFreshAccessToken, clearSyncToken } from './tokenStore'
 
 async function getSettings() {
   const rows = await db.settings.toArray()
@@ -212,13 +212,12 @@ async function syncStep(phase, work) {
 
 export async function runSync() {
   const s = await getSettings()
-  const token = await getSyncToken() // decrypted from the at-rest store (issue #126)
-  if (!s.syncProvider || !token) throw new Error('Not connected')
-  // Treat a token within the safety margin of expiry as already expired, so a
+  // Single access-token chokepoint (issue #126): decrypts the at-rest token and
+  // throws TOKEN_EXPIRED if it's past (within the safety margin of) expiry, so a
   // sync can't start and then have the (~1h, non-refreshable) Google/OneDrive
-  // token expire mid-flight, leaving remote state half-updated.
-  const EXPIRY_MARGIN_MS = 30_000
-  if (s.syncTokenExpiry && Date.now() > s.syncTokenExpiry - EXPIRY_MARGIN_MS) throw new Error('TOKEN_EXPIRED')
+  // token die mid-flight. Refresh-token support will land inside it.
+  const token = await getFreshAccessToken()
+  if (!s.syncProvider || !token) throw new Error('Not connected')
 
   // Capture freshness BEFORE merging: a cloud pull seeds preferences only into a
   // brand-new install (after that, each established device keeps its own).

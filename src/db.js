@@ -240,6 +240,7 @@ export const DEFAULT_SETTINGS = {
   lastSyncedAt: null,
   syncError: null,
   syncUsername: null,
+  autoSync: true, // background auto-sync: opt-in but ON by default once connected (per-device)
 }
 
 /** DEFAULT_SETTINGS as Dexie KV rows for bulkPut (populate + factoryReset). */
@@ -254,7 +255,7 @@ export const defaultSettingsRows = () =>
 // installed PWA isn't stranded at defaults when the browser's data can't carry.
 export const NON_PORTABLE_SETTING_KEYS = [
   'syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId',
-  'lastSyncedAt', 'syncError', 'syncUsername',
+  'lastSyncedAt', 'syncError', 'syncUsername', 'autoSync',
 ]
 
 /** The portable preferences as a plain { key: value } object. */
