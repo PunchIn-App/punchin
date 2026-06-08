@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.23.3] — 2026-06-08
+
+### Changed
+- **Faster Timer screen on large histories.** The desktop "This week" rail now reads the current week straight from the time index instead of loading every completed entry ever recorded — same numbers, far less work on the app's most-visited screen. (internal)
+
+---
+
 ## [0.23.2] — 2026-06-08
 
 ### Fixed
