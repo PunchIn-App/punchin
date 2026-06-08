@@ -75,11 +75,20 @@ export function openPrintWindow(html, { width = 800, height = 600 } = {}) {
   w.document.write(html)
   w.document.close()
   w.focus()
+  // Print once the brand webfonts have loaded — but never hang on it. On iOS the
+  // `fonts.ready` promise can stall (the popup's font load never settles), and
+  // because iOS *has* document.fonts it would otherwise skip the timed fallback
+  // below and never print, leaving the user staring at an un-printing window
+  // ("stuck"). So race fonts.ready against a 1.5s safety timeout: whichever fires
+  // first prints, and a `printed` latch makes the loser a no-op.
   const fonts = w.document.fonts
+  let printed = false
+  const doPrint = () => { if (!printed) { printed = true; w.print() } }
   if (fonts && fonts.ready && typeof fonts.ready.then === 'function') {
-    fonts.ready.then(() => w.print())
+    fonts.ready.then(doPrint)
+    setTimeout(doPrint, 1500)
   } else {
-    setTimeout(() => w.print(), 250)
+    setTimeout(doPrint, 250)
   }
   return true
 }

@@ -49,6 +49,25 @@ describe('printDocument', () => {
     expect(win.print).toHaveBeenCalled()
   })
 
+  it('prints via the 1.5s safety timeout when fonts.ready never settles (iOS hang guard)', () => {
+    // iOS has document.fonts, so a hung fonts.ready would otherwise skip the
+    // timed fallback and never print, leaving the user stuck. The race must still
+    // fire print() once the safety timeout elapses.
+    vi.useFakeTimers()
+    const win = {
+      document: { write: vi.fn(), close: vi.fn(), fonts: { ready: new Promise(() => {}) /* never resolves */ } },
+      focus: vi.fn(),
+      print: vi.fn(),
+    }
+    vi.spyOn(window, 'open').mockReturnValue(win)
+
+    openPrintWindow('<html>doc</html>')
+
+    expect(win.print).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1500)
+    expect(win.print).toHaveBeenCalledTimes(1)
+  })
+
   it('returns false without throwing when the popup is blocked (window.open → null)', () => {
     vi.spyOn(window, 'open').mockReturnValue(null)
     let result
