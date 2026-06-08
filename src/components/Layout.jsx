@@ -18,26 +18,24 @@ const NAV = [
   { id: 'settings',   label: 'Settings',  Icon: Settings   },
 ]
 
-// Builds inline style overrides for a standalone install.
-// In LANDSCAPE the Dynamic Island / notch sits on a side and overlaps the rail or
-// content, so inset the whole shell by the left/right safe areas in ANY standalone
-// install (these are 0 in portrait, so they're harmless there). The top/bottom bar
-// insets stay iOS-only — Android's WindowInsets handles its own status/nav bars.
-function useAdaptiveStyles(isStandalone, os) {
-  if (!isStandalone) return { root: undefined, header: undefined, nav: undefined }
-  const root = { paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }
-  if (os !== 'ios') return { root, header: undefined, nav: undefined }
-  return {
-    root,
-    header: { paddingTop: 'env(safe-area-inset-top)' },
-    nav:    { paddingBottom: 'env(safe-area-inset-bottom)' },
-  }
+// The TOP and SIDE safe-area insets are applied unconditionally via Tailwind
+// classes on the shell (root: left/right · header/aside: top · main: top at md+).
+// env() resolves to 0 with no notch/cutout, so this is harmless on devices and
+// browsers without one — and it means a non-standalone Safari tab gets them too
+// (iPhone landscape: the Dynamic Island sits on a side and would otherwise overlap
+// the sidebar rail; iPad standalone: the status bar sits over the top of the rail/
+// content). The BOTTOM inset is the exception: it stays runtime-gated to an iOS
+// standalone install, where the home indicator overlaps the bottom nav so the bar
+// pads its content up. In a browser tab the chrome owns the bottom and Safari's
+// bottom-inset semantics differ, so applying it there would open a spurious gap.
+function navBottomInset(isStandalone, os) {
+  return isStandalone && os === 'ios' ? { paddingBottom: 'env(safe-area-inset-bottom)' } : undefined
 }
 
 export default function Layout({ activeView, onNavigate, children }) {
   const { isStandalone, os } = usePlatformContext()
   const { settings } = useSettings()
-  const adaptive = useAdaptiveStyles(isStandalone, os)
+  const navStyle = navBottomInset(isStandalone, os)
 
   const hapticsOn = isStandalone && settings.hapticFeedback !== false
   const { trigger: hapticTrigger, hapticEl } = useHapticFeedback(hapticsOn ? os : 'web')
@@ -76,12 +74,14 @@ export default function Layout({ activeView, onNavigate, children }) {
   }, [])
 
   return (
-    <div style={adaptive.root} className="h-full flex flex-col md:flex-row bg-appBg">
+    <div className="h-full flex flex-col md:flex-row bg-appBg pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       {hapticEl}
 
       {/* Desktop chrome: tablet icon-rail (md) → labelled sidebar (lg+). Replaces
-          the phone header + bottom nav, which are hidden from md up. */}
-      <aside className="hidden md:flex md:flex-col md:w-16 lg:w-[236px] flex-shrink-0 border-r border-appBorderLight bg-appNav">
+          the phone header + bottom nav, which are hidden from md up. The top inset
+          keeps the rail's content clear of the iPad status bar while its appNav
+          background bleeds up behind it. */}
+      <aside className="hidden md:flex md:flex-col md:w-16 lg:w-[236px] flex-shrink-0 border-r border-appBorderLight bg-appNav pt-[env(safe-area-inset-top)]">
         <button
           onClick={() => navigate('timer')}
           aria-label="PunchIn — go to Timer"
@@ -148,8 +148,7 @@ export default function Layout({ activeView, onNavigate, children }) {
 
       {/* Phone header */}
       <header
-        style={adaptive.header}
-        className="md:hidden flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-appBorderLight bg-appNav"
+        className="md:hidden flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-appBorderLight bg-appNav pt-[calc(env(safe-area-inset-top)+0.75rem)]"
       >
         <button
           onClick={() => navigate('timer')}
@@ -170,14 +169,16 @@ export default function Layout({ activeView, onNavigate, children }) {
         )}
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 min-w-0 overflow-hidden">
+      {/* Main content. At md+ the phone header is gone and the content sits at the
+          top of the screen beside the rail, so it takes the top inset itself to
+          clear the iPad status bar; on phones the header above it already does. */}
+      <main className="flex-1 min-w-0 overflow-hidden md:pt-[env(safe-area-inset-top)]">
         {children}
       </main>
 
       {/* Phone bottom nav */}
       <nav
-        style={adaptive.nav}
+        style={navStyle}
         aria-label="Main navigation"
         className="md:hidden flex-shrink-0 flex border-t border-appBorderLight bg-appNav"
       >
