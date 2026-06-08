@@ -356,6 +356,33 @@ describe('InvoiceModal — export and print', () => {
     expect(html).toContain('Design')
   })
 
+  it('invoices a whole client — aggregates entries across the client’s jobs with per-job rates', async () => {
+    // Two jobs for the same client at different rates; selecting the client bills
+    // them together, each entry priced at ITS OWN job's rate (not one shared rate).
+    const jobsTwo = [
+      { id: 1, name: 'Acme Web', clientName: 'Acme', isActive: true, laborRates: { 1: 100 } },
+      { id: 2, name: 'Acme App', clientName: 'Acme', isActive: true, laborRates: { 1: 150 } },
+    ]
+    const entriesTwo = [
+      { id: 1, jobId: 1, laborTypeId: 1, punchIn: new Date('2025-06-01T09:00:00'), punchOut: new Date('2025-06-01T10:00:00') }, // 1h @ $100 = 100
+      { id: 2, jobId: 2, laborTypeId: 1, punchIn: new Date('2025-06-02T09:00:00'), punchOut: new Date('2025-06-02T11:00:00') }, // 2h @ $150 = 300
+    ]
+    useLiveQuery.mockImplementation((_fn, deps) => (deps?.[2] ? entriesTwo : []))
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+    render(<InvoiceModal jobs={jobsTwo} laborTypes={LABOR_TYPES} currentDate={new Date('2025-06-01')} currentTab="weekly" onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    fireEvent.click(screen.getByRole('option', { name: /whole client/i })) // the "Acme · whole client" option
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = fakeWin.document.write.mock.calls[0][0]
+    expect(html).toContain('Acme')        // billed to the client
+    expect(html).toContain('Acme Web')    // each job shown (per-job column)
+    expect(html).toContain('Acme App')
+    expect(html).toContain('3.00')        // total hours 1 + 2
+    expect(html).toContain('400')         // total amount 100 + 300
+  })
+
   it('does not advance the number when the popup is blocked', async () => {
     mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
     vi.spyOn(window, 'open').mockReturnValue(null)

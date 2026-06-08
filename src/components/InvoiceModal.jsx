@@ -82,31 +82,48 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     return { start: s, end: e }
   }, [preset, customStart, customEnd, currentDate, wsMon])
 
+  // The picker selects either a single job (numeric id) or a whole client
+  // ("client:<name>" → every active job billed to that client, aggregated).
+  const isClientSel = typeof selectedJobId === 'string' && selectedJobId.startsWith('client:')
+  const selClient = isClientSel ? selectedJobId.slice('client:'.length) : null
+  const jobMap = useMemo(() => new Map((jobs ?? []).map(j => [j.id, j])), [jobs])
+
   const allEntries = useLiveQuery(async () => {
     if (!start || !end || !selectedJobId) return []
-    return db.entries
+    const inRange = await db.entries
       .filter(e => {
         const d = new Date(e.punchIn)
-        return e.jobId === Number(selectedJobId) && d >= start && d <= end && !!e.punchOut
+        return d >= start && d <= end && !!e.punchOut
       })
       .toArray()
-  }, [start?.getTime(), end?.getTime(), selectedJobId])
+    return isClientSel
+      ? inRange.filter(e => jobMap.get(e.jobId)?.clientName === selClient)
+      : inRange.filter(e => e.jobId === Number(selectedJobId))
+  }, [start?.getTime(), end?.getTime(), selectedJobId, jobs])
 
-  const job = jobs?.find(j => j.id === Number(selectedJobId))
+  const job = isClientSel ? null : jobs?.find(j => j.id === Number(selectedJobId))
+  // Display identity for the title / billed-to band: a client invoice bills the
+  // client across its jobs; a single-job invoice bills that job's client (or the
+  // job's own name when it has no client).
+  const targetName = isClientSel ? selClient : (job?.name ?? '')
+  const billToName = isClientSel ? selClient : (job?.clientName || job?.name || '')
+  const billToSub  = isClientSel ? null : (job?.clientName ? job?.name : null)
+  const previewSub = isClientSel ? 'All jobs' : (job?.clientName || null) // in-modal preview header subtitle
 
   const lineItems = useMemo(() => {
-    if (!allEntries?.length || !job) return []
+    if (!allEntries?.length) return []
     return allEntries.map(raw => {
       // Bill in the user's favour: round the entry (start down, end up) so the
       // invoiced hours, amount, and shown Start/End times are consistent (#208).
       const e = roundEntry(raw, settings.roundingMinutes)
+      const eJob = jobMap.get(e.jobId)   // the entry's OWN job — a client invoice spans several, each at its own rate
       const lt = laborTypes?.find(l => l.id === e.laborTypeId)
       const hours = getEntryDuration(e) / 3600000
-      const rate  = (job.laborRates?.[e.laborTypeId]) ?? null
+      const rate  = (eJob?.laborRates?.[e.laborTypeId]) ?? null
       const amount = rate != null ? hours * rate : null
-      return { entry: e, lt, hours, rate, amount }
+      return { entry: e, job: eJob, lt, hours, rate, amount }
     }).sort((a, b) => new Date(a.entry.punchIn) - new Date(b.entry.punchIn))
-  }, [allEntries, job, laborTypes, settings.roundingMinutes])
+  }, [allEntries, jobMap, laborTypes, settings.roundingMinutes])
 
   const totalHours  = lineItems.reduce((s, li) => s + li.hours, 0)
   const totalAmount = lineItems.every(li => li.amount != null)
@@ -114,14 +131,15 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     : null
 
   const exportCsv = () => {
-    if (!job || !lineItems.length) return
+    if (!lineItems.length) return
     const rows = [
-      [`Invoice — ${job.name}${job.clientName ? ` / ${job.clientName}` : ''}`],
+      [`Invoice — ${targetName}`],
       [`Period: ${start ? format(start, 'yyyy-MM-dd') : ''} to ${end ? format(end, 'yyyy-MM-dd') : ''}`],
       [],
-      ['Date', 'Labor Type', 'Start', 'End', 'Hours', `Rate (${currencySymbol(currency)}/hr)`, `Amount (${currencySymbol(currency)})`],
+      ['Date', ...(isClientSel ? ['Job'] : []), 'Labor Type', 'Start', 'End', 'Hours', `Rate (${currencySymbol(currency)}/hr)`, `Amount (${currencySymbol(currency)})`],
       ...lineItems.map(li => [
         format(new Date(li.entry.punchIn), 'yyyy-MM-dd'),
+        ...(isClientSel ? [li.job?.name || ''] : []),
         li.lt?.name || '',
         formatTime(li.entry.punchIn, timeFormat),
         formatTime(li.entry.punchOut, timeFormat),
@@ -130,10 +148,10 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
         li.amount != null ? li.amount.toFixed(2) : '',
       ]),
       [],
-      ['', '', '', 'Total', totalHours.toFixed(2), '', totalAmount != null ? totalAmount.toFixed(2) : ''],
+      ['', ...(isClientSel ? [''] : []), '', '', 'Total', totalHours.toFixed(2), '', totalAmount != null ? totalAmount.toFixed(2) : ''],
     ]
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const slug = `${job.name.replace(/\s+/g, '-').toLowerCase()}-invoice`
+    const slug = `${targetName.replace(/\s+/g, '-').toLowerCase()}-invoice`
     const dateStr = start ? format(start, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
@@ -144,13 +162,16 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   }
 
   const printInvoice = () => {
-    if (!job || !lineItems.length) return
+    if (!lineItems.length) return
+    // Escape the free-text fields (billing profile, job names) for the print HTML.
+    const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
     const periodStr = start && end
       ? `${format(start, 'MMM d, yyyy')} – ${format(end, 'MMM d, yyyy')}`
       : ''
     const rows = lineItems.map(li => `
       <tr>
         <td>${format(new Date(li.entry.punchIn), 'MMM d, yyyy')}</td>
+        ${isClientSel ? `<td>${esc(li.job?.name || '')}</td>` : ''}
         <td>${laborBadgeHTML(li.lt)}</td>
         <td class="mono">${formatTime(li.entry.punchIn, timeFormat)} – ${formatTime(li.entry.punchOut, timeFormat)}</td>
         <td class="right mono">${li.hours.toFixed(2)}</td>
@@ -159,8 +180,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
       </tr>`).join('')
 
     // Billed-from (the billing profile) / Billed-to (the client) band + optional
-    // invoice number (display-only). Escape the free-text billing fields.
-    const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+    // invoice number (display-only).
     const fromLines = [settings.billingBusiness, settings.billingEmail, settings.billingPhone, settings.billingAddress].filter(Boolean)
     const logo = (settings.billingLogo || '').startsWith('data:image/') ? settings.billingLogo : ''
     const hasFrom = settings.billingName || fromLines.length || logo
@@ -175,13 +195,13 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   </div>
   <div class="party to">
     <div class="cap">Billed to</div>
-    <div class="pname">${esc(job.clientName || job.name)}</div>
-    ${job.clientName ? `<div class="pline">${esc(job.name)}</div>` : ''}
+    <div class="pname">${esc(billToName)}</div>
+    ${billToSub ? `<div class="pline">${esc(billToSub)}</div>` : ''}
   </div>
 </div>` : ''
 
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<title>Invoice — ${job.name}</title>
+<title>Invoice — ${esc(targetName)}</title>
 ${PRINT_FONT_HEAD}
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -219,7 +239,7 @@ ${PRINT_FONT_HEAD}
   <div class="header-row">
     <div>
       <h1>Invoice</h1>
-      <p class="meta">${esc(job.name)}</p>
+      <p class="meta">${esc(targetName)}</p>
       ${periodStr ? `<p class="period">${periodStr}</p>` : ''}
     </div>
     ${invNo ? `<div class="invno"><div class="cap">Invoice №</div><div class="num">${esc(invNo)}</div></div>` : ''}
@@ -228,12 +248,12 @@ ${PRINT_FONT_HEAD}
 ${bandHtml}
 <table>
   <thead><tr>
-    <th>Date</th><th>Labor Type</th><th>Time</th>
+    <th>Date</th>${isClientSel ? '<th>Job</th>' : ''}<th>Labor Type</th><th>Time</th>
     <th class="right">Hours</th><th class="right">Rate</th><th class="right">Amount</th>
   </tr></thead>
   <tbody>${rows}</tbody>
   <tfoot><tr class="tfoot">
-    <td colspan="3"><strong>Total</strong></td>
+    <td colspan="${isClientSel ? 4 : 3}"><strong>Total</strong></td>
     <td class="right mono">${totalHours.toFixed(2)}</td>
     <td></td>
     <td class="right mono">${totalAmount != null ? money(totalAmount) : '—'}</td>
@@ -280,12 +300,18 @@ ${totalAmount != null ? `<div class="paperfoot">
   const activeJobs = jobs?.filter(j => j.isActive !== false) ?? []
   // A job's dot colour is its own colour, else its labor type's.
   const laborColorOf = (id) => laborTypes?.find(l => l.id === id)?.color
-  const jobOptions = activeJobs.map(j => ({
-    value: j.id,
-    label: j.name,
-    sublabel: j.clientName || undefined,
-    color: j.color || laborColorOf(j.laborTypeId),
-  }))
+  // The picker offers each client (bill all their jobs together, "client:<name>")
+  // first, then the individual jobs.
+  const clientNames = [...new Set(activeJobs.map(j => j.clientName).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  const jobOptions = [
+    ...clientNames.map(c => ({ value: `client:${c}`, label: c, sublabel: 'whole client' })),
+    ...activeJobs.map(j => ({
+      value: j.id,
+      label: j.name,
+      sublabel: j.clientName || undefined,
+      color: j.color || laborColorOf(j.laborTypeId),
+    })),
+  ]
 
   return (
     <div
@@ -321,7 +347,7 @@ ${totalAmount != null ? `<div class="paperfoot">
             value={selectedJobId}
             onChange={setJobId}
             options={jobOptions}
-            placeholder="Select a job…"
+            placeholder="Select a job or client…"
           />
 
           {/* Invoice number — editable; defaults to the next number */}
@@ -396,8 +422,8 @@ ${totalAmount != null ? `<div class="paperfoot">
                 <div className="rounded-xl border border-appBorder overflow-hidden">
                   {/* Invoice header */}
                   <div className="bg-appInput px-4 py-3 border-b border-appBorder">
-                    <p className="font-display font-bold text-appText text-sm">{job?.name}</p>
-                    {job?.clientName && <p className="text-xs text-appTextMuted">{job.clientName}</p>}
+                    <p className="font-display font-bold text-appText text-sm">{targetName}</p>
+                    {previewSub && <p className="text-xs text-appTextMuted">{previewSub}</p>}
                     {start && end && (
                       <p className="text-xs text-appTextMuted mt-0.5">
                         {format(start, 'MMM d, yyyy')} – {format(end, 'MMM d, yyyy')}
@@ -418,7 +444,7 @@ ${totalAmount != null ? `<div class="paperfoot">
                     {lineItems.map((li, i) => (
                       <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-4 py-2.5 items-center">
                         <div className="min-w-0">
-                          <p className="text-xs text-appText">{format(new Date(li.entry.punchIn), 'MMM d')}</p>
+                          <p className="text-xs text-appText">{format(new Date(li.entry.punchIn), 'MMM d')}{isClientSel && li.job ? ` · ${li.job.name}` : ''}</p>
                           {li.lt && <LaborTag laborType={li.lt} className="mt-0.5" />}
                         </div>
                         <span className="font-mono text-xs text-appText text-right">{li.hours.toFixed(2)}</span>

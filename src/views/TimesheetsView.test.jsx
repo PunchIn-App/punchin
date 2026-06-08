@@ -505,6 +505,28 @@ describe('TimesheetsView — job filter', () => {
 
 // ─── Labor type filter dropdown ───────────────────────────────────────────────
 
+describe('TimesheetsView — client filter (the job picker also selects a whole client)', () => {
+  it('keeps every entry whose job belongs to the chosen client and drops the rest', () => {
+    const jobs = [
+      { id: 1, name: 'Acme Web', clientName: 'Acme', isActive: true },
+      { id: 2, name: 'Acme App', clientName: 'Acme', isActive: true },
+      { id: 3, name: 'Solo',     clientName: null,   isActive: true },
+    ]
+    const mk = (id, jobId) => ({ id, jobId, laborTypeId: 1, punchIn: new Date(TODAY.getTime() - 3600000), punchOut: new Date(TODAY), notes: null })
+    const entries = [mk(1, 1), mk(2, 2), mk(3, 3)]
+    let n = 0
+    useLiveQuery.mockImplementation((_fn, deps) => {
+      if (!deps || deps.length === 0) return (n++ % 2 === 0) ? jobs : LABOR_TYPES
+      return entries
+    })
+    render(<TimesheetsView />)
+    pickFilter('filter by job', 'whole client') // the only client option: "Acme · whole client"
+    expect(screen.getByRole('button', { name: /edit entry for acme web/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /edit entry for acme app/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit entry for solo/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('TimesheetsView — labor type filter', () => {
   it('hides entry when labor type filter does not match', () => {
     // AN_ENTRY.laborTypeId = 1 (Design); filter to Dev (id=2) → no match → empty

@@ -62,7 +62,11 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
         if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
       }
 
-      if (filterJobId && e.jobId !== Number(filterJobId)) return false
+      if (filterJobId) {
+        if (filterJobId.startsWith('client:')) {
+          if (job?.clientName !== filterJobId.slice('client:'.length)) return false
+        } else if (e.jobId !== Number(filterJobId)) return false
+      }
       if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
 
       return true
@@ -173,7 +177,11 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
         if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
       }
 
-      if (filterJobId && e.jobId !== Number(filterJobId)) return false
+      if (filterJobId) {
+        if (filterJobId.startsWith('client:')) {
+          if (job?.clientName !== filterJobId.slice('client:'.length)) return false
+        } else if (e.jobId !== Number(filterJobId)) return false
+      }
       if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
 
       return true
@@ -349,6 +357,14 @@ export default function TimesheetsView() {
   // A job's filter dot is its own colour, else its labor type's (mirrors the
   // job card's left-rail colour resolution).
   const laborColorOf = (id) => laborTypes?.find(l => l.id === id)?.color
+
+  // The job filter also offers each client ("client:<name>" → every job billed to
+  // that client), listed first, then the individual jobs.
+  const jobFilterOptions = [
+    ...[...new Set((jobs ?? []).map(j => j.clientName).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+      .map(c => ({ value: `client:${c}`, label: c, sublabel: 'whole client' })),
+    ...(jobs ?? []).map(j => ({ value: j.id, label: j.name, sublabel: j.clientName || undefined, color: j.color || laborColorOf(j.laborTypeId) })),
+  ]
 
   const go = dir => {
     setDate(d => tab === 'daily'
@@ -572,7 +588,7 @@ ${PRINT_FONT_HEAD}
           value={filterJobId}
           onChange={setFilterJobId}
           emptyOption={{ label: 'All Jobs' }}
-          options={jobs?.map(j => ({ value: j.id, label: j.name, color: j.color || laborColorOf(j.laborTypeId) })) || []}
+          options={jobFilterOptions}
         />
 
         {/* Labor Type Filter */}
