@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Download, Upload, Trash2, AlertTriangle, Cloud, CloudOff, RefreshCw, LogOut, Check } from 'lucide-react'
+import { Download, Upload, Trash2, AlertTriangle, Cloud, CloudOff, RefreshCw, LogOut, Check, ChevronRight } from 'lucide-react'
 import { db, defaultSettingsRows } from '../../db'
 import { useSettings } from '../../hooks/useSettings'
 import { runSync, disconnectSync, importSnapshot } from '../../sync/syncManager'
@@ -12,7 +12,7 @@ import { SYNC_CONFIG } from '../../sync/config'
 import { exportBackup, exportCsv } from '../../utils/backup'
 import ConfirmModal from '../../components/ConfirmModal'
 import DataTransfer from '../../components/DataTransfer'
-import { Panel, PanelGroup } from './components'
+import { Panel, PanelGroup, DangerZone } from './components'
 
 const PROVIDER_LABEL = { github: 'GitHub Gist', google: 'Google Drive', onedrive: 'OneDrive' }
 
@@ -278,27 +278,33 @@ export default function DataSyncPanel({ onBack }) {
       </PanelGroup>
 
       {/* Danger Zone — collapsed by default so destructive actions aren't a mis-tap away */}
-      <PanelGroup title="Danger Zone" danger collapsible defaultCollapsed>
-      <div className="rounded-xl border border-red-500/30 bg-appCard overflow-hidden">
+      <DangerZone>
+      <div className="rounded-xl border border-appBorder bg-appCard overflow-hidden">
         {/* Clear entries */}
         <button onClick={() => setShowClearConfirm(true)}
-          className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group border-b border-appBorderLight">
-          <Trash2 className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
-          <div>
-            <p className="text-sm text-appText font-medium group-hover:text-red-400">Clear time entries</p>
+          className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left border-b border-appBorderLight">
+          <span className="w-[34px] h-[34px] rounded-[9px] bg-appInput text-red-400 grid place-items-center flex-shrink-0">
+            <Trash2 className="w-[18px] h-[18px]" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-red-400">Clear time entries</p>
             <p className="text-xs text-appTextMuted mt-0.5">Permanent — jobs and types are kept</p>
           </div>
+          <ChevronRight className="ml-auto w-4 h-4 text-red-400 flex-shrink-0" aria-hidden="true" />
         </button>
 
         {resetStage === null && (
           <button
             onClick={() => setResetStage('warn')}
-            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors text-left group">
-            <AlertTriangle className="w-4 h-4 text-appTextMuted group-hover:text-red-400 flex-shrink-0" />
-            <div>
-              <p className="text-sm text-appText font-medium group-hover:text-red-400">Factory Reset</p>
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-red-500/5 transition-colors text-left">
+            <span className="w-[34px] h-[34px] rounded-[9px] bg-appInput text-red-400 grid place-items-center flex-shrink-0">
+              <AlertTriangle className="w-[18px] h-[18px]" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-red-400">Factory Reset</p>
               <p className="text-xs text-appTextMuted mt-0.5">Erase all data and restore app to default state</p>
             </div>
+            <ChevronRight className="ml-auto w-4 h-4 text-red-400 flex-shrink-0" aria-hidden="true" />
           </button>
         )}
 
@@ -350,7 +356,7 @@ export default function DataSyncPanel({ onBack }) {
           </div>
         )}
       </div>
-      </PanelGroup>
+      </DangerZone>
 
       {showClearConfirm && (
         <ConfirmModal

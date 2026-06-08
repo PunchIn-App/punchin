@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, within } from '@testing-library/react'
-import { WeekdayPicker, PanelGroup } from './components'
+import { WeekdayPicker, PanelGroup, DangerZone } from './components'
 
 describe('WeekdayPicker — display order vs stored value', () => {
   it('rotates the display to Monday-first but stores ABSOLUTE weekday indices', () => {
@@ -37,5 +37,23 @@ describe('PanelGroup — opt-in collapse', () => {
   it('renders children directly when not collapsible (default)', () => {
     render(<PanelGroup title="Backup"><p>always</p></PanelGroup>)
     expect(screen.getByText('always')).toBeInTheDocument()
+  })
+})
+
+describe('DangerZone — collapsed card toggle', () => {
+  it('is collapsed by default: shows the summary toggle, hides the destructive rows', () => {
+    render(<DangerZone><p>destructive</p></DangerZone>)
+    expect(screen.getByRole('button', { name: /danger zone/i })).toBeInTheDocument()
+    expect(screen.getByText(/clear entries · factory reset · irreversible/i)).toBeInTheDocument()
+    expect(screen.queryByText('destructive')).toBeNull()
+  })
+
+  it('reveals the rows on expand and hides them again on collapse', () => {
+    render(<DangerZone><p>destructive</p></DangerZone>)
+    fireEvent.click(screen.getByRole('button', { name: /danger zone/i })) // expand
+    expect(screen.getByText('destructive')).toBeInTheDocument()
+    expect(screen.queryByText(/clear entries · factory reset/i)).toBeNull() // summary gone once open
+    fireEvent.click(screen.getByRole('button', { name: /danger zone/i })) // collapse
+    expect(screen.queryByText('destructive')).toBeNull()
   })
 })
