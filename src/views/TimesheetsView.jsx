@@ -511,7 +511,7 @@ ${PRINT_FONT_HEAD}
     // openPrintWindow writes the doc and prints once the Noto webfonts load; it
     // returns false when the popup is blocked (window.open → null), same hardening
     // as InvoiceModal print so the button doesn't throw in its onClick (issue #150).
-    if (!openPrintWindow(html, { width: 900, height: 700 })) {
+    if (!openPrintWindow(html)) {
       alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use the CSV export instead.')
     }
   }
