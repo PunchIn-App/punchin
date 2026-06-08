@@ -160,6 +160,20 @@ describe('EditEntryModal — close behaviour', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('tapping the backdrop (scrim) calls onClose', () => {
+    const onClose = vi.fn()
+    const { container } = render(<EditEntryModal onClose={onClose} />)
+    fireEvent.click(container.firstChild) // the scrim element itself
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('clicking inside the dialog does NOT call onClose (guarded backdrop)', () => {
+    const onClose = vi.fn()
+    render(<EditEntryModal onClose={onClose} />)
+    fireEvent.click(screen.getByRole('dialog')) // bubbles to scrim, but target ≠ scrim
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })
 
 describe('EditEntryModal — validation', () => {

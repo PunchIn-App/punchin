@@ -34,10 +34,12 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
   const noopClose     = useCallback(() => {}, [])
   const noopHaptic    = useCallback(() => {}, [])
 
-  const swipeRef = useSwipeDismiss(
-    isStandalone && os === 'ios'     ? stableClose : noopClose,
-    isStandalone && os === 'ios'     ? hapticTrigger : noopHaptic,
-  )
+  // Swipe-down-to-dismiss on ANY touch platform, not just installed iOS — the
+  // drag handle is shown on iOS+Android standalone, and a user dragging it
+  // expects it to close (issue: the sheet ignored the handle on Android/web).
+  // hapticTrigger already self-noops off-iOS, and desktop fires no touch events,
+  // so this is inert where it shouldn't act.
+  const swipeRef = useSwipeDismiss(stableClose, hapticTrigger)
   useAndroidBackDismiss(
     isStandalone && os === 'android' ? stableClose : noopClose,
     isStandalone && os === 'android' ? hapticTrigger : noopHaptic,
@@ -119,7 +121,9 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
                     placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors`
 
   return (
-    <div className={scrim}>
+    // Tap the backdrop (the scrim itself, not a bubbled click from the sheet) to
+    // dismiss — matches the ConfirmModal idiom and every platform's expectation.
+    <div className={scrim} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       {/* Hidden iOS Taptic Engine trigger — zero layout impact, sr-only */}
       {hapticEl}
 

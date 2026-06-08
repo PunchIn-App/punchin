@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.24.0
+**Version:** 0.25.0
 
 ---
 
@@ -283,14 +283,16 @@ On mobile, modals are bottom sheets whose style branches by platform. On desktop
 | Context | Scrim | Corner radius | Extra behavior |
 |---|---|---|---|
 | iOS standalone | `bg-black/40 backdrop-blur-md` | `rounded-2xl` | Grabber pill, swipe-down-to-dismiss, Taptic Engine haptic |
-| Android standalone | `bg-black/70 backdrop-blur-sm` | `rounded-t-[28px]` (MD3) | 48 dp drag handle, `popstate` back-button dismiss, `vibrate(40)` haptic |
-| Web / browser tab | `bg-black/70 backdrop-blur-sm` | `rounded-2xl` | None |
+| Android standalone | `bg-black/70 backdrop-blur-sm` | `rounded-t-[28px]` (MD3) | 48 dp drag handle, swipe-down **or** `popstate` back-button dismiss, `vibrate(40)` haptic |
+| Web / browser tab | `bg-black/70 backdrop-blur-sm` | `rounded-2xl` | Backdrop-tap dismiss (and swipe-down on touch) |
+
+**Every sheet modal dismisses on a backdrop tap and a swipe-down**, in addition to the close button and Escape. The scrim's `onClick` is guarded with `e.target === e.currentTarget` so only a tap on the backdrop itself closes — a bubbled click from inside the sheet does not (the `ConfirmModal` idiom). Swipe-down past ~80px (`useSwipeDismiss`) dismisses on **any touch platform**, not just installed iOS — the drag handle behaves the same everywhere it's shown.
 
 Use `usePlatformContext()` to get `{ isStandalone, os }` and branch accordingly. Follow `StartTimerModal.jsx` as the reference pattern for **form / action** modals; apply the same treatment to any new one.
 
 **Shared modal hooks (issue #151).** Don't re-implement the focus trap or sheet plumbing inline — every modal consumes:
 - `useFocusTrap(dialogRef, onClose, opts?)` (`src/hooks/useFocusTrap.js`) — the full a11y contract in one place: initial focus (`[data-autofocus]` → first focusable, or `opts.initialFocus(el, focusables)` e.g. `(el) => el` for a scrollable reading dialog), a container-scoped Tab trap, focus **restoration** to the triggering element on close, and Escape→`onClose`.
-- `useSwipeDismiss` / `useAndroidBackDismiss` / `useSheetStyles` (`src/hooks/useBottomSheet.jsx`) — the iOS swipe-down, Android back-button dismiss, and platform scrim/sheet/handle styles for bottom-sheet modals.
+- `useSwipeDismiss` / `useAndroidBackDismiss` / `useSheetStyles` (`src/hooks/useBottomSheet.jsx`) — swipe-down dismiss (any touch platform), Android back-button dismiss, and platform scrim/sheet/handle styles for bottom-sheet modals.
 
 Title ids use `useId()` (never a hardcoded string) so two of the same modal can coexist.
 

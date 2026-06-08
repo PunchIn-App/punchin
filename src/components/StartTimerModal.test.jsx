@@ -233,6 +233,38 @@ describe('StartTimerModal — close behaviour', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('tapping the backdrop (scrim) calls onClose', () => {
+    const onClose = vi.fn()
+    const { container } = render(<StartTimerModal onClose={onClose} />)
+    fireEvent.click(container.firstChild) // the scrim element itself
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('clicking inside the sheet does NOT call onClose (guarded backdrop)', () => {
+    const onClose = vi.fn()
+    render(<StartTimerModal onClose={onClose} />)
+    fireEvent.click(screen.getByRole('dialog')) // bubbles to scrim, but target ≠ scrim
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('swiping the sheet down past the threshold dismisses (any touch platform)', () => {
+    const onClose = vi.fn()
+    render(<StartTimerModal onClose={onClose} />)
+    const sheet = screen.getByRole('dialog')
+    fireEvent.touchStart(sheet, { touches: [{ clientY: 100 }] })
+    fireEvent.touchEnd(sheet, { changedTouches: [{ clientY: 220 }] }) // +120 > 80px threshold
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('a downward drag under the threshold does NOT dismiss', () => {
+    const onClose = vi.fn()
+    render(<StartTimerModal onClose={onClose} />)
+    const sheet = screen.getByRole('dialog')
+    fireEvent.touchStart(sheet, { touches: [{ clientY: 100 }] })
+    fireEvent.touchEnd(sheet, { changedTouches: [{ clientY: 150 }] }) // +50 < 80px threshold
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })
 
 // --------------------------------------------------------------------------
