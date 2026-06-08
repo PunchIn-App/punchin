@@ -100,14 +100,16 @@ export default function Layout({ activeView, onNavigate, children }) {
                 onClick={() => navigate(id)}
                 aria-current={active ? 'page' : undefined}
                 aria-label={id === 'settings' && hasUpdate ? `${label} — update available` : label}
-                className={`relative flex items-center gap-3 rounded-lg py-2.5 justify-center lg:justify-start lg:px-3 transition-colors
+                className={`relative flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-colors
+                  lg:flex-row lg:items-center lg:gap-3 lg:py-2.5 lg:px-3 lg:justify-start
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent
                   ${active ? 'bg-appInput text-appText' : 'text-appTextMuted hover:text-appText hover:bg-appInput'}`}
               >
                 {/* 3px accent left-rail on the active item (sits at the sidebar's inner edge) */}
                 {active && <span aria-hidden="true" className="absolute -left-2 top-2 bottom-2 w-[3px] rounded-r bg-appAccent" />}
                 <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={active ? 2.2 : 1.5} aria-hidden="true" />
-                <span className="hidden lg:block text-sm font-semibold">{label}</span>
+                {/* Label: under the icon on the tablet icon-rail (md), beside it on the full sidebar (lg+) */}
+                <span className="text-[10px] leading-tight text-center font-semibold lg:text-sm lg:text-left">{label}</span>
                 {id === 'settings' && hasUpdate && (
                   <span aria-hidden="true" className="absolute top-1.5 right-1.5 lg:static lg:ml-auto w-2 h-2 rounded-full bg-red-500" />
                 )}

@@ -455,22 +455,28 @@ export default function App() {
   }
 
   // --- First-run import nudge --------------------------------------------
-  // An installed PWA / fresh browser gets a clean data store, so a returning
-  // user lands on an empty app. If there's no data yet (and they haven't
-  // dismissed), offer to restore a backup or connect cloud sync. One-shot check
-  // on mount; guarded so a stubbed db (tests) never throws.
+  // The carry-over problem is specific to an INSTALLED PWA (it gets a clean data
+  // store, separate from the browser), so only nudge there — a casual web/mobile
+  // tab shouldn't be nagged. Show it at most ONCE per install: mark it seen the
+  // moment it appears, so closing the app (without dismissing) doesn't re-pop it
+  // on the next open. Import stays reachable from Settings → Data & Sync after.
+  // Guarded so a stubbed db (tests) never throws.
   const [showFirstRun, setShowFirstRun] = useState(false)
   useEffect(() => {
+    if (!isInstalled) return
     let cancelled = false
     ;(async () => {
       try {
         if (localStorage.getItem(FIRSTRUN_DISMISSED_KEY)) return
         const [j, e, l] = await Promise.all([db.jobs.count(), db.entries.count(), db.laborTypes.count()])
-        if (!cancelled && j === 0 && e === 0 && l === 0) setShowFirstRun(true)
+        if (!cancelled && j === 0 && e === 0 && l === 0) {
+          try { localStorage.setItem(FIRSTRUN_DISMISSED_KEY, '1') } catch { /* ignore */ }
+          setShowFirstRun(true)
+        }
       } catch { /* storage/db unavailable — skip the nudge gracefully */ }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [isInstalled])
 
   const dismissFirstRun = () => {
     try { localStorage.setItem(FIRSTRUN_DISMISSED_KEY, '1') } catch { /* ignore */ }
