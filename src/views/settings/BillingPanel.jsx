@@ -3,13 +3,11 @@ import { DollarSign, Hash, Image as ImageIcon } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { fileToLogoDataUrl } from '../../utils/image'
 import EntitySelect from '../../components/EntitySelect'
-import { Panel, SettingsRow, Toggle } from './components'
+import { Panel, SettingsRow, Toggle, FIELD_INPUT_CLS as inputCls, FIELD_LABEL_CLS as labelCls } from './components'
 
-const inputCls =
-  'w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors'
-const labelCls = 'ds-overline text-appTextMuted'
-
-// A reasonable shortlist; users can also store any ISO 4217 code another way.
+// A reasonable shortlist of common currencies. The stored `defaultCurrency` can
+// be any ISO 4217 code (e.g. via an imported/synced value — `formatMoney` formats
+// whatever it's given); this dropdown just offers the common ones.
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'INR', 'BRL', 'MXN', 'SEK', 'NZD', 'ZAR', 'SGD']
 const CURRENCY_OPTIONS = CURRENCIES.map(c => ({ value: c, label: c }))
 

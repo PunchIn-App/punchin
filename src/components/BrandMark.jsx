@@ -1,23 +1,24 @@
 // The PunchIn brand identity, shared by the phone header and the desktop sidebar.
 //   - PunchMark: the stopwatch glyph on the accent tile (the app logo badge)
 //   - Wordmark:  "PunchIn" in Noto Sans Display with the accent-tinted capital I
-// The mark glyph flips white/dark via readableInk so it reads on any accent;
-// the geometry mirrors src/iconSvg.js (the favicon / install-icon source).
+// The mark glyph flips white/dark via readableInk so it reads on any accent; the
+// geometry comes from src/stopwatchGeometry.js (shared with the SVG-string renderer
+// src/iconSvg.js — the favicon / install-icon source — so the two can't drift).
 import { readableInk } from '../utils/inkOnAccent'
+import { STOPWATCH_ELEMENTS } from '../stopwatchGeometry'
 
-// The stopwatch path geometry (crown + stem + body + clock hands), mirroring
-// src/iconSvg.js. Stroke + the centre dot use `currentColor` so the colour is
-// driven by the SVG's resolved text colour — set it via the `color` prop on
-// StopwatchGlyph, or an inline `style`/inherited colour on PunchGlyph.
+// The stopwatch path geometry (crown + stem + body + clock hands + centre dot),
+// rendered from the shared STOPWATCH_ELEMENTS. Strokes + the filled centre dot use
+// `currentColor`, so the colour is driven by the SVG's resolved text colour — set
+// it via the `color` prop on StopwatchGlyph, or an inherited colour on PunchGlyph.
 function StopwatchPaths() {
   return (
     <>
-      <path d="M9.5 2.6h5" />
-      <path d="M12 2.6v2.4" />
-      <circle cx="12" cy="13.4" r="8.2" />
-      <path d="M12 13.4V8.6" />
-      <path d="M12 13.4l3 1.9" />
-      <circle cx="12" cy="13.4" r="0.9" fill="currentColor" stroke="none" />
+      {STOPWATCH_ELEMENTS.map((el, i) =>
+        el.d
+          ? <path key={i} d={el.d} />
+          : <circle key={i} cx={el.cx} cy={el.cy} r={el.r} {...(el.fill ? { fill: 'currentColor', stroke: 'none' } : null)} />
+      )}
     </>
   )
 }

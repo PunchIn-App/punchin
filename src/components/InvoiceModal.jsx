@@ -10,7 +10,7 @@ import { db } from '../db'
 import EntitySelect from './EntitySelect'
 import { getEntryDuration, roundEntry, formatTime } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
-import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
+import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, escHtml } from '../utils/printDocument'
 import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
@@ -164,7 +164,9 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   const printInvoice = () => {
     if (!lineItems.length) return
     // Escape the free-text fields (billing profile, job names) for the print HTML.
-    const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+    // Reuse the shared print escaper so the invoice and timesheet paths escape
+    // identically (it also escapes " — safe for attribute contexts).
+    const esc = escHtml
     const periodStr = start && end
       ? `${format(start, 'MMM d, yyyy')} – ${format(end, 'MMM d, yyyy')}`
       : ''
@@ -182,6 +184,9 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     // Billed-from (the billing profile) / Billed-to (the client) band + optional
     // invoice number (display-only).
     const fromLines = [settings.billingBusiness, settings.billingEmail, settings.billingPhone, settings.billingAddress].filter(Boolean)
+    // Gated to a `data:image/…` base64 URL (no quotes/whitespace), so the
+    // unescaped `src="${logo}"` interpolation below can't break out of the
+    // attribute; any other value is dropped. Keep this gate if you change the source.
     const logo = (settings.billingLogo || '').startsWith('data:image/') ? settings.billingLogo : ''
     const hasFrom = settings.billingName || fromLines.length || logo
     const invNo = settings.numberInvoices ? `${settings.invoicePrefix || ''}${invoiceNumIsPlain ? invoiceNum.padStart(3, '0') : invoiceNum}` : ''

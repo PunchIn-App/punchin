@@ -8,6 +8,12 @@ export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
 const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 export const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 
+// Shared field styling for settings-panel forms (the full-width text input + its
+// mono overline label), so panels don't each re-declare the Tailwind recipe.
+// Modals (StartTimer/EditEntry/Invoice) keep their own intentionally-sized inputs.
+export const FIELD_INPUT_CLS = 'w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors'
+export const FIELD_LABEL_CLS = 'ds-overline text-appTextMuted'
+
 export function Toggle({ value, onChange, ariaLabel }) {
   return (
     <button
