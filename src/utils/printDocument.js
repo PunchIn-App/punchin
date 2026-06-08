@@ -65,25 +65,45 @@ export function laborBadgeHTML(lt) {
   return `<span style="${pillStyle}"><span style="${chipStyle}">${svgStr}</span>${escHtml(lt.name)}</span>`
 }
 
-// Open a print window, write the document, and print once the brand webfonts
-// have loaded. Falls back to a short fixed delay where document.fonts is absent
-// (older browsers / jsdom in tests). Returns false — without throwing — when the
-// popup is blocked (window.open → null) so callers can alert + offer CSV.
-export function openPrintWindow(html, { width = 800, height = 600 } = {}) {
-  const w = window.open('', '_blank', `width=${width},height=${height}`)
-  if (!w) return false
-  w.document.write(html)
-  w.document.close()
-  w.focus()
-  // Print once the brand webfonts have loaded — but never hang on it. On iOS the
-  // `fonts.ready` promise can stall (the popup's font load never settles), and
-  // because iOS *has* document.fonts it would otherwise skip the timed fallback
-  // below and never print, leaving the user staring at an un-printing window
-  // ("stuck"). So race fonts.ready against a 1.5s safety timeout: whichever fires
-  // first prints, and a `printed` latch makes the loser a no-op.
-  const fonts = w.document.fonts
+// Render the document into a hidden, same-page iframe and print THAT — never a
+// popup window. On iOS a print popup (window.open) can't be dismissed back to an
+// installed PWA: closing the print/share sheet strands the user on a dead tab they
+// have to force-quit. An iframe prints in place — closing the sheet returns to the
+// app — and it isn't subject to popup blockers. Being about:blank, it inherits the
+// app's base URL, so the document's absolute /fonts/*.woff2 URLs still resolve.
+//
+// Prints once the brand webfonts have loaded, but never hangs on it: iOS *has*
+// document.fonts yet its `ready` promise can stall, so race it against a 1.5s
+// safety timeout (a `printed` latch makes the loser a no-op). The iframe is removed
+// once the user is done — on `afterprint`, or when the app regains focus after the
+// print sheet closes. Returns false (without throwing) only if the frame can't
+// initialise, so callers can still alert + offer CSV.
+export function openPrintWindow(html) {
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute('aria-hidden', 'true')
+  iframe.title = 'Print document'
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;border:0;visibility:hidden'
+  document.body.appendChild(iframe)
+
+  const win = iframe.contentWindow
+  if (!win) { iframe.remove(); return false }
+  win.document.open()
+  win.document.write(html)
+  win.document.close()
+
   let printed = false
-  const doPrint = () => { if (!printed) { printed = true; w.print() } }
+  const doPrint = () => {
+    if (printed) return
+    printed = true
+    try { win.focus(); win.print() } catch { /* printing unsupported here — no-op */ }
+  }
+  // Idempotent cleanup: afterprint (desktop), or the app regaining focus once the
+  // iOS print/share sheet is dismissed (afterprint isn't reliable there).
+  const cleanup = () => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe) }
+  try { win.addEventListener('afterprint', cleanup) } catch { /* ignore */ }
+  window.addEventListener('focus', cleanup, { once: true })
+
+  const fonts = win.document.fonts
   if (fonts && fonts.ready && typeof fonts.ready.then === 'function') {
     fonts.ready.then(doPrint)
     setTimeout(doPrint, 1500)

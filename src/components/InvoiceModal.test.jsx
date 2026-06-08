@@ -1,6 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import InvoiceModal from './InvoiceModal'
+import { openPrintWindow } from '../utils/printDocument'
+
+// Printing goes through openPrintWindow (a hidden iframe, not a popup). Mock just
+// that fn so these tests assert WHAT html the modal builds and hands off — the
+// iframe mechanics are covered in printDocument.test.js. PRINT_FONT_HEAD and
+// laborBadgeHTML stay real so the built html is faithful.
+vi.mock('../utils/printDocument', async (importOriginal) => ({
+  ...(await importOriginal()),
+  openPrintWindow: vi.fn(() => true),
+}))
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 
@@ -50,6 +60,7 @@ function pickJob(name = 'Acme Corp') {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  openPrintWindow.mockReturnValue(true) // clearAllMocks keeps return overrides — reset to the success default
   mockSettings = { weekStartsMonday: true }
   // Return [] when no job selected, ENTRIES when selectedJobId is non-empty (deps[2])
   useLiveQuery.mockImplementation((_fn, deps) => {
@@ -222,8 +233,6 @@ describe('InvoiceModal — export and print', () => {
   beforeEach(() => {
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
     global.URL.revokeObjectURL = vi.fn()
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
   })
 
   afterEach(() => {
@@ -238,32 +247,30 @@ describe('InvoiceModal — export and print', () => {
     expect(global.URL.createObjectURL).toHaveBeenCalled()
   })
 
-  it('calls window.open when Print is clicked with line items', async () => {
+  it('hands the print document to openPrintWindow when Print is clicked with line items', async () => {
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    expect(window.open).toHaveBeenCalled()
+    expect(openPrintWindow).toHaveBeenCalled()
   })
 
-  it('alerts instead of throwing when the popup is blocked (window.open → null) (#150)', async () => {
-    window.open.mockReturnValue(null)
+  it('alerts instead of throwing when printing fails (openPrintWindow → false) (#150)', async () => {
+    openPrintWindow.mockReturnValue(false)
     global.alert = vi.fn()
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     expect(() => fireEvent.click(screen.getByRole('button', { name: /print/i }))).not.toThrow()
-    expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('pop-ups'))
+    expect(global.alert).toHaveBeenCalled()
   })
 
   it('prints the invoice in the Noto brand font, loading the webfont (not the system-UI fallback)', async () => {
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    const html = fakeWin.document.write.mock.calls[0][0]
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain("font-family: 'Noto Sans', sans-serif")
     expect(html).toContain("'Noto Sans Mono', monospace")
     expect(html).toContain("'Noto Sans Display'")
@@ -274,13 +281,11 @@ describe('InvoiceModal — export and print', () => {
 
   it('renders the Billed-from band + invoice number in the print HTML when configured', async () => {
     mockSettings = { weekStartsMonday: true, billingName: 'Jane Doe', billingEmail: 'jane@example.com', numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    const html = fakeWin.document.write.mock.calls[0][0]
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain('Billed from')
     expect(html).toContain('Jane Doe')
     expect(html).toContain('Billed to')
@@ -291,26 +296,22 @@ describe('InvoiceModal — export and print', () => {
 
   it('renders the business logo in the print band when set', async () => {
     mockSettings = { weekStartsMonday: true, billingName: 'Jane Doe', billingLogo: 'data:image/png;base64,LOGO123' }
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    const html = fakeWin.document.write.mock.calls[0][0]
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain('data:image/png;base64,LOGO123')
   })
 
   it('lets the user override the invoice number; the printout + counter follow it', async () => {
     mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.change(screen.getByLabelText('Invoice number'), { target: { value: '50' } })
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    const html = fakeWin.document.write.mock.calls[0][0]
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain('PI-050')                                    // printed number follows the edit
     expect(mockUpdateSetting).toHaveBeenCalledWith('nextInvoiceNumber', 51) // counter advances to edited + 1
   })
@@ -320,8 +321,6 @@ describe('InvoiceModal — export and print', () => {
     // plain numbers. A non-numeric value is used as-is (no zero-padding) and the
     // auto-increment counter must NOT advance (you can't "+1" a string).
     mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
@@ -329,14 +328,13 @@ describe('InvoiceModal — export and print', () => {
     fireEvent.change(field, { target: { value: 'INV-2024-A' } })
     expect(field).toHaveValue('INV-2024-A')                 // letters kept, not coerced to a number
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    const html = fakeWin.document.write.mock.calls[0][0]
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain('PI-INV-2024-A')                 // prefix + verbatim value, no zero-padding
     expect(mockUpdateSetting).not.toHaveBeenCalledWith('nextInvoiceNumber', expect.anything())
   })
 
   it('advances nextInvoiceNumber when a numbered invoice is generated', async () => {
     mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
-    vi.spyOn(window, 'open').mockReturnValue({ document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() })
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
@@ -345,13 +343,11 @@ describe('InvoiceModal — export and print', () => {
   })
 
   it('printed invoice badge shows the labor glyph (svg) and labor name, not colour-only', async () => {
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     renderModal()
     pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    const html = fakeWin.document.write.mock.calls[0][0]
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain('<svg')
     expect(html).toContain('Design')
   })
@@ -368,14 +364,12 @@ describe('InvoiceModal — export and print', () => {
       { id: 2, jobId: 2, laborTypeId: 1, punchIn: new Date('2025-06-02T09:00:00'), punchOut: new Date('2025-06-02T11:00:00') }, // 2h @ $150 = 300
     ]
     useLiveQuery.mockImplementation((_fn, deps) => (deps?.[2] ? entriesTwo : []))
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     render(<InvoiceModal jobs={jobsTwo} laborTypes={LABOR_TYPES} currentDate={new Date('2025-06-01')} currentTab="weekly" onClose={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /^job/i }))
     fireEvent.click(screen.getByRole('option', { name: /whole client/i })) // the "Acme · whole client" option
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    const html = fakeWin.document.write.mock.calls[0][0]
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain('Acme')        // billed to the client
     expect(html).toContain('Acme Web')    // each job shown (per-job column)
     expect(html).toContain('Acme App')
@@ -383,9 +377,9 @@ describe('InvoiceModal — export and print', () => {
     expect(html).toContain('400')         // total amount 100 + 300
   })
 
-  it('does not advance the number when the popup is blocked', async () => {
+  it('does not advance the number when printing fails to open', async () => {
     mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
-    vi.spyOn(window, 'open').mockReturnValue(null)
+    openPrintWindow.mockReturnValue(false)
     global.alert = vi.fn()
     renderModal()
     pickJob()

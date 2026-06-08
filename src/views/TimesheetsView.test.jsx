@@ -1,6 +1,15 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import TimesheetsView from './TimesheetsView'
+import { openPrintWindow } from '../utils/printDocument'
+
+// Printing goes through openPrintWindow (a hidden iframe, not a popup). Mock just
+// that fn so these tests assert the html the view builds; the iframe mechanics are
+// covered in printDocument.test.js (PRINT_FONT_HEAD/laborBadgeHTML stay real).
+vi.mock('../utils/printDocument', async (importOriginal) => ({
+  ...(await importOriginal()),
+  openPrintWindow: vi.fn(() => true),
+}))
 
 const mockEntriesDelete = vi.fn().mockResolvedValue(undefined)
 const mockDeleteEntry   = vi.fn().mockResolvedValue(undefined)
@@ -68,8 +77,6 @@ beforeEach(() => {
   useLiveQuery.mockReturnValue([])
   global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
   global.URL.revokeObjectURL = vi.fn()
-  const fakeWindow = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-  vi.spyOn(window, 'open').mockReturnValue(fakeWindow)
 })
 
 afterEach(() => {
@@ -352,26 +359,24 @@ describe('TimesheetsView — CSV export', () => {
 // ─── Print timesheet ─────────────────────────────────────────────────────────
 
 describe('TimesheetsView — print timesheet', () => {
-  it('calls window.open when Print button is clicked (daily)', async () => {
+  it('hands the print document to openPrintWindow (daily)', async () => {
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
-    await waitFor(() => expect(window.open).toHaveBeenCalled())
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
   })
 
-  it('calls window.open when Print button is clicked (weekly)', async () => {
+  it('hands the print document to openPrintWindow (weekly)', async () => {
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
-    await waitFor(() => expect(window.open).toHaveBeenCalled())
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
   })
 
   it('prints the timesheet in the Noto brand font, loading the webfont (not the system-UI fallback)', async () => {
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
-    await waitFor(() => expect(fakeWin.document.write).toHaveBeenCalled())
-    const html = fakeWin.document.write.mock.calls[0][0]
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain("font-family: 'Noto Sans', sans-serif")
     expect(html).toContain("'Noto Sans Mono', monospace")
     expect(html).toContain("'Noto Sans Display'")
@@ -385,12 +390,10 @@ describe('TimesheetsView — print timesheet', () => {
     // both: useLiveQuery for the on-screen sheet, mockDbEntries for the print path.
     setupWithEntries()
     mockDbEntries = [AN_ENTRY]
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
-    await waitFor(() => expect(fakeWin.document.write).toHaveBeenCalled())
-    const html = fakeWin.document.write.mock.calls[0][0]
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+    const html = openPrintWindow.mock.calls[0][0]
     expect(html).toContain('<svg')
     expect(html).toContain('Design')
   })

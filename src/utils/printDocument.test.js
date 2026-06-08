@@ -15,64 +15,42 @@ describe('printDocument', () => {
     expect(PRINT_FONT_HEAD).toContain("'Noto Sans Mono'")
   })
 
-  it('writes the document and waits for the brand webfonts before printing', async () => {
-    let resolveReady
-    const ready = new Promise((r) => { resolveReady = r })
-    const win = {
-      document: { write: vi.fn(), close: vi.fn(), fonts: { ready } },
-      focus: vi.fn(),
-      print: vi.fn(),
-    }
-    vi.spyOn(window, 'open').mockReturnValue(win)
+  // openPrintWindow now renders into a hidden, same-page iframe (NOT a popup), so
+  // the print sheet can be dismissed back to an installed iOS PWA instead of
+  // stranding the user on a dead popup tab. These cover the iframe mechanics; the
+  // brand-font HTML is asserted by PRINT_FONT_HEAD above and at each call site.
+  function getPrintFrame() {
+    return document.querySelector('iframe[aria-hidden="true"][title="Print document"]')
+  }
 
-    const ok = openPrintWindow('<html>doc</html>', { width: 800, height: 600 })
-
+  it('renders the document into a hidden, same-page iframe (never a popup window)', () => {
+    const openSpy = vi.spyOn(window, 'open')
+    const ok = openPrintWindow('<html><body>doc-marker</body></html>')
     expect(ok).toBe(true)
-    expect(win.document.write).toHaveBeenCalledWith('<html>doc</html>')
-    expect(win.document.close).toHaveBeenCalled()
-    expect(win.print).not.toHaveBeenCalled() // must not print before fonts load
-
-    resolveReady()
-    await ready
-    expect(win.print).toHaveBeenCalled()
+    expect(openSpy).not.toHaveBeenCalled()                       // no popup window
+    const frame = getPrintFrame()
+    expect(frame).toBeTruthy()
+    expect(frame.style.visibility).toBe('hidden')               // offscreen + invisible
+    expect(frame.contentDocument.body.textContent).toContain('doc-marker')
+    frame.remove()
   })
 
-  it('falls back to a timed print when document.fonts is unavailable', () => {
+  it('prints the iframe after the font fallback delay (document.fonts absent in jsdom)', () => {
     vi.useFakeTimers()
-    const win = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(win)
-
-    openPrintWindow('<html>doc</html>')
-
-    expect(win.print).not.toHaveBeenCalled()
+    openPrintWindow('<html><body>x</body></html>')
+    const frame = getPrintFrame()
+    const printSpy = vi.spyOn(frame.contentWindow, 'print').mockImplementation(() => {})
+    expect(printSpy).not.toHaveBeenCalled()
     vi.advanceTimersByTime(250)
-    expect(win.print).toHaveBeenCalled()
+    expect(printSpy).toHaveBeenCalledTimes(1)
+    frame.remove()
   })
 
-  it('prints via the 1.5s safety timeout when fonts.ready never settles (iOS hang guard)', () => {
-    // iOS has document.fonts, so a hung fonts.ready would otherwise skip the
-    // timed fallback and never print, leaving the user stuck. The race must still
-    // fire print() once the safety timeout elapses.
-    vi.useFakeTimers()
-    const win = {
-      document: { write: vi.fn(), close: vi.fn(), fonts: { ready: new Promise(() => {}) /* never resolves */ } },
-      focus: vi.fn(),
-      print: vi.fn(),
-    }
-    vi.spyOn(window, 'open').mockReturnValue(win)
-
-    openPrintWindow('<html>doc</html>')
-
-    expect(win.print).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(1500)
-    expect(win.print).toHaveBeenCalledTimes(1)
-  })
-
-  it('returns false without throwing when the popup is blocked (window.open → null)', () => {
-    vi.spyOn(window, 'open').mockReturnValue(null)
-    let result
-    expect(() => { result = openPrintWindow('<html>doc</html>') }).not.toThrow()
-    expect(result).toBe(false)
+  it('removes the print iframe when the app regains focus (print sheet dismissed)', () => {
+    openPrintWindow('<html><body>x</body></html>')
+    expect(getPrintFrame()).toBeTruthy()
+    window.dispatchEvent(new Event('focus'))
+    expect(getPrintFrame()).toBeNull()
   })
 })
 
