@@ -148,7 +148,7 @@ export default function Layout({ activeView, onNavigate, children }) {
 
       {/* Phone header */}
       <header
-        className="md:hidden flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-appBorderLight bg-appNav pt-[calc(env(safe-area-inset-top)+0.75rem)]"
+        className="md:hidden flex-shrink-0 flex items-center justify-between px-4 pb-3 border-b border-appBorderLight bg-appNav pt-[calc(env(safe-area-inset-top)+0.75rem)]"
       >
         <button
           onClick={() => navigate('timer')}
