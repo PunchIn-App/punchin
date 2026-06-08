@@ -7,6 +7,15 @@
   </defs>
   
   <rect width="1280" height="640" fill="url(#glow)"></rect>
+  <!-- Ghosted oversized stopwatch marks, bleeding off both edges to frame the lockup -->
+  <g fill="none" stroke="#2D5BF5" stroke-width="0.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.08">
+    <g transform="translate(-238,9.6) scale(24)">
+      <path d="M9.5 2.6h5"></path><path d="M12 2.6v2.4"></path><circle cx="12" cy="13.4" r="8.2"></circle><path d="M12 13.4V8.6"></path><path d="M12 13.4l3 1.9"></path>
+    </g>
+    <g transform="translate(942,9.6) scale(24)">
+      <path d="M9.5 2.6h5"></path><path d="M12 2.6v2.4"></path><circle cx="12" cy="13.4" r="8.2"></circle><path d="M12 13.4V8.6"></path><path d="M12 13.4l3 1.9"></path>
+    </g>
+  </g>
   
   <rect x="570" y="180" width="140" height="140" rx="32" fill="#2D5BF5"></rect>
   
