@@ -7,8 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.26.0] — 2026-06-08
 
+### Added
+- **Custom date picker.** A branded calendar popover — arrow-key navigable (←/→ a day, ↑/↓ a week, Page Up/Down a month, Enter to select) — replaces the browser's native date control on a time entry's start/end dates and the invoice custom range.
+
 ### Changed
-- **Time fields now use PunchIn's own picker.** Reminder times and a time entry's start/end time open a branded scrolling hour/minute picker instead of the browser's native time control — and unlike the native one, it follows your 12-hour / 24-hour preference from Settings. (Date fields move to the matching custom picker next.)
+- **Time & date fields now use PunchIn's own pickers.** A time entry's start/end times and the reminder times open a branded picker where you can **type the hour and minute** (great on a desktop keyboard) or **spin the wheel** (great on touch) — and unlike the native control, it follows your 12-hour / 24-hour preference from Settings. Date fields move to the matching branded **calendar** described above.
 
 ---
 

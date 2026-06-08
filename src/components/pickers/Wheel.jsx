@@ -16,17 +16,20 @@ export const ITEM_H = 30 // px per row
 export const VISIBLE = 3 // rows shown: 1 above, the selection, 1 below
 const REPEAT = 5 // copies of the list (buffer for wrap-around)
 const CENTER = Math.floor(REPEAT / 2)
-const PAD = (VISIBLE - 1) / 2
 
-export function Wheel({ values, value, onStep, onLiveStep, label, format }) {
+// `itemH` / `visible` / `width` size the column; they default to the shared
+// constants so existing callers (the long-running-timer duration picker) are
+// untouched, while the TimePicker can ask for roomier rows (issue #229 follow-up).
+export function Wheel({ values, value, onStep, onLiveStep, label, format, itemH = ITEM_H, visible = VISIBLE, width = '2.25rem' }) {
   const ref = useRef(null)
   const settle = useRef(0)
   const lastLive = useRef(0)
   const N = values.length
+  const pad = (visible - 1) / 2
   const baseIdx = Math.max(0, values.indexOf(value))
-  const scrollFor = (vi) => (CENTER * N + vi - PAD) * ITEM_H
+  const scrollFor = (vi) => (CENTER * N + vi - pad) * itemH
   const stepsFromScroll = (el) =>
-    Math.round(el.scrollTop / ITEM_H) + PAD - (CENTER * N + baseIdx)
+    Math.round(el.scrollTop / itemH) + pad - (CENTER * N + baseIdx)
 
   // Centre the current value on the middle copy (mount + external change).
   useEffect(() => {
@@ -78,14 +81,14 @@ export function Wheel({ values, value, onStep, onLiveStep, label, format }) {
       onScroll={onScroll}
       onKeyDown={onKeyDown}
       className="wheel-col font-mono text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-appAccent/50"
-      style={{ height: VISIBLE * ITEM_H, width: '2.25rem' }}
+      style={{ height: visible * itemH, width }}
     >
       {Array.from({ length: REPEAT * N }, (_, k) => values[k % N]).map((v, k) => (
         <div
           key={k}
           aria-hidden="true"
           className="flex items-center justify-center text-appText"
-          style={{ height: ITEM_H, scrollSnapAlign: 'center' }}
+          style={{ height: itemH, scrollSnapAlign: 'center' }}
         >
           {format(v)}
         </div>

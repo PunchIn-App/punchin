@@ -77,10 +77,10 @@ describe('EditEntryModal — manual add mode', () => {
     expect(screen.getByRole('button', { name: /add time entry/i })).toBeInTheDocument()
   })
 
-  it('renders both start and end date inputs', () => {
+  it('renders both start and end date pickers', () => {
     render(<EditEntryModal onClose={vi.fn()} />)
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    expect(dateInputs).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /start date/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /end date/i })).toBeInTheDocument()
   })
 })
 
@@ -110,10 +110,9 @@ describe('EditEntryModal — edit mode (completed entry)', () => {
     expect(screen.getByPlaceholderText('What did you work on?')).toHaveValue('Design review')
   })
 
-  it('pre-fills start date with "2025-06-01"', () => {
+  it('pre-fills the start date picker with Jun 1, 2025', () => {
     render(<EditEntryModal entry={COMPLETED_ENTRY} onClose={vi.fn()} />)
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    expect(dateInputs[0]).toHaveValue('2025-06-01')
+    expect(screen.getByRole('button', { name: /start date: jun 1, 2025/i })).toBeInTheDocument()
   })
 })
 
@@ -128,10 +127,10 @@ describe('EditEntryModal — active timer mode', () => {
     expect(screen.getByText('Edit Active Timer')).toBeInTheDocument()
   })
 
-  it('renders only 1 date input (no end date)', () => {
+  it('renders only a start date picker (no end date) for an active timer', () => {
     render(<EditEntryModal entry={ACTIVE_ENTRY} onClose={vi.fn()} />)
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    expect(dateInputs).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /start date/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /end date/i })).not.toBeInTheDocument()
   })
 
   it('renders only a start time picker (no end time) for an active timer', () => {
@@ -213,15 +212,21 @@ describe('EditEntryModal — validation', () => {
     )
   })
 
-  it('rejects a future start on an active timer (#153)', async () => {
-    render(<EditEntryModal entry={ACTIVE_ENTRY} onClose={vi.fn()} />)
-    // Active timer has one date input (start); push it far into the future
-    fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: '2999-01-01' } })
-    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
-    await waitFor(() =>
+  it('rejects a future start on an active timer (#153)', () => {
+    // Pin "now" to the entry's start so the next calendar day is unambiguously
+    // the future, then drive the start-date picker forward a day.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2025-06-01T09:00:00'))
+    try {
+      render(<EditEntryModal entry={ACTIVE_ENTRY} onClose={vi.fn()} />)
+      fireEvent.click(screen.getByRole('button', { name: /start date/i })) // open the calendar
+      fireEvent.click(screen.getByRole('button', { name: 'June 2, 2025' })) // tomorrow
+      fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
       expect(screen.getByText(/start can.t be in the future/i)).toBeInTheDocument()
-    )
-    expect(mockEntriesUpdate).not.toHaveBeenCalled()
+      expect(mockEntriesUpdate).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

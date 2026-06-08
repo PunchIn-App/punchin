@@ -8,6 +8,7 @@ import {
 } from 'date-fns'
 import { db } from '../db'
 import EntitySelect from './EntitySelect'
+import DatePicker from './pickers/DatePicker'
 import { getEntryDuration, roundEntry, formatTime } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, escHtml } from '../utils/printDocument'
@@ -394,18 +395,20 @@ ${totalAmount != null ? `<div class="paperfoot">
             </div>
             {preset === RANGE_PRESETS.length - 1 && (
               <div className="flex items-center gap-2 mt-2">
-                <input
-                  type="date"
+                <DatePicker
+                  label="Custom start"
                   value={customStart}
-                  onChange={e => setCustomStart(e.target.value)}
-                  className={`flex-1 ${inputCls}`}
+                  onChange={setCustomStart}
+                  className="flex-1 block"
+                  buttonClassName={`w-full justify-start ${inputCls}`}
                 />
                 <span className="text-appTextMuted text-xs">to</span>
-                <input
-                  type="date"
+                <DatePicker
+                  label="Custom end"
                   value={customEnd}
-                  onChange={e => setCustomEnd(e.target.value)}
-                  className={`flex-1 ${inputCls}`}
+                  onChange={setCustomEnd}
+                  className="flex-1 block"
+                  buttonClassName={`w-full justify-start ${inputCls}`}
                 />
               </div>
             )}

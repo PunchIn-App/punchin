@@ -6,6 +6,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap'
 import ConfirmModal from './ConfirmModal'
 import EntitySelect from './EntitySelect'
 import TimePicker from './pickers/TimePicker'
+import DatePicker from './pickers/DatePicker'
 
 // Helper helpers for date/time controls — exported for unit testing
 export function formatDateToYYYYMMDD(date) {
@@ -234,12 +235,13 @@ export default function EditEntryModal({ entry, onClose }) {
             {/* Start Date */}
             <div className="space-y-1.5">
               <label htmlFor={startDate_} className={labelCls}>Start Date</label>
-              <input
+              <DatePicker
                 id={startDate_}
-                type="date"
                 value={dateStr}
-                onChange={e => setDateStr(e.target.value)}
-                className={inputCls}
+                onChange={setDateStr}
+                label="Start Date"
+                className="block"
+                buttonClassName={inputCls}
               />
             </div>
 
@@ -260,12 +262,13 @@ export default function EditEntryModal({ entry, onClose }) {
             {!isActiveTimer && (
               <div className="space-y-1.5">
                 <label htmlFor={endDate_} className={labelCls}>End Date</label>
-                <input
+                <DatePicker
                   id={endDate_}
-                  type="date"
                   value={endDateStr}
-                  onChange={e => setEndDateStr(e.target.value)}
-                  className={inputCls}
+                  onChange={setEndDateStr}
+                  label="End Date"
+                  className="block"
+                  buttonClassName={inputCls}
                 />
               </div>
             )}

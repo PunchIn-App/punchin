@@ -94,6 +94,52 @@ describe('TimePicker — 12h AM/PM', () => {
   })
 })
 
+describe('TimePicker — typeable fields', () => {
+  const hourField = () => screen.getByRole('textbox', { name: /hour/i })
+  const minuteField = () => screen.getByRole('textbox', { name: /minute/i })
+
+  it('typing the hour field emits the typed hour (24h)', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:30" onChange={onChange} label="Start" />)
+    openPicker()
+    fireEvent.change(hourField(), { target: { value: '7' } })
+    expect(onChange).toHaveBeenLastCalledWith('07:30')
+  })
+
+  it('typing the minute field emits the typed minute', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:30" onChange={onChange} label="Start" />)
+    openPicker()
+    fireEvent.change(minuteField(), { target: { value: '45' } })
+    expect(onChange).toHaveBeenLastCalledWith('09:45')
+  })
+
+  it('clamps an out-of-range typed minute (99 → 59)', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:30" onChange={onChange} label="Start" />)
+    openPicker()
+    fireEvent.change(minuteField(), { target: { value: '99' } })
+    expect(onChange).toHaveBeenLastCalledWith('09:59')
+  })
+
+  it('ArrowUp in the hour field increments the hour', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:30" onChange={onChange} label="Start" />)
+    openPicker()
+    fireEvent.keyDown(hourField(), { key: 'ArrowUp' })
+    expect(onChange).toHaveBeenLastCalledWith('10:30')
+  })
+
+  it('12h: typing the hour respects the current AM/PM period', () => {
+    mockTimeFormat = '12h'
+    const onChange = vi.fn()
+    render(<TimePicker value="13:05" onChange={onChange} label="Start" />) // 1:05 PM
+    openPicker()
+    fireEvent.change(hourField(), { target: { value: '3' } })
+    expect(onChange).toHaveBeenLastCalledWith('15:05') // 3 PM
+  })
+})
+
 describe('TimePicker — dismiss', () => {
   it('closes the popover on Escape', () => {
     render(<TimePicker value="09:30" onChange={vi.fn()} label="Start" />)

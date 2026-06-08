@@ -193,39 +193,50 @@ describe('InvoiceModal — period presets', () => {
     expect(screen.getByRole('button', { name: /last month/i })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('shows custom date inputs when "Custom" preset is selected', () => {
+  it('shows custom date pickers when "Custom" preset is selected', () => {
     renderModal()
     fireEvent.click(screen.getByRole('button', { name: /^custom$/i }))
-    expect(screen.getAllByDisplayValue('').length).toBeGreaterThanOrEqual(1)
-    // Two date inputs appear
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    expect(dateInputs.length).toBe(2)
+    expect(screen.getByRole('button', { name: /custom start/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /custom end/i })).toBeInTheDocument()
   })
 
-  it('custom date inputs accept values', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /^custom$/i }))
-    const [startInput, endInput] = document.querySelectorAll('input[type="date"]')
-    fireEvent.change(startInput, { target: { value: '2025-06-01' } })
-    fireEvent.change(endInput,   { target: { value: '2025-06-30' } })
-    expect(startInput.value).toBe('2025-06-01')
-    expect(endInput.value).toBe('2025-06-30')
+  it('custom date pickers accept values', () => {
+    // Pin "now" so the empty pickers open on a known month and the day cells exist.
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2025-06-15T12:00:00'))
+    try {
+      renderModal()
+      fireEvent.click(screen.getByRole('button', { name: /^custom$/i }))
+      fireEvent.click(screen.getByRole('button', { name: /custom start/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'June 1, 2025' }))
+      fireEvent.click(screen.getByRole('button', { name: /custom end/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'June 30, 2025' }))
+      expect(screen.getByRole('button', { name: /custom start: jun 1, 2025/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /custom end: jun 30, 2025/i })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('clips the custom end to an inclusive end-of-day (23:59:59.999) (#157)', () => {
-    let capturedDeps
-    useLiveQuery.mockImplementation((_fn, deps) => { capturedDeps = deps; return [] })
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /^custom$/i }))
-    const [startInput, endInput] = document.querySelectorAll('input[type="date"]')
-    fireEvent.change(startInput, { target: { value: '2025-06-01' } })
-    fireEvent.change(endInput,   { target: { value: '2025-06-30' } })
-    // deps = [start.getTime(), end.getTime(), selectedJobId]; end must be 23:59:59.999
-    const end = new Date(capturedDeps[1])
-    expect(end.getHours()).toBe(23)
-    expect(end.getMinutes()).toBe(59)
-    expect(end.getSeconds()).toBe(59)
-    expect(end.getMilliseconds()).toBe(999)
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2025-06-15T12:00:00'))
+    try {
+      let capturedDeps
+      useLiveQuery.mockImplementation((_fn, deps) => { capturedDeps = deps; return [] })
+      renderModal()
+      fireEvent.click(screen.getByRole('button', { name: /^custom$/i }))
+      fireEvent.click(screen.getByRole('button', { name: /custom start/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'June 1, 2025' }))
+      fireEvent.click(screen.getByRole('button', { name: /custom end/i }))
+      fireEvent.click(screen.getByRole('button', { name: 'June 30, 2025' }))
+      // deps = [start.getTime(), end.getTime(), selectedJobId]; end must be 23:59:59.999
+      const end = new Date(capturedDeps[1])
+      expect(end.getHours()).toBe(23)
+      expect(end.getMinutes()).toBe(59)
+      expect(end.getSeconds()).toBe(59)
+      expect(end.getMilliseconds()).toBe(999)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
