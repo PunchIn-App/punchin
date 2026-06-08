@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus } from 'lucide-react'
+import { Plus, Play } from 'lucide-react'
 import { db } from '../db'
 import TimerCard from '../components/TimerCard'
 import StartTimerModal from '../components/StartTimerModal'
@@ -119,6 +119,39 @@ export default function TimerView() {
             <StatTile label="This week" value={formatDurationHM(stats.week)} />
             <StatTile label="Avg / day" value={formatDurationHM(stats.avg)} className="hidden sm:block" />
           </div>
+        )}
+
+        {/* Quick punch (phone + tablet; the xl rail carries it on desktop) — the
+            3 most recently used jobs. Tapping opens the sheet so the user picks
+            the task, matching the rail's behaviour. */}
+        {recentJobs.length > 0 && (
+          <section className="mb-6 xl:hidden">
+            <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-2">Quick punch</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {recentJobs.map(job => {
+                const jlt = ltMap.get(job.laborTypeId)
+                return (
+                  <button
+                    key={job.id}
+                    onClick={() => handleQuickPunch(job)}
+                    aria-label={`Punch in: ${job.name}`}
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-appCard border border-appBorder
+                               hover:bg-appInput text-left transition-colors
+                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent"
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: jlt?.color || '#6366F1' }} aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm text-appText truncate">{job.name}</span>
+                      {jlt && <span className="block text-[11px] text-appTextMuted truncate">{jlt.name}</span>}
+                    </span>
+                    <span className="flex-shrink-0 w-7 h-7 rounded-md bg-appAccent/15 flex items-center justify-center">
+                      <Play className="w-3.5 h-3.5 text-appAccent fill-current" aria-hidden="true" />
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
         )}
 
         {/* Empty state */}
