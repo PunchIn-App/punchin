@@ -113,7 +113,7 @@ describe('EntitySelect', () => {
     expect(screen.getByText('Select a job…')).toBeInTheDocument()
   })
 
-  it('compact mode renders a smaller toolbar-chip trigger and floats the menu absolutely', () => {
+  it('compact mode renders a smaller toolbar-chip trigger; the menu overlays (fixed)', () => {
     render(<EntitySelect compact label="Job" value="" onChange={() => {}} options={JOB_OPTS} emptyOption={{ label: 'All Jobs' }} />)
     const trigger = screen.getByRole('button', { name: /job/i })
     // The compact trigger matches the Timesheets toolbar filter chips:
@@ -122,14 +122,16 @@ describe('EntitySelect', () => {
     expect(trigger).toHaveClass('text-xs')
 
     fireEvent.click(trigger)
-    // The compact menu floats (absolute) anchored to the trigger instead of
-    // expanding in flow, so it doesn't shove the toolbar content down.
-    expect(screen.getByRole('listbox')).toHaveClass('absolute')
+    // The menu floats over content (position: fixed, positioned off the trigger)
+    // instead of expanding in flow, so it never shoves the toolbar/form down.
+    expect(screen.getByRole('listbox')).toHaveStyle({ position: 'fixed' })
   })
 
-  it('default (non-compact) mode keeps the in-flow menu (not absolute)', () => {
+  it('the default menu also overlays content (floats, not in-flow)', () => {
+    // Dropdowns overlay rather than push the form down; both modes use a fixed
+    // floating menu so a scroll-container modal never clips it.
     render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
     fireEvent.click(screen.getByRole('button', { name: /job/i }))
-    expect(screen.getByRole('listbox')).not.toHaveClass('absolute')
+    expect(screen.getByRole('listbox')).toHaveStyle({ position: 'fixed' })
   })
 })

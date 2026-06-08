@@ -15,10 +15,14 @@ import { glyphComponent } from './LaborGlyph'
 // "All Jobs" (filter) or "No default" (optional) selects; omit it for required
 // ones so the only way to satisfy them is to pick a real option.
 //
-// The menu expands IN FLOW (it pushes the following content down) rather than
-// floating absolutely. That keeps it from being clipped inside a scroll-container
-// modal (e.g. EditEntryModal's `overflow-y-auto` body) and from fighting a modal
-// focus trap — the menu lives inside the dialog, so Tab and Escape compose.
+// The menu OVERLAYS (floats over) content rather than expanding in flow. It uses
+// `position: fixed` positioned off the trigger's rect (flips above when there's
+// no room below, clamps into the viewport) so it's never clipped by a scroll-
+// container modal (e.g. EditEntryModal's `overflow-y-auto` body) — fixed escapes
+// ancestor overflow, and there's no transformed ancestor to contain it. The menu
+// stays inside the trigger's DOM subtree, so the modal focus-trap, Escape, and
+// outside-click all still compose. It closes on any outer scroll so a fixed menu
+// never drifts from its (now-moved) trigger.
 // `small` shrinks the glyph/dot for the compact toolbar-chip trigger only —
 // the menu rows always render the default size so the open list is unchanged.
 function OptionVisual({ opt, small = false }) {
@@ -38,6 +42,10 @@ function OptionVisual({ opt, small = false }) {
   )
 }
 
+const MENU_MIN_W = 200   // compact toolbar chips are narrow; floor the menu width
+const MENU_MAX_H = 240   // matches max-h-60
+const MENU_GAP = 6
+
 export default function EntitySelect({
   label,
   value,
@@ -47,29 +55,52 @@ export default function EntitySelect({
   emptyOption,        // { label } | undefined
   hideLabel = false,  // keep `label` as the accessible name but hide the overline
   buttonClassName = '',
-  compact = false,    // toolbar-chip trigger + floating (absolute) menu — for filter rows
+  compact = false,    // toolbar-chip trigger (the floating menu is the same in both modes)
 }) {
   const [open, setOpen] = useState(false)
-  const [alignRight, setAlignRight] = useState(false)
+  const [pos, setPos] = useState(null)   // { left, width, top? , bottom? } in viewport coords
   const wrapRef = useRef(null)
+  const menuRef = useRef(null)
   const uid = useId()
   const labelId = `${uid}-label`
 
-  // Compact (toolbar-filter) menus float `absolute`. In a wrapping toolbar a chip
-  // can land in the right half of the row, where a left-anchored 200px menu would
-  // overflow the viewport (clipped by Layout's `<main overflow-hidden>`). Measure
-  // on open and flip to right-anchored when a left anchor wouldn't fit. Vertical
-  // never clips (the menu caps at max-h-60 near the top of the view), so no portal
-  // is needed. useLayoutEffect avoids a one-frame flash of the wrong side.
-  const MENU_MIN_W = 200
+  // Position the floating menu off the trigger: match the trigger width (min 200
+  // for narrow compact chips), flip above when there's no room below, and clamp
+  // into the viewport. useLayoutEffect computes before paint so there's no flash.
   useLayoutEffect(() => {
-    if (!open || !compact) return
-    const rect = wrapRef.current?.getBoundingClientRect()
-    if (rect) setAlignRight(rect.left + MENU_MIN_W > window.innerWidth - 8)
-  }, [open, compact])
+    if (!open) { setPos(null); return }
+    const compute = () => {
+      const r = wrapRef.current?.getBoundingClientRect()
+      if (!r) return
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const width = Math.max(r.width, MENU_MIN_W)
+      const left = Math.min(Math.max(8, r.left), Math.max(8, vw - width - 8))
+      const roomBelow = vh - r.bottom
+      const flipUp = roomBelow < MENU_MAX_H + MENU_GAP && r.top > roomBelow
+      setPos(flipUp
+        ? { left, width, bottom: vh - r.top + MENU_GAP }
+        : { left, width, top: r.bottom + MENU_GAP })
+    }
+    compute()
+    const onScroll = (e) => {
+      // Ignore the menu's own internal scroll; close on any outer scroll so the
+      // fixed menu doesn't float away from a trigger that has moved.
+      if (menuRef.current && menuRef.current.contains(e.target)) return
+      setOpen(false)
+    }
+    window.addEventListener('resize', compute)
+    window.addEventListener('scroll', onScroll, true)
+    return () => {
+      window.removeEventListener('resize', compute)
+      window.removeEventListener('scroll', onScroll, true)
+    }
+  }, [open])
 
   // Outside-click + capture-phase Escape (closes the menu before a surrounding
   // modal's Escape→onClose can fire) — the ColorPicker / GlyphPicker contract.
+  // The menu is inside wrapRef's subtree (despite being position: fixed), so
+  // contains() correctly treats option clicks as inside.
   useEffect(() => {
     if (!open) return
     const onOutside = (e) => {
@@ -137,9 +168,13 @@ export default function EntitySelect({
 
       {open && (
         <div
+          ref={menuRef}
           role="listbox"
           aria-label={label}
-          className={`${compact ? `absolute z-50 mt-1 min-w-[200px] ${alignRight ? 'right-0' : 'left-0'}` : 'mt-1.5'} bg-appCard border border-appBorder rounded-xl shadow-[var(--shadow-pop)] p-1.5 max-h-60 overflow-y-auto`}
+          style={pos
+            ? { position: 'fixed', left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom }
+            : { position: 'fixed', visibility: 'hidden' }}
+          className="z-50 bg-appCard border border-appBorder rounded-xl shadow-[var(--shadow-pop)] p-1.5 max-h-60 overflow-y-auto"
         >
           {emptyOption && (
             <button
