@@ -34,13 +34,13 @@
 
 - [ ] `docs/ARCHITECTURE.md` file map updated (new / renamed / removed components, hooks, or utilities)
 - [ ] `docs/TEST-COVERAGE.md` updated (new / changed test files)
-- [ ] New settings key added to the Settings Keys table in `CLAUDE.md`
+- [ ] New settings key added to the Settings Keys table in `docs/SETTINGS.md`
 - [ ] DB schema changes reflected in the Collections table in `CLAUDE.md`
 
 ### Screenshots
 
 - [ ] No visible UI changed **OR**
-- [ ] `docs/screenshots/` regenerated via the Playwright script (see `CLAUDE.md` → Screenshots)
+- [ ] `docs/screenshots/` regenerated via the Playwright script (see `docs/SCREENSHOTS.md`)
 
 ### Contributor License Agreement
 

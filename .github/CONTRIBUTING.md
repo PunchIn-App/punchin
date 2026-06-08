@@ -168,7 +168,7 @@ Every PR that changes code must update the relevant documentation in the **same 
 | New or changed test file | Add/update its row in `docs/TEST-COVERAGE.md` | — | — | — |
 | New or changed `time.js` helper | Update Time Utilities list (`CLAUDE.md`) | — | — | — |
 | DB schema change (table, index, field) | Update Database → Collections table (`CLAUDE.md`) | — | ✓ if user-visible | — |
-| New setting key | Add to Settings Keys table (`CLAUDE.md`) | — | ✓ | — |
+| New setting key | Add to Settings Keys table (`docs/SETTINGS.md`) | — | ✓ | — |
 | Any visible UI change | — | — | — | ✓ regenerate |
 | Version bump | Update `**Version:**` in header; full checklist in `docs/RELEASING.md` | Update version badge | Add new section | ✓ if UI changed |
 
@@ -185,7 +185,7 @@ Every PR that changes code must update the relevant documentation in the **same 
 
 **Do not regenerate** for: logic-only changes, hook/utility changes, DB schema changes with no visual effect, test additions, CI changes, or documentation-only updates.
 
-See the Screenshots section of [`CLAUDE.md`](../CLAUDE.md) for the Playwright regeneration script.
+See [`docs/SCREENSHOTS.md`](../docs/SCREENSHOTS.md) for the device specs and Playwright regeneration script.
 
 ---
 
