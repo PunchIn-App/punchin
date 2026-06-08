@@ -4,6 +4,7 @@ import { notificationsSupported, requestNotificationPermission } from '../../uti
 import EntitySelect from '../../components/EntitySelect'
 import { Panel, SettingsRow, ReminderRow, WeekdayPicker, Toggle, WEEKDAYS, ALL_DAYS } from './components'
 import LongRunningMinutesInput from './LongRunningMinutesInput'
+import TimePicker from '../../components/pickers/TimePicker'
 
 const reminderInputClass = 'bg-appBg border border-appBorder text-appText rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-appAccent/50'
 
@@ -112,16 +113,15 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                   enabled={!!settings.remindIdle}
                   onToggle={v => updateSetting('remindIdle', v)}
                 >
-                  <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                  <span className="flex items-center gap-2 text-xs text-appTextMuted">
                     At
-                    <input
-                      type="time"
+                    <TimePicker
                       value={settings.remindIdleTime || '09:00'}
-                      onChange={e => updateSetting('remindIdleTime', e.target.value)}
-                      aria-label="No-timer reminder time"
-                      className={reminderInputClass}
+                      onChange={v => updateSetting('remindIdleTime', v)}
+                      label="No-timer reminder time"
+                      buttonClassName={reminderInputClass}
                     />
-                  </label>
+                  </span>
                   <WeekdayPicker
                     value={settings.remindIdleDays}
                     onChange={days => setReminderDays('remindIdle', 'remindIdleDays', days)}
@@ -137,16 +137,15 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                   enabled={!!settings.remindStillRunning}
                   onToggle={v => updateSetting('remindStillRunning', v)}
                 >
-                  <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                  <span className="flex items-center gap-2 text-xs text-appTextMuted">
                     At
-                    <input
-                      type="time"
+                    <TimePicker
                       value={settings.remindStillRunningTime || '17:00'}
-                      onChange={e => updateSetting('remindStillRunningTime', e.target.value)}
-                      aria-label="Still-running reminder time"
-                      className={reminderInputClass}
+                      onChange={v => updateSetting('remindStillRunningTime', v)}
+                      label="Still-running reminder time"
+                      buttonClassName={reminderInputClass}
                     />
-                  </label>
+                  </span>
                   <WeekdayPicker
                     value={settings.remindStillRunningDays}
                     onChange={days => setReminderDays('remindStillRunning', 'remindStillRunningDays', days)}
@@ -162,16 +161,15 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                   enabled={!!settings.remindTimesheetDaily}
                   onToggle={v => updateSetting('remindTimesheetDaily', v)}
                 >
-                  <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                  <span className="flex items-center gap-2 text-xs text-appTextMuted">
                     At
-                    <input
-                      type="time"
+                    <TimePicker
                       value={settings.remindTimesheetDailyTime || '17:00'}
-                      onChange={e => updateSetting('remindTimesheetDailyTime', e.target.value)}
-                      aria-label="Daily timesheet reminder time"
-                      className={reminderInputClass}
+                      onChange={v => updateSetting('remindTimesheetDailyTime', v)}
+                      label="Daily timesheet reminder time"
+                      buttonClassName={reminderInputClass}
                     />
-                  </label>
+                  </span>
                   <WeekdayPicker
                     value={settings.remindTimesheetDailyDays}
                     onChange={days => setReminderDays('remindTimesheetDaily', 'remindTimesheetDailyDays', days)}
@@ -200,16 +198,15 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                       />
                     </span>
                   </span>
-                  <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                  <span className="flex items-center gap-2 text-xs text-appTextMuted">
                     at
-                    <input
-                      type="time"
+                    <TimePicker
                       value={settings.remindTimesheetWeeklyTime || '16:00'}
-                      onChange={e => updateSetting('remindTimesheetWeeklyTime', e.target.value)}
-                      aria-label="Weekly timesheet reminder time"
-                      className={reminderInputClass}
+                      onChange={v => updateSetting('remindTimesheetWeeklyTime', v)}
+                      label="Weekly timesheet reminder time"
+                      buttonClassName={reminderInputClass}
                     />
-                  </label>
+                  </span>
                 </ReminderRow>
               </>
             )}

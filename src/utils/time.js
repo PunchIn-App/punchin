@@ -97,10 +97,20 @@ function deviceHour12() {
   }
 }
 
+/**
+ * Whether to render clock time in 24-hour form for the given preference.
+ * `'auto'` (and any non-`'12h'`/`'24h'` value) falls back to the device's
+ * locale preference. Shared by formatTime and the custom TimePicker so the
+ * branded picker honours the same 12/24h choice the native input couldn't.
+ * @param {'auto'|'12h'|'24h'} [fmt] @returns {boolean}
+ */
+export function is24Hour(fmt = 'auto') {
+  return fmt === '24h' || (fmt !== '12h' && !deviceHour12())
+}
+
 /** @param {Date|string|number} date @param {'auto'|'12h'|'24h'} [fmt] @returns {string} */
 export function formatTime(date, fmt = 'auto') {
-  const use24 = fmt === '24h' || (fmt !== '12h' && !deviceHour12())
-  return format(new Date(date), use24 ? 'HH:mm' : 'h:mm a')
+  return format(new Date(date), is24Hour(fmt) ? 'HH:mm' : 'h:mm a')
 }
 
 /** @param {Date|string|number} date @returns {string} */

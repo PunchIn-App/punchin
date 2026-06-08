@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.26.0] — 2026-06-08
+
+### Changed
+- **Time fields now use PunchIn's own picker.** Reminder times and a time entry's start/end time open a branded scrolling hour/minute picker instead of the browser's native time control — and unlike the native one, it follows your 12-hour / 24-hour preference from Settings. (Date fields move to the matching custom picker next.)
+
+---
+
 ## [0.25.1] — 2026-06-08
 
 ### Changed
