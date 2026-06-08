@@ -16,19 +16,37 @@ function Overline({ children }) {
 }
 
 export default function TimerRail({ jobMap, ltMap, recentJobs, lastEntry, weekStartsMonday, timeFormat, onPunch }) {
-  const completed = useLiveQuery(() => db.entries.filter(e => !!e.punchOut).toArray(), [])
-
+  // Current-week range. The query window reaches back a day to mirror the
+  // TimesheetsView range pattern (#132/#136); since the aggregation below filters
+  // on punchIn only, those look-back rows are simply dropped (inert here, but it
+  // keeps the index-bounded query identical to the timesheet one).
   const week = useMemo(() => {
-    if (!completed) return null
     const { start, end } = getWeekRange(new Date(), weekStartsMonday)
-    const inWeek = completed.filter(e => isEntryInRange(e, start, end))
+    const queryStart = new Date(start.getTime() - 24 * 60 * 60 * 1000) // 1-day look-back margin (#136)
+    return { start, end, queryStart }
+  }, [weekStartsMonday])
+
+  // Indexed range query (issue #132): bounded to one week off the `punchIn` index
+  // instead of scanning all history on the most-visited screen.
+  const completed = useLiveQuery(
+    () => db.entries
+      .where('punchIn').between(week.queryStart, week.end, true, true)
+      .filter(e => !!e.punchOut)
+      .toArray(),
+    [week.queryStart.getTime(), week.end.getTime()]
+  )
+
+  const summary = useMemo(() => {
+    if (!completed) return null
+    // Keep only entries whose punchIn falls in the real week (drops the look-back margin).
+    const inWeek = completed.filter(e => isEntryInRange(e, week.start, week.end))
     const totalMs = inWeek.reduce((s, e) => s + getEntryDuration(e), 0)
     const byJob = new Map()
     for (const e of inWeek) byJob.set(e.jobId, (byJob.get(e.jobId) || 0) + getEntryDuration(e))
     const top = [...byJob.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
     const maxMs = top.length ? top[0][1] : 1
     return { totalMs, top, maxMs }
-  }, [completed, weekStartsMonday])
+  }, [completed, week.start, week.end])
 
   const quickJobs = recentJobs ?? []
 
@@ -94,13 +112,13 @@ export default function TimerRail({ jobMap, ltMap, recentJobs, lastEntry, weekSt
 
         {/* This week — total in the overline + per-job progress bars (job colour) */}
         <section>
-          <Overline>This week{week ? ` · ${formatDurationHM(week.totalMs)}` : ''}</Overline>
-          {week && week.top.length > 0 ? (
+          <Overline>This week{summary ? ` · ${formatDurationHM(summary.totalMs)}` : ''}</Overline>
+          {summary && summary.top.length > 0 ? (
             <div className="space-y-2.5">
-              {week.top.map(([jobId, ms]) => {
+              {summary.top.map(([jobId, ms]) => {
                 const job = jobMap.get(jobId)
                 const jlt = job && ltMap.get(job.laborTypeId)
-                const pct = Math.max(4, Math.round((ms / week.maxMs) * 100))
+                const pct = Math.max(4, Math.round((ms / summary.maxMs) * 100))
                 return (
                   <div key={jobId}>
                     <div className="flex items-center justify-between gap-2 text-xs mb-1">
