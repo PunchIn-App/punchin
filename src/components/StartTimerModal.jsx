@@ -114,7 +114,7 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
     : 'Job, none selected'
 
   // Mono uppercase overline — the design system's field-label treatment (.pcm-lbl).
-  const overlineCls = 'block mb-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted'
+  const overlineCls = 'block mb-2 ds-overline text-appTextMuted'
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-xl px-4 py-3 text-[14.5px]
                     placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors`
 

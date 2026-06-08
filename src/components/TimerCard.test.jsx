@@ -93,6 +93,30 @@ describe('TimerCard — colour accent', () => {
   })
 })
 
+describe('TimerCard — long-running (overnight) motion', () => {
+  // The design-system motion rule reserves the pulse for the live "On the clock"
+  // status; a >12h timer must read as a calm, static note — never infinite/bouncy
+  // decorative motion. Guards against re-adding the old animate-pulse border +
+  // animate-bounce "Overnight Run?" badge.
+  const overnightEntry = { ...ENTRY, punchIn: new Date(Date.now() - 13 * 3600000) } // 13h ago
+
+  it('shows a calm "Still running · 12h+" note past 12 hours', () => {
+    render(<TimerCard entry={overnightEntry} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('Still running · 12h+')).toBeInTheDocument()
+  })
+
+  it('uses no infinite/bouncy decorative animation when overnight', () => {
+    const { container } = render(<TimerCard entry={overnightEntry} job={JOB} laborType={LABOR_TYPE} />)
+    expect(container.querySelector('.animate-pulse')).toBeNull()
+    expect(container.querySelector('.animate-bounce')).toBeNull()
+  })
+
+  it('does not show the overnight note for a normal-length timer', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />) // 1h ago
+    expect(screen.queryByText(/still running/i)).not.toBeInTheDocument()
+  })
+})
+
 describe('TimerCard — background pause (#142)', () => {
   afterEach(() => {
     vi.useRealTimers()

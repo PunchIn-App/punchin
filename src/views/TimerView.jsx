@@ -7,7 +7,7 @@ import StartTimerModal from '../components/StartTimerModal'
 import TimerRail from '../components/TimerRail'
 import { LaborTag } from '../components/LaborGlyph'
 import { PunchMark } from '../components/BrandMark'
-import { DEFAULT_ACCENT } from '../accentPresets'
+import { DEFAULT_JOB_COLOR } from '../accentPresets'
 import { useSettings } from '../hooks/useSettings'
 import { formatDurationHM, formatTime, formatDate, getDayRange, getWeekRange, getEntryDurationInRange } from '../utils/time'
 
@@ -15,7 +15,7 @@ import { formatDurationHM, formatTime, formatDate, getDayRange, getWeekRange, ge
 function StatTile({ label, value, className = '' }) {
   return (
     <div className={`rounded-xl border border-appBorder bg-appCard px-4 py-3 ${className}`}>
-      <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted">{label}</p>
+      <p className="ds-overline text-appTextMuted">{label}</p>
       <p className="font-mono text-2xl font-extrabold text-appText mt-1">{value}</p>
     </div>
   )
@@ -52,7 +52,7 @@ export default function TimerView() {
   const stats = useMemo(() => {
     if (!completed) return null
     const { start: ds, end: de } = getDayRange()
-    const { start: ws, end: we } = getWeekRange(new Date(), settings.weekStartsMonday !== false)
+    const { start: ws, end: we } = getWeekRange(new Date(), settings.weekStartsMonday)
     const today = completed.reduce((s, e) => s + getEntryDurationInRange(e, ds, de), 0)
     const week  = completed.reduce((s, e) => s + getEntryDurationInRange(e, ws, we), 0)
     return { today, week, avg: week / 7 }
@@ -126,7 +126,7 @@ export default function TimerView() {
             the task, matching the rail's behaviour. */}
         {recentJobs.length > 0 && (
           <section className="mb-6 xl:hidden">
-            <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-2">Quick punch</p>
+            <p className="ds-overline text-appTextMuted mb-2">Quick punch</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {recentJobs.map(job => {
                 const jlt = ltMap.get(job.laborTypeId)
@@ -139,7 +139,7 @@ export default function TimerView() {
                                hover:bg-appInput text-left transition-colors
                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent"
                   >
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: jlt?.color || '#6366F1' }} aria-hidden="true" />
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: jlt?.color || DEFAULT_JOB_COLOR }} aria-hidden="true" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm text-appText truncate">{job.name}</span>
                       {jlt && <span className="block text-[11px] text-appTextMuted truncate">{jlt.name}</span>}
@@ -158,7 +158,7 @@ export default function TimerView() {
         {active?.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="relative mb-6">
-              <PunchMark accent={settings.accentColor || DEFAULT_ACCENT} className="w-20 h-20 rounded-2xl shadow-lg shadow-appAccent/30" glyphClassName="w-10 h-10" />
+              <PunchMark accent={settings.accentColor} className="w-20 h-20 rounded-2xl shadow-lg shadow-appAccent/30" glyphClassName="w-10 h-10" />
               <div className="absolute -inset-2 rounded-[28px] border border-dashed border-appAccent/40" aria-hidden="true" />
             </div>
             <p className="font-display font-semibold text-appTextMuted text-xl">Nothing running</p>
@@ -168,7 +168,7 @@ export default function TimerView() {
 
         {/* Active timers */}
         {active && active.length > 0 && (
-          <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-2">Active · {active.length}</p>
+          <p className="ds-overline text-appTextMuted mb-2">Active · {active.length}</p>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {active?.map(entry => (
@@ -185,11 +185,11 @@ export default function TimerView() {
         {lastEntry && (() => {
           const job = getJob(lastEntry.jobId)
           const lt  = getLT(lastEntry.laborTypeId)
-          const color = lt?.color || '#6366F1'
+          const color = lt?.color || DEFAULT_JOB_COLOR
           const duration = new Date(lastEntry.punchOut) - new Date(lastEntry.punchIn)
           return (
             <div className="mt-8 xl:hidden">
-              <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-2">Last Session</p>
+              <p className="ds-overline text-appTextMuted mb-2">Last Session</p>
               <div className="relative rounded-xl border border-appBorder bg-appCard overflow-hidden opacity-70">
                 <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
                 <div className="pl-5 pr-4 py-3 flex items-center justify-between gap-3">
@@ -216,7 +216,7 @@ export default function TimerView() {
         ltMap={ltMap}
         recentJobs={recentJobs}
         lastEntry={lastEntry}
-        weekStartsMonday={settings.weekStartsMonday !== false}
+        weekStartsMonday={settings.weekStartsMonday}
         timeFormat={settings.timeFormat}
         onPunch={handleQuickPunch}
       />

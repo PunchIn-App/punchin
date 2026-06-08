@@ -152,7 +152,7 @@ export default function EditEntryModal({ entry, onClose }) {
 
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2.5 text-sm
                     placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors`
-  const labelCls = 'block mb-1.5 font-mono text-[10.5px] font-semibold text-appTextMuted uppercase tracking-[0.14em]'
+  const labelCls = 'block mb-1.5 ds-overline text-appTextMuted'
 
   // A job's dot colour is its own colour, else its labor type's. Both lists
   // already include the entry's own (possibly archived) job/type from the

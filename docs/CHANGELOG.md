@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.23.1] — 2026-06-08
+
+### Changed
+- **Timer — a long-running timer is calmer.** A timer past 12 hours no longer pulses or bounces for attention; it now shows a quiet "Still running · 12h+" note instead. The gentle pulse stays reserved for the live "On the clock" status (design-system motion rule).
+- **Design-system polish.** Default job / labor-type colours, the uppercase overline labels, and the light theme's surface tones were nudged to match the design-system tokens exactly. Sub-perceptual — nothing about how the app works changes.
+
+---
+
 ## [0.23.0] — 2026-06-07
 
 PunchIn brand refresh — new identity (PunchIn Blue + stopwatch mark), self-hosted fonts, a desktop/tablet layout, labor-type glyphs, a billing profile, and more.

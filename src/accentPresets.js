@@ -19,6 +19,12 @@ export const DEFAULT_ACCENT = ACCENT_PRESETS[0].hex
 // the default accent in light mode; a custom accent is used as-is in both themes).
 export const DEFAULT_ACCENT_LIGHT = '#2348DB'
 
+// Fallback colour for a job / labor type that has no colour of its own — used for
+// the dot / left-rail accent across the Timer surfaces and labor glyphs. An
+// on-palette pastel (`--pastel-indigo`) rather than the old off-palette `#6366F1`
+// (which was the light-theme `--violet`, not one of the pastel presets).
+export const DEFAULT_JOB_COLOR = '#9B8CFF'
+
 // Folder/key for a preset's pre-rendered install-icon set: the hex without '#',
 // lowercased (e.g. '#F59E0B' -> 'f59e0b'). Returns null for a non-preset
 // (custom) colour, which has no pre-rendered set.

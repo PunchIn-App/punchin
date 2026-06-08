@@ -127,11 +127,11 @@ export default function AnalyticsView() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-          <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-1">Total logged</p>
+          <p className="ds-overline text-appTextMuted mb-1">Total logged</p>
           <p className="font-mono text-2xl font-semibold text-appText">{formatDurationHM(total)}</p>
         </div>
         <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-          <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-1">Avg / day</p>
+          <p className="ds-overline text-appTextMuted mb-1">Avg / day</p>
           <p className="font-mono text-2xl font-semibold text-appText">
             {formatDurationHM((total / days) || 0)}
           </p>
@@ -141,7 +141,7 @@ export default function AnalyticsView() {
       {/* Billable earnings — only when per-job rates are set (Analytics is hours-first) */}
       {ratedCount > 0 && (
         <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-          <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-1">Billable earnings</p>
+          <p className="ds-overline text-appTextMuted mb-1">Billable earnings</p>
           <p className="font-mono text-2xl font-semibold text-appText">{formatMoney(earnings, settings.defaultCurrency)}</p>
           {ratedCount < entries.length && (
             <p className="text-xs text-appTextMuted mt-1">From {ratedCount} of {entries.length} {entries.length === 1 ? 'entry' : 'entries'} with a rate set</p>
@@ -151,7 +151,7 @@ export default function AnalyticsView() {
 
       {/* Daily chart */}
       <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-        <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-4" id="daily-chart-label">Hours per day</p>
+        <p className="ds-overline text-appTextMuted mb-4" id="daily-chart-label">Hours per day</p>
         <figure aria-labelledby="daily-chart-label" role="img"
           aria-label={`Bar chart: daily hours for the last ${days} days. Total: ${formatDurationHM(total)}.`}>
           <ResponsiveContainer width="100%" height={130}>
@@ -180,7 +180,7 @@ export default function AnalyticsView() {
         <div className="flex flex-col lg:flex-row gap-4">
           {jobData.length > 0 && (
             <div className="flex-1 min-w-0 rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-              <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-4" id="job-chart-label">Hours by job</p>
+              <p className="ds-overline text-appTextMuted mb-4" id="job-chart-label">Hours by job</p>
               <figure aria-labelledby="job-chart-label" role="img"
                 aria-label={`Bar chart: hours by job. Top job: ${jobData[0]?.name} with ${jobData[0]?.hours}h.`}>
                 <ResponsiveContainer width="100%" height={Math.max(80, jobData.length * 44)}>
@@ -214,7 +214,7 @@ export default function AnalyticsView() {
 
           {ltData.length > 0 && (
             <div className="lg:w-72 flex-shrink-0 rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-              <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-4" id="lt-chart-label">By labor type</p>
+              <p className="ds-overline text-appTextMuted mb-4" id="lt-chart-label">By labor type</p>
               <div className="flex items-center gap-5">
                 <figure
                   className="relative flex-shrink-0 w-[100px] h-[100px]"

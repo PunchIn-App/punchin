@@ -6,7 +6,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-2d5bf5?style=flat" alt="License" /></a>
   <a href="../../actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/PunchIn-App/punchin/ci.yml?branch=main&style=flat&label=CI&color=2d5bf5" alt="CI" /></a>
-  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.21.0-2d5bf5?style=flat" alt="Version 0.21.0" /></a>
+  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.23.1-2d5bf5?style=flat" alt="Version 0.23.1" /></a>
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 
 ---
 
-PunchIn is a mobile-first, offline-capable Progressive Web App (PWA) for freelancers and independent contractors who need fast, no-friction time tracking. No accounts. No cloud. No subscriptions. Your data lives entirely on your device.
+PunchIn is a mobile-first, offline-capable Progressive Web App (PWA) for freelancers and independent contractors who need fast, no-friction time tracking. No accounts. No subscriptions. Your data stays on your device by default — nothing leaves it unless you opt in to sync.
 
 ---
 
@@ -210,10 +210,12 @@ All state lives in a local IndexedDB database named `PunchInDB`, managed by Dexi
 |---|---|
 | `entries` | Time entries — `punchOut: null` means the timer is still running |
 | `jobs` | Client projects; soft-archived via `isActive` |
-| `laborTypes` | Billable categories with hex color; soft-archived via `isArchived` |
+| `laborTypes` | Billable categories with a color **and glyph** (an icon id); soft-archived via `isArchived` |
 | `settings` | Key-value app preferences |
+| `deletions` | Delete tombstones — a removed entry's `uuid` is recorded here so opt-in sync propagates the deletion across devices instead of it resurrecting from a peer's snapshot |
+| `secrets` | At-rest-encrypted sync credentials — a non-extractable AES-GCM key plus the encrypted OAuth sync token (never stored in plaintext) |
 
-Soft-deletion is used throughout: records are never hard-deleted so historical entries always retain valid references to their job and labor type.
+Soft-deletion is used for `jobs` and `laborTypes`: those records are never hard-deleted so historical entries always retain valid references. Deleting an entry hard-deletes it and records a `deletions` tombstone so the removal propagates through opt-in sync.
 
 ### State Management
 
@@ -246,10 +248,12 @@ A `usePlatformContext()` hook detects standalone mode and the host OS at runtime
 | Database | Dexie 4 (IndexedDB) |
 | Charts | Recharts 3 |
 | Date utilities | date-fns 4 |
-| Typography | Noto Sans / Display / Mono (via Google Fonts, OFL-1.1) |
+| Typography | Self-hosted Noto Sans / Display / Mono (variable WOFF2, OFL-1.1) — no CDN |
 | Icons | lucide-react |
 | PWA | vite-plugin-pwa |
 | Hosting | Cloudflare Workers |
+
+> An abridged, illustrative map — sync internals (`sync/oauthState.js`, `sync/tokenStore.js`, `sync/pkce.js`) and `worker/iconRender.js` are omitted for brevity. The authoritative file-by-file tree lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ```
 punchin/
@@ -334,7 +338,7 @@ Found a security vulnerability? Please report it privately — see [SECURITY.md]
 
 ## Credits
 
-PunchIn's interface is set in Google's **Noto** type family — **Noto Sans** (UI text), **Noto Sans Display** (headings and the wordmark), and **Noto Sans Mono** (timers) — served from the Google Fonts CDN. The Noto fonts are licensed under the [SIL Open Font License 1.1](docs/licenses/OFL-1.1.txt); see [docs/THIRD-PARTY-LICENSES.md](docs/THIRD-PARTY-LICENSES.md) for full attribution.
+PunchIn's interface is set in Google's **Noto** type family — **Noto Sans** (UI text), **Noto Sans Display** (headings and the wordmark), and **Noto Sans Mono** (timers) — **self-hosted** as variable WOFF2 files (no CDN; the worker CSP is `font-src 'self'`). The Noto fonts are licensed under the [SIL Open Font License 1.1](docs/licenses/OFL-1.1.txt); see [docs/THIRD-PARTY-LICENSES.md](docs/THIRD-PARTY-LICENSES.md) for full attribution.
 
 ---
 
