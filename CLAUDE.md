@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Users punch in/out of jobs, categorize work by labor type, review timesheets, and analyze time trends. All data is stored locally in IndexedDB (no backend/auth).
+PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Users punch in/out of jobs, categorize work by labor type, review timesheets, and analyze time trends. The app is local-first by default: all data is stored locally in IndexedDB and the base app has no backend or auth. Optional, opt-in cloud sync adds a Cloudflare Worker (GitHub OAuth code→token exchange) that needs one provider secret (`GITHUB_CLIENT_SECRET`); sync builds also read `VITE_*` client IDs from `.env.local`.
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.23.0
+**Version:** 0.23.1
 
 ---
 
@@ -63,7 +63,7 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 npm run deploy   # builds then deploys via `wrangler deploy` using the root wrangler.jsonc
 ```
 
-No `.env` files are needed — the app has no backend secrets. Cloudflare account credentials for deployment are managed via `wrangler login`.
+The **base app** needs no `.env` files and has no backend secrets — it's local-first by default. **Optional, opt-in cloud sync** is the exception: the Cloudflare Worker (`worker/oauth.js`) needs a `GITHUB_CLIENT_SECRET` Cloudflare secret for the GitHub OAuth code→token exchange (see `wrangler.jsonc`'s keep-vars comment), and sync builds read the `VITE_*` client IDs from `.env.local` (copy `.env.example`). Cloudflare account credentials for deployment are managed via `wrangler login`.
 
 ### Pull Requests
 
@@ -328,14 +328,14 @@ The UI uses Google's **Noto** type family, mapped to Tailwind tokens in `tailwin
 
 | Tailwind class | CSS variable | Dark | Light |
 |---|---|---|---|
-| `bg-appBg` | `--bg-primary` | `#0F1117` | `#F3F4F6` |
+| `bg-appBg` | `--bg-primary` | `#0F1117` | `#F4F5F7` |
 | `bg-appCard` | `--bg-secondary` | `#161923` | `#FFFFFF` |
-| `bg-appInput` | `--bg-tertiary` | `#1E2232` | `#E5E7EB` |
+| `bg-appInput` | `--bg-tertiary` | `#1E2232` | `#EDEFF3` |
 | `bg-appNav` | `--bg-nav` | `#0C0E14` | `#FFFFFF` |
-| `border-appBorder` | `--border-color` | `#2A2F45` | `#E5E7EB` |
+| `border-appBorder` | `--border-color` | `#2A2F45` | `#E3E6EC` |
 | `border-appBorderLight` | `--border-light` | `#1E2232` | `#E5E7EB` |
 | `text-appText` | `--text-primary` | `#FFFFFF` | `#111827` |
-| `text-appTextMuted` | `--text-muted` | `#6B7280` | `#6B7280` |
+| `text-appTextMuted` | `--text-muted` | `#8A93A6` | `#6B7280` |
 | `text-appTextDisabled` | `--text-disabled` | `#374151` | `#D1D5DB` |
 | `bg-appAccent` / `text-appAccent` | `--accent-rgb` | `#2D5BF5` (user-configurable) | `#2348DB` (default; user-configurable) |
 | `text-appOnAccent` | `--on-accent` | `#FFFFFF` (legible ink ON the accent) | flips to `#0F1117` on a light/pastel accent |
@@ -344,7 +344,7 @@ Two additional CSS variables exist in `index.css` but have **no Tailwind token**
 
 | CSS variable | Dark | Light | Use |
 |---|---|---|---|
-| `--text-secondary` | `#E2E8F0` | `#374151` | secondary labels, axis text |
+| `--text-secondary` | `#C7D0E0` | `#374151` | secondary labels, axis text |
 | `--text-darker` | `#4B5563` | `#9CA3AF` | tertiary/dimmed text |
 
 The accent color is stored as a hex string in the `accentColor` setting. `App.jsx` converts it to space-separated RGB values and writes them to `--accent-rgb` on the root element (plus `--accent` as raw hex, and `--on-accent` = `readableInk(accent)` for legible on-accent text). The Tailwind token uses `rgb(var(--accent-rgb) / <alpha-value>)` so opacity modifiers like `bg-appAccent/30` work correctly. **Never use hardcoded `amber-*` Tailwind classes** — always use `appAccent` so the user's chosen color is respected. **For text/icons sitting ON an accent fill, use `text-appOnAccent`** (never a hardcoded `text-[#0F1117]` / `text-white`) so the foreground stays legible when the user picks a light/pastel accent.

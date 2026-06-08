@@ -41,11 +41,11 @@
   color-scheme: light;
   --accent: #2348DB;
   --accent-rgb: 35 72 219;
-  --bg-primary: #F3F4F6;
+  --bg-primary: #F4F5F7;
   --bg-secondary: #FFFFFF;
-  --bg-tertiary: #E5E7EB;
+  --bg-tertiary: #EDEFF3;
   --bg-nav: #FFFFFF;
-  --border-color: #E5E7EB;
+  --border-color: #E3E6EC;
   --border-light: #E5E7EB;
   --text-primary: #111827;
   --text-secondary: #374151;
@@ -173,6 +173,18 @@
   .scrollable {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* Design-system overline — the mono UPPERCASE micro-label recipe (TODAY /
+     THIS WEEK / Quick punch / field labels). Sets the shared type recipe only;
+     each caller keeps its own colour (text-appTextMuted / text-red-400) and
+     margins. Tracking is the DS `--track-over` (0.16em). */
+  .ds-overline {
+    font-family: 'Noto Sans Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--track-over);
   }
 
   /* Scroll-snap "wheel" column for the reminder duration picker (issue #111).

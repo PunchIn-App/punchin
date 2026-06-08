@@ -7,7 +7,7 @@ import { Panel, SettingsRow, Toggle } from './components'
 
 const inputCls =
   'w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors'
-const labelCls = 'font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted'
+const labelCls = 'ds-overline text-appTextMuted'
 
 // A reasonable shortlist; users can also store any ISO 4217 code another way.
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'INR', 'BRL', 'MXN', 'SEK', 'NZD', 'ZAR', 'SGD']

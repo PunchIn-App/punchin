@@ -137,7 +137,7 @@ export default function EntitySelect({
       {label && !hideLabel && (
         <span
           id={labelId}
-          className="block mb-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted"
+          className="block mb-2 ds-overline text-appTextMuted"
           aria-hidden="true"
         >
           {label}

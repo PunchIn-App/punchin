@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Play } from 'lucide-react'
 import { db } from '../db'
 import { formatDurationHM, formatTime, getWeekRange, isEntryInRange, getEntryDuration } from '../utils/time'
+import { DEFAULT_JOB_COLOR } from '../accentPresets'
 
 // The Timer screen's desktop-only right rail (xl+): Last session · Quick punch ·
 // This week. Co-located with the Timer view (not the Layout shell) since its
@@ -10,7 +11,7 @@ import { formatDurationHM, formatTime, getWeekRange, isEntryInRange, getEntryDur
 
 function Overline({ children }) {
   return (
-    <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted mb-2">{children}</p>
+    <p className="ds-overline text-appTextMuted mb-2">{children}</p>
   )
 }
 
@@ -41,7 +42,7 @@ export default function TimerRail({ jobMap, ltMap, recentJobs, lastEntry, weekSt
         {lastEntry && (() => {
           const job = jobMap.get(lastEntry.jobId)
           const lt = ltMap.get(lastEntry.laborTypeId)
-          const color = lt?.color || '#6366F1'
+          const color = lt?.color || DEFAULT_JOB_COLOR
           return (
             <section>
               <Overline>Last session</Overline>
@@ -76,7 +77,7 @@ export default function TimerRail({ jobMap, ltMap, recentJobs, lastEntry, weekSt
                                hover:bg-appInput text-left transition-colors
                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-appAccent"
                   >
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: jlt?.color || '#6366F1' }} aria-hidden="true" />
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: jlt?.color || DEFAULT_JOB_COLOR }} aria-hidden="true" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm text-appText truncate">{job.name}</span>
                       {jlt && <span className="block text-[11px] text-appTextMuted truncate">{jlt.name}</span>}

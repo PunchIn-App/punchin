@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Square, Pencil, AlertTriangle } from 'lucide-react'
+import { Square, Pencil } from 'lucide-react'
 import { db } from '../db'
 import { formatElapsed, formatTime } from '../utils/time'
 import { formatMoney } from '../utils/format'
 import EditEntryModal from './EditEntryModal'
 import { LaborTag } from './LaborGlyph'
+import { DEFAULT_JOB_COLOR } from '../accentPresets'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
@@ -24,9 +25,8 @@ export default function TimerCard({ entry, job, laborType }) {
     const start = () => { if (iv === null) iv = setInterval(tick, 1000) }
     const stop  = () => { if (iv !== null) { clearInterval(iv); iv = null } }
     // Pause the per-second tick while the tab is backgrounded so N concurrent
-    // timer cards don't each keep a 1s interval (and animate-pulse/bounce) alive
-    // with nothing watching; re-sync and resume the instant it's visible again
-    // (issue #142).
+    // timer cards don't each keep a 1s interval alive with nothing watching;
+    // re-sync and resume the instant it's visible again (issue #142).
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') stop()
       else { tick(); start() }
@@ -44,12 +44,12 @@ export default function TimerCard({ entry, job, laborType }) {
 
   // The card's accent (left rail + live clock) is the job's identity colour,
   // falling back to its labor type's colour, then the default.
-  const color = job?.color || laborType?.color || '#6366F1'
+  const color = job?.color || laborType?.color || DEFAULT_JOB_COLOR
   const isOvernight = elapsed > 43200000 // 12 hours in milliseconds
 
   return (
     <div className={`relative rounded-xl border bg-appCard overflow-hidden transition-all duration-300 ${
-      isOvernight ? 'border-appAccent/40 shadow-lg shadow-appAccent/5 animate-pulse' : 'border-appBorder'
+      isOvernight ? 'border-appAccent/40 shadow-lg shadow-appAccent/5' : 'border-appBorder'
     }`}>
       {hapticEl}
       {/* Color accent bar */}
@@ -61,9 +61,8 @@ export default function TimerCard({ entry, job, laborType }) {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-display font-extrabold text-appText truncate">{job?.name || 'Unknown Job'}</p>
               {isOvernight && (
-                <div className="flex items-center gap-1 text-appAccent text-[10px] font-bold uppercase tracking-wider bg-appAccent/10 px-2 py-0.5 rounded-full animate-bounce">
-                  <AlertTriangle className="w-3 h-3" />
-                  Overnight Run?
+                <div className="text-appAccent text-[10px] font-bold uppercase tracking-wider bg-appAccent/10 px-2 py-0.5 rounded-full">
+                  Still running · 12h+
                 </div>
               )}
             </div>

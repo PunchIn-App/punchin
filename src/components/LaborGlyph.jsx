@@ -8,6 +8,7 @@ import {
   Zap, Coffee, Package, Plane, Users, GraduationCap,
 } from 'lucide-react'
 import { PunchGlyph } from './BrandMark'
+import { DEFAULT_JOB_COLOR } from '../accentPresets'
 
 // Glyph set (string id → component). Stored as the id string on laborTypes.glyph;
 // mapped here so render sites import one component. `punchin` (the PunchIn brand
@@ -26,7 +27,9 @@ export const LABOR_GLYPHS = {
   users: Users, grad: GraduationCap,
 }
 export const LABOR_GLYPH_IDS = Object.keys(LABOR_GLYPHS)
-export const DEFAULT_LABOR_COLOR = '#6366F1'
+// One source of truth — the shared on-palette fallback (see accentPresets.js).
+// Kept as `DEFAULT_LABOR_COLOR` so existing import sites need no change.
+export const DEFAULT_LABOR_COLOR = DEFAULT_JOB_COLOR
 
 // Resolve a glyph id to its component; unknown / unset falls back to the PunchIn
 // brand mark so existing records (no glyph field) render without a migration.

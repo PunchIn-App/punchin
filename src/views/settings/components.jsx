@@ -150,7 +150,7 @@ export function Panel({ title, onBack, children }) {
 // Backup / Sync / Transfer / Danger Zone visually distinct).
 export function PanelGroup({ title, danger, children, collapsible, defaultCollapsed }) {
   const [collapsed, setCollapsed] = useState(!!defaultCollapsed)
-  const titleCls = `font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] ${danger ? 'text-red-400' : 'text-appTextMuted'}`
+  const titleCls = `ds-overline ${danger ? 'text-red-400' : 'text-appTextMuted'}`
   if (!collapsible) {
     return (
       <div>
