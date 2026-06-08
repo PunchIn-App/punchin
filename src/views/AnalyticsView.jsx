@@ -72,10 +72,13 @@ export default function AnalyticsView() {
       return { date: format(day, days === 7 ? 'EEE' : 'M/d'), hours: parseFloat(hrs.toFixed(2)) }
     })
 
-    // Job breakdown
+    // Job breakdown — each bar carries the job's OWN colour (its set colour, else
+    // its labor type's, matching the job card's left-rail resolution).
+    const ltColor = (id) => laborTypes.find(l => l.id === id)?.color
     const jobData = jobs.map(j => ({
       name: j.name,
       hours: parseFloat((entries.filter(e => e.jobId === j.id).reduce((a, e) => a + getEntryDuration(e), 0) / 3600000).toFixed(2)),
+      color: j.color || ltColor(j.laborTypeId) || 'rgb(var(--accent-rgb))',
     })).filter(d => d.hours > 0).sort((a, b) => b.hours - a.hours)
 
     // Labor type pie
@@ -189,7 +192,8 @@ export default function AnalyticsView() {
                       tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={110} />
                     <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
                       formatter={(v) => [`${v}h`, 'Hours']} />
-                    <Bar dataKey="hours" fill="rgb(var(--accent-rgb))" radius={[0,3,3,0]}>
+                    <Bar dataKey="hours" radius={[0,3,3,0]}>
+                      {jobData.map((d, i) => <Cell key={i} fill={d.color} />)}
                       <LabelList dataKey="hours" position="right" formatter={(v) => `${v}h`}
                         style={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
                     </Bar>
@@ -218,12 +222,14 @@ export default function AnalyticsView() {
                   role="img"
                   aria-label={`Donut chart: hours by labor type. ${ltData.map(d => `${d.name}: ${formatDurationHM(d.value)}`).join(', ')}.`}
                 >
-                  <PieChart width={100} height={100}>
-                    <Pie data={ltData} cx={45} cy={45} innerRadius={28} outerRadius={44}
-                      paddingAngle={2} dataKey="value" stroke="none">
-                      {ltData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                    </Pie>
-                  </PieChart>
+                  <ResponsiveContainer width="100%" height={100}>
+                    <PieChart>
+                      <Pie data={ltData} innerRadius={28} outerRadius={44}
+                        paddingAngle={2} dataKey="value" stroke="none" isAnimationActive={false}>
+                        {ltData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
                   {/* Total sits in the donut hole, the way the design system shows it. */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" aria-hidden="true">
                     <span className="text-[8px] uppercase tracking-widest text-appTextMuted leading-none">Logged</span>
