@@ -20,7 +20,7 @@ punchin/
 ├── app/        # Vite root — index.html app shell + public/ (PWA / home-screen icons)
 ├── config/     # vite.config.js (+ Vitest), manifest.base.js, postcss.config.js, tailwind.config.js
 ├── scripts/    # build/asset tooling — screenshots.mjs, icons.mjs, social-preview.py
-├── docs/       # CHANGELOG, THIRD-PARTY-LICENSES, ARCHITECTURE.md, TEST-COVERAGE.md, RELEASING.md, screenshots/, licenses/
+├── docs/       # CHANGELOG, THIRD-PARTY-LICENSES, ARCHITECTURE.md, TEST-COVERAGE.md, RELEASING.md, SETTINGS.md, SCREENSHOTS.md, THEMING.md, screenshots/, licenses/
 └── src/        # app source
     ├── main.jsx, App.jsx    # entry point; root tab/theme/accent + OAuth-callback shell
     ├── sync/                # cloud sync: config, oauthState, tokenStore, pkce, syncManager + providers/ (github, google, onedrive)
@@ -95,7 +95,7 @@ Every PR that changes code must update relevant documentation in the **same comm
 | New or changed test file | Add/update its row in `docs/TEST-COVERAGE.md` | — | — | — |
 | New or changed `time.js` helper | Update Time Utilities list (`CLAUDE.md`) | — | — | — |
 | DB schema change (table, index, or field) | Update Database → Collections table (`CLAUDE.md`) | — | ✓ if user-visible | — |
-| New setting key | Add row to Settings Keys table (`CLAUDE.md`) | — | ✓ | — |
+| New setting key | Add row to the Settings Keys table in `docs/SETTINGS.md` | — | ✓ | — |
 | New exported helper from any source file | Update the relevant section (`CLAUDE.md` / `docs/ARCHITECTURE.md`) | — | — | — |
 | Any visible UI change | — | — | — | ✓ regenerate |
 | Version bump | Update `**Version:**` in header; full checklist in `docs/RELEASING.md` | Update version badge | Add new section | ✓ if UI changed |
@@ -127,13 +127,13 @@ Keep `SECURITY.md` accurate whenever code changes affect what versions are suppo
 
 ### Keeping CLAUDE.md (and the extracted docs) accurate
 
-`CLAUDE.md` and its extracted companions — `docs/ARCHITECTURE.md` (file map), `docs/TEST-COVERAGE.md` (test table), `docs/RELEASING.md` (release process) — document the *current state* of the codebase. They must stay accurate, not just accumulate additions. Apply these rules when making any code change:
+`CLAUDE.md` and its extracted companions — `docs/ARCHITECTURE.md` (file map), `docs/TEST-COVERAGE.md` (test table), `docs/RELEASING.md` (release process), `docs/SETTINGS.md` (settings-key table), `docs/SCREENSHOTS.md` (screenshot specs + regeneration), `docs/THEMING.md` (Tailwind/CSS token tables + design-system layer) — document the *current state* of the codebase. They must stay accurate, not just accumulate additions. Apply these rules when making any code change:
 
 - **Adding** a component, view, hook, or utility: add an entry to the file map in `docs/ARCHITECTURE.md` and the relevant detail section
 - **Removing** something: delete its entry (in `docs/ARCHITECTURE.md` and anywhere it's named) — do not leave stale references
 - **Renaming** something: update every mention, including the `docs/ARCHITECTURE.md` file map and any section that names it
 - **Changing an exported function signature**: update the Time Utilities list or whichever section documents that API
-- **Changing the DB schema**: update the Collections table and, if a new setting is added, the Settings Keys table
+- **Changing the DB schema**: update the Collections table and, if a new setting is added, the Settings Keys table in `docs/SETTINGS.md`
 - **Changing a convention** (modal pattern, theming rules, accessibility requirements): update the relevant convention section — a stale convention is worse than no convention
 
 ---
@@ -180,50 +180,7 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 
 ### Settings Keys
 
-| Key | Type | Default |
-|-----|------|---------|
-| `allowConcurrentTimers` | boolean | `false` |
-| `weekStartsMonday` | boolean | device-locale default — Sunday-start locales (e.g. en-US) seed `false`, Monday-start locales (e.g. en-GB) seed `true`; falls back to `false` where the locale's week info is unavailable (`localeWeekStartsMonday()` in `db.js`) |
-| `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
-| `accentColor` | hex string | `"#2D5BF5"` (PunchIn Blue; light theme renders the default as the darker `#2348DB`) |
-| `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
-| `decimalHours` | boolean | `false` — show timesheet durations as decimal hours (`1.50 h`) instead of `1h 30m` (issue #208) |
-| `roundingMinutes` | number (`0` \| `15` \| `30`) | `0` — round each billable entry in the user's favour (start floored, end ceiled) for timesheets & invoices; `0` = off (issue #208) |
-| `timeFormat` | `"auto"` \| `"12h"` \| `"24h"` | `"auto"` (match the device's 12/24h preference) — clock-time rendering in timers, timesheets & invoices (`formatTime(date, fmt)`) |
-| `defaultCurrency` | ISO 4217 string | `"USD"` — formats invoice/CSV amounts via `Intl.NumberFormat` (`utils/format.js`) |
-| `billingName` | string | `""` — Billing profile: your name (the invoice "Billed from" identity) |
-| `billingBusiness` | string | `""` — Billing profile: business name |
-| `billingEmail` | string | `""` — Billing profile: email |
-| `billingPhone` | string | `""` — Billing profile: phone |
-| `billingAddress` | string | `""` — Billing profile: address (multi-line) |
-| `billingPaymentTerms` | string | `""` — Billing profile: payment terms |
-| `billingNotes` | string | `""` — Billing profile: notes / payment instructions |
-| `billingLogo` | string | `""` — Billing profile: optional business logo as a downscaled PNG data URL (`utils/image.js`); rendered in the invoice "Billed from" band |
-| `numberInvoices` | boolean | `false` — print an invoice number (advances `nextInvoiceNumber` each time an invoice print is generated) |
-| `invoicePrefix` | string | `""` — prefix prepended to the invoice number (e.g. `PI-`) |
-| `nextInvoiceNumber` | number | `1` — the next invoice number; printed when `numberInvoices` is on and **auto-incremented when an invoice print is generated** (a blocked popup doesn't burn a number) |
-| `remindersEnabled` | boolean | `false` — master switch for local reminder notifications (issue #54); enabling it requests notification permission |
-| `remindLongRunning` | boolean | `true` — alert when an active timer exceeds the threshold |
-| `remindLongRunningMinutes` | number | `60` — long-running timer threshold (minutes) |
-| `remindIdle` | boolean | `false` — alert if no timer is running by `remindIdleTime` |
-| `remindIdleTime` | string (`"HH:MM"`) | `"09:00"` |
-| `remindIdleDays` | number[] (0=Sun … 6=Sat) | `[0,1,2,3,4,5,6]` — weekdays the idle reminder may fire (clearing all days turns the reminder off) |
-| `remindStillRunning` | boolean | `false` — alert if a timer is still running at `remindStillRunningTime` |
-| `remindStillRunningTime` | string (`"HH:MM"`) | `"17:00"` |
-| `remindStillRunningDays` | number[] (0=Sun … 6=Sat) | `[0,1,2,3,4,5,6]` — weekdays the still-running reminder may fire |
-| `remindTimesheetDaily` | boolean | `false` — daily timesheet reminder |
-| `remindTimesheetDailyTime` | string (`"HH:MM"`) | `"17:00"` |
-| `remindTimesheetDailyDays` | number[] (0=Sun … 6=Sat) | `[0,1,2,3,4,5,6]` — weekdays the daily timesheet reminder may fire |
-| `remindTimesheetWeekly` | boolean | `false` — weekly timesheet reminder |
-| `remindTimesheetWeeklyDay` | number (0=Sun … 6=Sat) | `5` (Friday) |
-| `remindTimesheetWeeklyTime` | string (`"HH:MM"`) | `"16:00"` |
-| `syncProvider` | `"github"` \| `"google"` \| `"onedrive"` \| `null` | `null` |
-| `syncToken` | string \| `null` | `null` |
-| `syncTokenExpiry` | number (ms epoch) \| `null` | `null` — GitHub tokens do not expire; Google/OneDrive implicit tokens expire after ~1 hour |
-| `syncFileId` | string \| `null` | `null` — GitHub Gist ID; unused for Google/OneDrive |
-| `lastSyncedAt` | number (ms epoch) \| `null` | `null` |
-| `syncError` | string \| `null` | `null` — set when the OAuth callback returns a `sync_error` fragment |
-| `syncUsername` | string \| `null` | `null` — GitHub login name fetched after OAuth; shown in the connected status UI; null for Google/OneDrive |
+> **The full settings-key reference table lives in [`docs/SETTINGS.md`](docs/SETTINGS.md).** Add a row there when you add a new setting key. Keys + defaults are defined once in the `DEFAULT_SETTINGS` object in `src/db.js`; because `useSettings` merges live rows over it, consumers read `settings.yourKey` directly without a fallback.
 
 ### Fresh Install / Zero State
 
@@ -307,62 +264,13 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 - **Labor type colors:** 10 suggested pastel presets defined in `JobsView.jsx` (`#FF8FA3 #FFB163 #E6C84B #5FD08A #4FC6E8 #6FA8FF #9B8CFF #C77DFF #FF8FD9 #9AA4B2` — the design-system pastel rainbow, mirrored as `--pastel-*` tokens in `index.css`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
 - **Labor type glyphs:** each labor type also carries a **glyph** (a Lucide icon — or `punchin`, the PunchIn brand stopwatch, which is also the default when none is chosen; accessibility — read by shape + colour, not colour alone). Render labor types via the shared `LaborTag` (tinted pill + glyph + name) or `LaborGlyphChip` (solid colour chip + glyph) from `src/components/LaborGlyph.jsx` — **never** a bare colour dot/pill — so the glyph rides along on every surface (timer ticket, timesheets, analytics legend, invoice line items, management lists)
 
-### Typography & Fonts
+### Typography, tokens & full colour tables
 
-The UI uses Google's **Noto** type family, mapped to Tailwind tokens in `tailwind.config.js`:
+> **The exhaustive reference lives in [`docs/THEMING.md`](docs/THEMING.md)** — the self-hosted **Noto** font setup, the full Tailwind-token → CSS-variable → dark/light value tables, and the design-system token layer (type scale, radii, spacing, elevation, status & pastel colours). The must-not-violate rules stay here:
 
-| Tailwind class | Family | Use |
-|---|---|---|
-| `font-sans` | Noto Sans | Default body / UI text |
-| `font-display` | Noto Sans Display (falls back to Noto Sans) | Headings, the brand wordmark |
-| `font-mono` | Noto Sans Mono | Timers / numerals |
-
-- The fonts are **self-hosted** (no CDN): five variable WOFF2 files (Noto Sans normal+italic, Noto Sans Display normal+italic, Noto Sans Mono normal) live in `app/public/fonts/`, served at `/fonts/`, with `@font-face` rules at the top of `src/index.css` (each spans the full 100–900 weight axis). The Google Fonts `<link>` is gone from `app/index.html` (which now `preload`s the body face); the worker CSP (`worker/oauth.js`) is correspondingly tightened to `font-src 'self'` / `style-src 'self' 'unsafe-inline'`. The fonts are precached by the service worker (they sit in `app/public`, outside the `icons/**` glob-ignore) so the brand renders offline. **Noto Sans JP is intentionally not shipped** — it only existed in the design system for a "bad font" illustration the app never renders.
-- **Print / export documents use the brand font too.** The invoice (`InvoiceModal.jsx`) and timesheet (`TimesheetsView.jsx`) print/PDF paths build a standalone print popup, which does **not** inherit the app stylesheet — so they go through `src/utils/printDocument.js`: `PRINT_FONT_HEAD` declares the same self-hosted `@font-face` (the popup is same-origin, so `/fonts/*.woff2` resolve), and `openPrintWindow()` waits for `document.fonts.ready` before printing (falling back to a short delay) so exports render in Noto instead of a system-UI fallback. Set print `font-family` to `'Noto Sans'` / `'Noto Sans Display'` / `'Noto Sans Mono'` (never `-apple-system` or `SF Mono`).
-- All three Noto families are licensed under the **SIL Open Font License 1.1**. The license text lives at `docs/licenses/OFL-1.1.txt`, and `docs/THIRD-PARTY-LICENSES.md` records the attribution and how the fonts are used. Now that the binaries are committed and redistributed, the OFL requires shipping that license alongside them — it does.
-- The social-preview cards render the wordmark/tagline as **outlined vector paths** (not `<text>` + font, and not embedded font binaries) so they show Noto on GitHub without a webfont. Regenerate them with `scripts/social-preview.py` whenever the wordmark, tagline, or brand mark changes — never hand-edit the `<path>` data.
-
-### Tailwind Custom Color Tokens
-
-`tailwind.config.js` maps semantic token names to CSS custom properties so both Tailwind utilities and CSS variables stay in sync:
-
-| Tailwind class | CSS variable | Dark | Light |
-|---|---|---|---|
-| `bg-appBg` | `--bg-primary` | `#0F1117` | `#F4F5F7` |
-| `bg-appCard` | `--bg-secondary` | `#161923` | `#FFFFFF` |
-| `bg-appInput` | `--bg-tertiary` | `#1E2232` | `#EDEFF3` |
-| `bg-appNav` | `--bg-nav` | `#0C0E14` | `#FFFFFF` |
-| `border-appBorder` | `--border-color` | `#2A2F45` | `#E3E6EC` |
-| `border-appBorderLight` | `--border-light` | `#1E2232` | `#E5E7EB` |
-| `text-appText` | `--text-primary` | `#FFFFFF` | `#111827` |
-| `text-appTextMuted` | `--text-muted` | `#8A93A6` | `#6B7280` |
-| `text-appTextDisabled` | `--text-disabled` | `#374151` | `#D1D5DB` |
-| `bg-appAccent` / `text-appAccent` | `--accent-rgb` | `#2D5BF5` (user-configurable) | `#2348DB` (default; user-configurable) |
-| `text-appOnAccent` | `--on-accent` | `#FFFFFF` (legible ink ON the accent) | flips to `#0F1117` on a light/pastel accent |
-
-Two additional CSS variables exist in `index.css` but have **no Tailwind token** — use them via `var()` in CSS files or Recharts style props only, not via Tailwind utilities:
-
-| CSS variable | Dark | Light | Use |
-|---|---|---|---|
-| `--text-secondary` | `#C7D0E0` | `#374151` | secondary labels, axis text |
-| `--text-darker` | `#4B5563` | `#9CA3AF` | tertiary/dimmed text |
-
-The accent color is stored as a hex string in the `accentColor` setting. `App.jsx` converts it to space-separated RGB values and writes them to `--accent-rgb` on the root element (plus `--accent` as raw hex, and `--on-accent` = `readableInk(accent)` for legible on-accent text). The Tailwind token uses `rgb(var(--accent-rgb) / <alpha-value>)` so opacity modifiers like `bg-appAccent/30` work correctly. **Never use hardcoded `amber-*` Tailwind classes** — always use `appAccent` so the user's chosen color is respected. **For text/icons sitting ON an accent fill, use `text-appOnAccent`** (never a hardcoded `text-[#0F1117]` / `text-white`) so the foreground stays legible when the user picks a light/pastel accent.
-
-In JSX, use Tailwind token classes rather than raw hex values or inline `var()` calls — except for `--text-secondary` and `--text-darker` which have no token. `color-scheme: dark/light` is set on `:root`/`.light` in `index.css` so browser-native controls (date/time pickers, caret, scrollbars) render in the correct scheme.
-
-### Design-system tokens
-
-`index.css` also defines the PunchIn design-system token layer (CSS custom properties; reference via `var()`):
-
-- **Type scale / weights / tracking:** `--text-display|h1|h2|lg|base|sm|xs|2xs`, `--weight-regular…black`, `--track-tight|normal|over`
-- **Radii:** `--radius-sm` 8 · `--radius` 11 · `--radius-md` 13 · `--radius-lg` 16 · `--radius-xl` 20 · `--radius-pill`
-- **Spacing:** `--space-1…8` (4px base)
-- **Elevation:** `--shadow-card|pop|modal` + `--shadow-accent` (`color-mix` against `--accent`)
-- **Status colours (per theme):** `--green --violet --amber --red`
-- **Pastel presets:** `--pastel-red…gray` — the suggested accent + labor-type colours (users may still pick any custom hex)
-
-The radii/spacing/type/shadow/pastel scales are theme-independent; `--accent`, `--accent-rgb`, and the status colours are overridden under `.light`.
+- **Accent:** never hardcode `amber-*` (or any palette) for accent surfaces — always use the `appAccent` / `text-appAccent` tokens so the user's chosen colour is respected. For text/icons sitting **on** an accent fill, use `text-appOnAccent` (never `text-white` / `text-[#0F1117]`) so the foreground stays legible on a light/pastel accent.
+- **Tokens vs. raw values:** prefer the Tailwind token class over raw hex or inline `var()`. The exceptions are `--text-secondary` and `--text-darker`, which have **no** Tailwind token — reference them via `var()` in CSS / Recharts style props only.
+- **Fonts:** the UI **and** all print/export documents use the self-hosted Noto family (`font-sans` / `font-display` / `font-mono`) — never a CDN `<link>`, and never `-apple-system` / `SF Mono` in print CSS (the print popup goes through `src/utils/printDocument.js`). `index.css` sets `color-scheme: dark/light` so native controls render in the right scheme.
 
 ---
 
@@ -442,59 +350,16 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 
 ## Screenshots
 
-Screenshots live in `docs/screenshots/{phone,tablet,desktop}-{dark,light}/` and are embedded in `README.md` using GitHub's `#gh-dark-mode-only` / `#gh-light-mode-only` URL fragments so GitHub shows the correct theme automatically. They are committed to the repo but must be **generated by the Playwright script** — never captured and saved by hand.
+> **The device specs and the full Playwright regeneration procedure live in [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md).** See "What counts as a visible UI change" above for *when* to regenerate; see that doc for *how*.
 
-### Device specs used
-
-| Device | Physical (default) | PPI | DPR | CSS viewport |
-|--------|-------------------|-----|-----|--------------|
-| Pixel 10 Pro XL | 1080×2404 (max: 1344×2992) | 486 | 2.625× | 412×916 |
-| iPad Air 11" M2 | 2388×1668 (landscape) | 264 | 2× | 1194×834 |
-| Desktop | — | — | 1× | 1920×1080 |
-
-Phone shots use the Pixel's **default** 1080×2404 resolution. At 486 PPI physical the Android DPR is ~2.625 (1080 / 2.625 ≈ 412 CSS px).
-
-### Regenerating
-
-> **Important:** Use the **preview build**, not the dev server. The dev server's `root: './app'` configuration causes Chromium (Playwright) to 404 on the `../src/main.jsx` module script path; the preview build serves a self-contained bundle that loads correctly.
-
-1. Build and start the preview server:
-
-```bash
-npm run build && npm run preview -- --port 5174
-```
-
-2. Run the script from the project root:
-
-```bash
-SCREENSHOT_URL=http://localhost:5174 node scripts/screenshots.mjs
-```
-
-Playwright must be available — it ships with the cloud environment at `/opt/node22/lib/node_modules/playwright/index.mjs`. For local runs where it isn't globally installed:
-
-```bash
-npm install --save-dev playwright && npx playwright install chromium
-SCREENSHOT_URL=http://localhost:5174 node scripts/screenshots.mjs
-```
-
-The script (`scripts/screenshots.mjs`):
-- Checks that the target server is reachable before starting
-- Iterates over 3 devices × 2 themes = 6 browser contexts
-- Sets a realistic per-device **userAgent** (Android for phone, iPadOS for tablet, default desktop Chromium for desktop) so the app's OS detection resolves correctly — without it, mobile-only surfaces (the Haptic feedback toggle, iOS install guidance) never render
-- Seeds demo data directly into IndexedDB (including the `theme` setting), then reloads so the app picks it up
-- Suppresses the first-run install nudge (`pi.installNudgeDismissed` in localStorage) so it doesn't pop a bottom sheet over the captured views once a mobile UA makes it eligible
-- Injects 2 active timers (`punchOut: null`) so the Timer view is populated
-- Captures 7 views per context (42 total): `timer`, `jobs`, `labor-types`, `timesheets-daily`, `timesheets-weekly`, `analytics`, `settings`
-- Outputs to `docs/screenshots/{device}-{theme}/` — 6 directories, 7 PNGs each
-- Is idempotent — clears existing data before seeding, so re-runs always produce consistent output
-- Accepts `SCREENSHOT_URL` env var to target a different server (default: `http://localhost:5173`)
+Screenshots live in `docs/screenshots/{phone,tablet,desktop}-{dark,light}/` and are embedded in `README.md` via GitHub's `#gh-dark-mode-only` / `#gh-light-mode-only` URL fragments. They are committed to the repo but must be **generated by the Playwright script** (`scripts/screenshots.mjs`) — never captured and saved by hand.
 
 ---
 
 ## Adding Features — Checklist
 
 1. **New data type?** Add table/indexes in `db.js`, bump version, add seed data if needed
-2. **New setting?** Add the key + default to the single `DEFAULT_SETTINGS` object in `db.js` (both `populate` and `factoryReset` consume it via `defaultSettingsRows()`, so there's one source of truth — no separate edit to `SettingsView.jsx` needed) and document it in the Settings Keys table above. Because `useSettings` merges over `DEFAULT_SETTINGS`, consumers can read `settings.yourKey` directly without a fallback. Destructive data actions belong in the collapsible **Danger Zone** section, not in the main Data section.
+2. **New setting?** Add the key + default to the single `DEFAULT_SETTINGS` object in `db.js` (both `populate` and `factoryReset` consume it via `defaultSettingsRows()`, so there's one source of truth — no separate edit to `SettingsView.jsx` needed) and document it in the Settings Keys table in `docs/SETTINGS.md`. Because `useSettings` merges over `DEFAULT_SETTINGS`, consumers can read `settings.yourKey` directly without a fallback. Destructive data actions belong in the collapsible **Danger Zone** section, not in the main Data section.
 3. **New view?** Add to `App.jsx` tab switch and `Layout.jsx` nav bar (keep it to 5 nav items max for mobile)
 4. **Editing time?** Always go through `utils/time.js` helpers; never use raw `Date` arithmetic inline
 5. **Charts?** Follow `AnalyticsView.jsx` — use Recharts, reference CSS variables for colors (`var(--text-secondary)` etc.). Wrap each chart in `<figure role="img" aria-label="…">` with a `<table className="sr-only">` fallback.
