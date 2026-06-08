@@ -142,6 +142,11 @@
 
   html, body, #root {
     height: 100%;
+    /* Fill the TRUE visual viewport on an iOS standalone PWA (viewport-fit=cover):
+       height:100% there stops at the safe viewport, leaving a gap below the bottom
+       nav. dvh covers the home-indicator strip; the nav's safe-area-inset-bottom
+       padding then insets its content correctly (no double gap). */
+    height: 100dvh;
     overflow: hidden;
     background-color: var(--bg-primary);
     color: var(--text-secondary);

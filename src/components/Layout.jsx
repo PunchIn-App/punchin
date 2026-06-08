@@ -18,11 +18,17 @@ const NAV = [
   { id: 'settings',   label: 'Settings',  Icon: Settings   },
 ]
 
-// Builds inline style overrides for iOS standalone mode only.
-// Android's WindowInsets system handles its own bars; no manual padding needed.
+// Builds inline style overrides for a standalone install.
+// In LANDSCAPE the Dynamic Island / notch sits on a side and overlaps the rail or
+// content, so inset the whole shell by the left/right safe areas in ANY standalone
+// install (these are 0 in portrait, so they're harmless there). The top/bottom bar
+// insets stay iOS-only — Android's WindowInsets handles its own status/nav bars.
 function useAdaptiveStyles(isStandalone, os) {
-  if (!isStandalone || os !== 'ios') return { header: undefined, nav: undefined }
+  if (!isStandalone) return { root: undefined, header: undefined, nav: undefined }
+  const root = { paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }
+  if (os !== 'ios') return { root, header: undefined, nav: undefined }
   return {
+    root,
     header: { paddingTop: 'env(safe-area-inset-top)' },
     nav:    { paddingBottom: 'env(safe-area-inset-bottom)' },
   }
@@ -70,7 +76,7 @@ export default function Layout({ activeView, onNavigate, children }) {
   }, [])
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-appBg">
+    <div style={adaptive.root} className="h-full flex flex-col md:flex-row bg-appBg">
       {hapticEl}
 
       {/* Desktop chrome: tablet icon-rail (md) → labelled sidebar (lg+). Replaces
