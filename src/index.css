@@ -142,17 +142,23 @@
 
   html, body, #root {
     height: 100%;
-    /* Fill the TRUE visual viewport on an iOS standalone PWA (viewport-fit=cover):
-       height:100% there stops at the safe viewport, leaving a gap below the bottom
-       nav. dvh covers the home-indicator strip; the nav's safe-area-inset-bottom
-       padding then insets its content correctly (no double gap). */
-    height: 100dvh;
     overflow: hidden;
     background-color: var(--bg-primary);
     color: var(--text-secondary);
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Pin the app shell to the layout viewport. On iOS (Safari AND standalone),
+     100vh/100dvh can resolve SHORT of the real screen — leaving the bottom nav
+     floating above a strip of page background (the gap reported on device). A
+     fixed, inset-0 #root fills the actual viewport so the shell's flex column
+     always reaches the bottom edge; the nav's safe-area-inset-bottom padding then
+     lifts its content above the home indicator. */
+  #root {
+    position: fixed;
+    inset: 0;
   }
 
   select option {
