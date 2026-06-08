@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Info, ExternalLink, ScrollText, ChevronDown, Bug, Lightbulb, Scale, RefreshCw, Heart } from 'lucide-react'
 import { usePlatformContext } from '../../hooks/usePlatformContext'
+import { useSettings } from '../../hooks/useSettings'
 import { buildBugReportUrl, buildFeatureRequestUrl, buildFeedbackBugUrl, buildFeedbackFeatureUrl } from '../../utils/issueUrl'
 import ChangelogModal from '../../components/ChangelogModal'
 import LicenseModal from '../../components/LicenseModal'
@@ -10,6 +11,7 @@ import { Panel } from './components'
 // with the root-list "update available" badge) and passed in (issue #149).
 export default function AboutPanel({ onBack, updateAvailable, updateStatus, checkForUpdates }) {
   const { isStandalone, os } = usePlatformContext()
+  const { settings } = useSettings()
   const [showChangelog, setShowChangelog] = useState(false)
   const [showLicense, setShowLicense] = useState(false)
 
@@ -55,7 +57,7 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
           <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
         </button>
         <button
-          onClick={() => window.open(buildFeedbackBugUrl(__APP_VERSION__, isStandalone, os), '_blank', 'noopener,noreferrer')}
+          onClick={() => window.open(buildFeedbackBugUrl(__APP_VERSION__, isStandalone, os, settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
           <div className="flex items-center gap-3 min-w-0">
             <Bug className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
@@ -79,7 +81,7 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
           <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
         </button>
         <button
-          onClick={() => window.open(buildFeedbackFeatureUrl(), '_blank', 'noopener,noreferrer')}
+          onClick={() => window.open(buildFeedbackFeatureUrl(settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
           <div className="flex items-center gap-3 min-w-0">
             <Lightbulb className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />

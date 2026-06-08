@@ -201,10 +201,28 @@ describe('buildFeedbackBugUrl', () => {
     expect(p.get('device')).toMatch(/^Desktop \(\d+×\d+\)$/)
     expect(p.get('template')).toBeNull() // not a GitHub issue form
   })
+
+  it('carries theme + accent when provided', () => {
+    setUA('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36')
+    const p = params(buildFeedbackBugUrl('0.21.0', true, 'web', 'dark', '#FF8FA3'))
+    expect(p.get('theme')).toBe('dark')
+    expect(p.get('accent')).toBe('#FF8FA3')
+  })
+
+  it('omits theme when auto and accent when not a hex', () => {
+    setUA('Mozilla/5.0')
+    const p = params(buildFeedbackBugUrl('0.21.0', false, 'web', 'auto', 'blue'))
+    expect(p.get('theme')).toBeNull()
+    expect(p.get('accent')).toBeNull()
+  })
 })
 
 describe('buildFeedbackFeatureUrl', () => {
   it('points to the feedback feature form (no prefill)', () => {
     expect(buildFeedbackFeatureUrl()).toBe('https://feedback.trackmytime.today/feature')
+  })
+
+  it('carries theme + accent when provided', () => {
+    expect(buildFeedbackFeatureUrl('light', '#abc')).toBe('https://feedback.trackmytime.today/feature?theme=light&accent=%23abc')
   })
 })

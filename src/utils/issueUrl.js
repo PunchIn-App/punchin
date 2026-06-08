@@ -88,13 +88,24 @@ export function buildFeatureRequestUrl(appVersion) {
   }))
 }
 
-// Self-hosted feedback forms (no GitHub account required). The bug form gets the
-// same prefilled environment metadata as the GitHub form; the feature form
-// carries no environment fields, so it opens unprefilled.
-export function buildFeedbackBugUrl(appVersion, isStandalone, os) {
-  return `${FEEDBACK_BASE}/bug?${new URLSearchParams(bugMetadata(appVersion, isStandalone, os)).toString()}`
+// Carry the user's theme + accent so the self-hosted form matches the app. An
+// "auto" theme is omitted so the form follows the device (its default); accent
+// must be a bare hex (the form injects it into a <style>, and drops non-hex).
+function withTheme(params, theme, accent) {
+  if (theme === 'light' || theme === 'dark') params.set('theme', theme)
+  if (typeof accent === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(accent)) params.set('accent', accent)
+  return params
 }
 
-export function buildFeedbackFeatureUrl() {
-  return `${FEEDBACK_BASE}/feature`
+// Self-hosted feedback forms (no GitHub account required). The bug form gets the
+// same prefilled environment metadata as the GitHub form; the feature form
+// carries no environment fields. Both also carry the app's theme + accent.
+export function buildFeedbackBugUrl(appVersion, isStandalone, os, theme, accent) {
+  const params = withTheme(new URLSearchParams(bugMetadata(appVersion, isStandalone, os)), theme, accent)
+  return `${FEEDBACK_BASE}/bug?${params.toString()}`
+}
+
+export function buildFeedbackFeatureUrl(theme, accent) {
+  const qs = withTheme(new URLSearchParams(), theme, accent).toString()
+  return qs ? `${FEEDBACK_BASE}/feature?${qs}` : `${FEEDBACK_BASE}/feature`
 }
