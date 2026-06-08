@@ -102,6 +102,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                       minutes={settings.remindLongRunningMinutes ?? 60}
                       onChange={v => updateSetting('remindLongRunningMinutes', v)}
                       onTurnOff={() => updateSetting('remindLongRunning', false)}
+                      buttonClassName={reminderInputClass}
                     />
                   </div>
                 </ReminderRow>

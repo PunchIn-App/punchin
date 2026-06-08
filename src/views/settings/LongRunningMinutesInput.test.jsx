@@ -1,14 +1,18 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import LongRunningMinutesInput from './LongRunningMinutesInput'
 
-// Focused unit test for the long-running threshold wheel picker (issue #111).
-// jsdom has no layout/scroll, so this drives the ARIA spinbutton keyboard path
-// (the scroll-snap + wrap behaviour is exercised in a real browser).
+// Focused unit test for the long-running threshold picker (issue #111). It's now a
+// popover (issue #229), so each case opens it first. jsdom has no layout/scroll,
+// so this drives the ARIA spinbutton keyboard path + the typeable fields (the
+// scroll-snap + wrap behaviour is exercised in a real browser).
+
+const openPicker = () => fireEvent.click(screen.getByRole('button', { name: /long-running threshold/i }))
 
 const setup = (minutes = 60) => {
   const onChange = vi.fn()
   const onTurnOff = vi.fn()
   render(<LongRunningMinutesInput minutes={minutes} onChange={onChange} onTurnOff={onTurnOff} />)
+  openPicker()
   return {
     hours: screen.getByLabelText(/hours before a long-running timer reminder/i),
     mins: screen.getByLabelText(/minutes before a long-running timer reminder/i),
@@ -18,9 +22,28 @@ const setup = (minutes = 60) => {
 }
 
 // jsdom has no layout but does store scrollTop. The minutes wheel renders its 12
-// values as REPEAT(5) stacked copies of 30px rows, centred on the middle copy
+// values as REPEAT(5) stacked copies of 34px rows, centred on the middle copy
 // (PAD=1), so the scrollTop representing `steps` rows away from a centred index is:
-const minScrollTop = (baseIdx, steps) => (2 * 12 + baseIdx + steps - 1) * 30
+const minScrollTop = (baseIdx, steps) => (2 * 12 + baseIdx + steps - 1) * 34
+
+describe('LongRunningMinutesInput — trigger + typeable fields', () => {
+  it('the trigger shows the duration', () => {
+    render(<LongRunningMinutesInput minutes={90} onChange={vi.fn()} onTurnOff={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /long-running threshold: 1h 30m/i })).toBeInTheDocument()
+  })
+
+  it('typing the hours field sets the hour part', () => {
+    const { onChange } = setup(90) // 1h 30m
+    fireEvent.change(screen.getByLabelText(/^hours$/i), { target: { value: '2' } })
+    expect(onChange).toHaveBeenLastCalledWith(150) // 2h 30m
+  })
+
+  it('typing the minutes field snaps to the 5-min grid', () => {
+    const { onChange } = setup(60) // 1h 00m
+    fireEvent.change(screen.getByLabelText(/^minutes$/i), { target: { value: '37' } })
+    expect(onChange).toHaveBeenLastCalledWith(95) // 1h 35m (37 → 35)
+  })
+})
 
 describe('LongRunningMinutesInput (#111 — 24h wheel, live minutes carry into hours)', () => {
   it('splits the stored minutes across two spinbutton wheels', () => {

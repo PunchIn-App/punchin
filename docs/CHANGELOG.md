@@ -12,6 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 - **Time & date fields now use PunchIn's own pickers.** A time entry's start/end times and the reminder times open a branded picker where you can **type the hour and minute** (great on a desktop keyboard) or **spin the wheel** (great on touch) — and unlike the native control, it follows your 12-hour / 24-hour preference from Settings. Date fields move to the matching branded **calendar** described above.
+- **The Long-running timer reminder** (Settings › Reminders) now uses the same branded picker — its duration is a tidy "1h 30m" button you tap to **type or spin** the hours/minutes, instead of the always-on-screen wheel.
 
 ---
 
