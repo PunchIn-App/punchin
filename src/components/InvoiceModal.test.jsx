@@ -315,6 +315,25 @@ describe('InvoiceModal — export and print', () => {
     expect(mockUpdateSetting).toHaveBeenCalledWith('nextInvoiceNumber', 51) // counter advances to edited + 1
   })
 
+  it('accepts a custom alphanumeric invoice number; prints it verbatim and leaves the counter untouched', async () => {
+    // The number field allows letters/symbols (e.g. a per-client code) on top of
+    // plain numbers. A non-numeric value is used as-is (no zero-padding) and the
+    // auto-increment counter must NOT advance (you can't "+1" a string).
+    mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    const field = screen.getByLabelText('Invoice number')
+    fireEvent.change(field, { target: { value: 'INV-2024-A' } })
+    expect(field).toHaveValue('INV-2024-A')                 // letters kept, not coerced to a number
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = fakeWin.document.write.mock.calls[0][0]
+    expect(html).toContain('PI-INV-2024-A')                 // prefix + verbatim value, no zero-padding
+    expect(mockUpdateSetting).not.toHaveBeenCalledWith('nextInvoiceNumber', expect.anything())
+  })
+
   it('advances nextInvoiceNumber when a numbered invoice is generated', async () => {
     mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
     vi.spyOn(window, 'open').mockReturnValue({ document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() })

@@ -48,9 +48,13 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   const money = (n) => formatMoney(n, currency)
 
   // Editable invoice number: defaults to the next number, but the user can
-  // override it (manual / per-client / reset). Generation advances the counter.
+  // override it with anything (manual / per-client / a custom alphanumeric code).
+  // It's free text — letters/symbols are allowed on top of plain numbers. Plain
+  // numbers zero-pad and advance the auto-counter; a custom code prints verbatim
+  // and leaves the counter alone (you can't "+1" a string).
   const [numOverride, setNumOverride] = useState(null)
-  const invoiceNum = numOverride ?? (settings.nextInvoiceNumber ?? 1)
+  const invoiceNum = numOverride ?? String(settings.nextInvoiceNumber ?? 1)
+  const invoiceNumIsPlain = /^\d+$/.test(invoiceNum)
 
   const uid      = useId()
   const titleId  = `${uid}-title`
@@ -160,7 +164,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     const fromLines = [settings.billingBusiness, settings.billingEmail, settings.billingPhone, settings.billingAddress].filter(Boolean)
     const logo = (settings.billingLogo || '').startsWith('data:image/') ? settings.billingLogo : ''
     const hasFrom = settings.billingName || fromLines.length || logo
-    const invNo = settings.numberInvoices ? `${settings.invoicePrefix || ''}${String(invoiceNum).padStart(3, '0')}` : ''
+    const invNo = settings.numberInvoices ? `${settings.invoicePrefix || ''}${invoiceNumIsPlain ? invoiceNum.padStart(3, '0') : invoiceNum}` : ''
     const bandHtml = hasFrom ? `
 <div class="band">
   <div class="party">
@@ -249,7 +253,9 @@ ${totalAmount != null ? `<div class="paperfoot">
       // the next number. Only on a successful open (a blocked popup won't burn a
       // number); re-generating the same invoice intentionally takes a new number.
       if (settings.numberInvoices) {
-        updateSetting('nextInvoiceNumber', invoiceNum + 1)
+        // Only advance the counter for a plain number; a custom alphanumeric code
+        // can't be incremented, so it's left as-is for the user to manage.
+        if (invoiceNumIsPlain) updateSetting('nextInvoiceNumber', Number(invoiceNum) + 1)
         setNumOverride(null) // next time, show the new auto number
       }
     } else {
@@ -328,14 +334,14 @@ ${totalAmount != null ? `<div class="paperfoot">
                 )}
                 <input
                   id={`${uid}-invno`}
-                  type="number"
-                  min="1"
+                  type="text"
+                  autoComplete="off"
                   value={invoiceNum}
-                  onChange={e => setNumOverride(Math.max(1, Number(e.target.value) || 1))}
-                  className={`w-28 font-mono ${inputCls} ${settings.invoicePrefix ? 'rounded-l-none' : ''}`}
+                  onChange={e => setNumOverride(e.target.value)}
+                  className={`w-40 font-mono ${inputCls} ${settings.invoicePrefix ? 'rounded-l-none' : ''}`}
                 />
               </div>
-              <p className="text-[11px] text-appTextMuted mt-1">Edit for a manual or per-client number; advances after you generate the invoice.</p>
+              <p className="text-[11px] text-appTextMuted mt-1">Manual, per-client, or a custom code — letters and symbols are allowed. The counter only auto-advances for plain numbers.</p>
             </div>
           )}
 
