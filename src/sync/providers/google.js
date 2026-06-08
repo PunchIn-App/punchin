@@ -25,6 +25,11 @@ export function buildGoogleOAuthUrl(clientId, state) {
     // `state` carries the provider label (for callback routing) plus a CSRF
     // nonce verified on return (issue #125): `google:<nonce>`.
     state: state ? `google:${state}` : 'google',
+    // Always show the account chooser instead of silently re-issuing a token to
+    // the already-signed-in Google account. Without this, reconnecting after a
+    // disconnect "pushes right through" with no chance to pick a different
+    // account — see the matching revoke-on-disconnect in syncManager.
+    prompt: 'select_account',
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }

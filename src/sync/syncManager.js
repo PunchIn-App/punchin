@@ -269,13 +269,41 @@ export async function runSync() {
   return now
 }
 
+// Ask our Cloudflare Worker to revoke this device's OAuth token at the provider. The
+// worker holds the GitHub client secret (required for GitHub's revoke) and also
+// proxies Google's revoke so the app gets a real status without widening the
+// browser CSP — see worker/oauth.js `handleRevoke`. Best-effort and same-origin.
+async function revokeViaWorker(provider, token) {
+  await fetch('/oauth/revoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, token }),
+  })
+}
+
 export async function disconnectSync() {
   const s = await getSettings()
   const token = await getSyncToken()
 
-  // Best-effort: delete this device's file from the gist before clearing credentials
+  // Best-effort: delete this device's file from the gist before clearing
+  // credentials — and before the revoke below, which invalidates the token (so
+  // a revoke-first ordering would 401 this PATCH and orphan the device file).
   if (s.syncProvider === 'github' && token && s.syncFileId) {
     try { await deleteDeviceFile(token, s.syncFileId, getDeviceId()) } catch {}
+  }
+
+  // Best-effort: kill THIS device's token at the provider so disconnect revokes
+  // access provider-side, not merely locally — wiping the encrypted token below
+  // only forgets it on this device, and the still-signed-in browser session
+  // could otherwise be handed a fresh token silently ("pushed right through").
+  // Deliberately device-scoped: GitHub uses DELETE …/token (other devices keep
+  // syncing — not …/grant, which is account-wide), Google revokes just this
+  // token (~1h-lived anyway). Drops the app's ACCESS only — the cloud copy of
+  // the data is untouched and reconnecting re-discovers it. Both go through the
+  // worker; OneDrive has no client-side revoke (its ~1h token simply expires —
+  // the account chooser is forced via prompt=select_account instead).
+  if (token && (s.syncProvider === 'github' || s.syncProvider === 'google')) {
+    try { await revokeViaWorker(s.syncProvider, token) } catch {}
   }
 
   await clearSyncToken() // remove the encrypted token (and any legacy plaintext)

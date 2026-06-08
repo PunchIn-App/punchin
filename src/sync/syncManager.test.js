@@ -189,6 +189,15 @@ describe('runSync — seeds preferences on a fresh install only', () => {
 // ---------------------------------------------------------------------------
 
 describe('disconnectSync', () => {
+  // disconnectSync now POSTs a best-effort grant-revoke to the worker (/oauth/revoke),
+  // so stub fetch for the whole block. Default: a successful revoke.
+  let fetchMock
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 })
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
   it('sets all sync settings (including syncUsername) to null', async () => {
     await seedSyncSettings({ syncProvider: 'google', syncToken: 'tok', lastSyncedAt: 12345 })
     await db.settings.put({ key: 'syncUsername', value: 'octocat' })
@@ -202,19 +211,44 @@ describe('disconnectSync', () => {
     expect(await getSyncToken()).toBeNull()
   })
 
-  it('calls deleteDeviceFile before clearing settings for GitHub', async () => {
+  it('deletes the device gist file, then revokes the GitHub grant through the worker (in that order)', async () => {
     await seedSyncSettings({ syncProvider: 'github', syncToken: 'gh-token', syncFileId: 'gist-del' })
     github.deleteDeviceFile.mockResolvedValueOnce(undefined)
     await disconnectSync()
     expect(github.deleteDeviceFile).toHaveBeenCalledWith('gh-token', 'gist-del', 'testdevice')
-    const row = await db.settings.get('syncProvider')
-    expect(row?.value).toBeNull()
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/oauth/revoke')
+    expect(opts.method).toBe('POST')
+    expect(JSON.parse(opts.body)).toEqual({ provider: 'github', token: 'gh-token' })
+    // gist cleanup must run BEFORE the revoke — revoking kills the token, so a
+    // revoke-first ordering would 401 the cleanup PATCH and orphan the file.
+    expect(github.deleteDeviceFile.mock.invocationCallOrder[0])
+      .toBeLessThan(fetchMock.mock.invocationCallOrder[0])
+    expect((await db.settings.get('syncProvider'))?.value).toBeNull()
   })
 
-  it('does not call deleteDeviceFile for non-GitHub providers', async () => {
+  it('revokes the Google token through the worker (no gist cleanup for non-GitHub)', async () => {
     await seedSyncSettings({ syncProvider: 'google', syncToken: 'goog-token', syncFileId: null })
     await disconnectSync()
     expect(github.deleteDeviceFile).not.toHaveBeenCalled()
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/oauth/revoke')
+    expect(JSON.parse(opts.body)).toEqual({ provider: 'google', token: 'goog-token' })
+  })
+
+  it('does not call the worker revoke for OneDrive (no client-side revoke exists)', async () => {
+    await seedSyncSettings({ syncProvider: 'onedrive', syncToken: 'od-token', syncFileId: null })
+    await disconnectSync()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect((await db.settings.get('syncProvider'))?.value).toBeNull()
+  })
+
+  it('still clears settings and wipes the token even if the worker revoke fails', async () => {
+    await seedSyncSettings({ syncProvider: 'google', syncToken: 'goog-token', syncFileId: null })
+    fetchMock.mockRejectedValueOnce(new Error('network'))
+    await disconnectSync()
+    expect((await db.settings.get('syncProvider'))?.value).toBeNull()
+    expect(await getSyncToken()).toBeNull()
   })
 
   it('still clears settings even if deleteDeviceFile throws', async () => {

@@ -90,12 +90,70 @@ async function handleAccentIcon(url) {
   }
 }
 
+// Best-effort OAuth token revocation, called by the app's disconnect flow so a
+// disconnect drops access provider-side instead of the provider silently
+// re-issuing a token to the still-signed-in browser session. Routed through the worker for two
+// reasons: GitHub's revoke needs the client *secret* (HTTP Basic), which must
+// never reach the browser; and Google's, though secret-less, runs here too so
+// the app gets a real status and `oauth2.googleapis.com` stays out of the
+// browser CSP (the worker's own outbound fetch isn't subject to `connect-src`).
+// OneDrive has no client-side per-app revoke, so the app never posts it here.
+async function handleRevoke(request, env) {
+  if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 })
+
+  let provider, token
+  try { ({ provider, token } = await request.json()) } catch { /* malformed body → 400 below */ }
+  if (!provider || !token) return new Response('Bad Request', { status: 400 })
+
+  try {
+    if (provider === 'github') {
+      // DELETE the token (device-scoped), NOT the whole grant: this kills only
+      // this device's token at GitHub and leaves the user's OTHER devices'
+      // tokens working (`/grant` would revoke every token for the account). The
+      // app's "Connect as @you?" dialog already gates reconnect, so we don't
+      // need the heavier account-wide revoke. Basic auth = the client creds.
+      const basic = btoa(`${env.GITHUB_CLIENT_ID}:${env.GITHUB_CLIENT_SECRET}`)
+      const res = await fetch(`https://api.github.com/applications/${env.GITHUB_CLIENT_ID}/token`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Basic ${basic}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'PunchIn-Sync', // api.github.com 403s without a UA
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ access_token: token }),
+      })
+      // 204 = revoked; 404 = token already invalid. Both mean "nothing live left".
+      return new Response(null, { status: res.status === 204 || res.status === 404 ? 204 : 502 })
+    }
+
+    if (provider === 'google') {
+      const res = await fetch('https://oauth2.googleapis.com/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ token }),
+      })
+      // 200 = revoked; 400 = token already invalid/expired — nothing left to do.
+      return new Response(null, { status: res.ok || res.status === 400 ? 204 : 502 })
+    }
+
+    return new Response('Unsupported provider', { status: 400 })
+  } catch {
+    return new Response(null, { status: 502 })
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
 
     const icon = await handleAccentIcon(url)
     if (icon) return withSecurityHeaders(icon)
+
+    if (url.pathname === '/oauth/revoke') {
+      return handleRevoke(request, env)
+    }
 
     if (url.pathname !== '/oauth/github/callback') {
       return withSecurityHeaders(await env.ASSETS.fetch(request))
