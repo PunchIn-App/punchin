@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react'
 
 // Shared Settings primitives, extracted from the SettingsView monolith so each
 // panel can compose them (issue #144).
@@ -177,6 +177,50 @@ export function PanelGroup({ title, danger, children, collapsible, defaultCollap
         {title}
       </button>
       {!collapsed && children}
+    </div>
+  )
+}
+
+// The Settings "Danger Zone" — collapsed by default so destructive actions
+// (clear entries / factory reset) aren't a mis-tap away. Matches the design
+// system: collapsed, it's a red-tinted card with a warning icon tile, a title,
+// and a one-line summary; expanded, a red mono overline heading reveals the
+// destructive rows passed as children. (Replaces a faint red overline link.)
+export function DangerZone({ children }) {
+  const [open, setOpen] = useState(false)
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-expanded={false}
+        className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border border-red-500/30 bg-appCard text-left hover:bg-red-500/5 transition-colors"
+      >
+        <span className="w-[34px] h-[34px] rounded-[9px] bg-red-500/10 text-red-400 grid place-items-center flex-shrink-0">
+          <AlertTriangle className="w-[18px] h-[18px]" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-red-400">Danger Zone</span>
+          <span className="block text-xs text-appTextMuted mt-0.5">Clear entries · factory reset · irreversible</span>
+        </span>
+        <ChevronDown className="ml-auto w-4 h-4 text-appTextMuted -rotate-90 flex-shrink-0" aria-hidden="true" />
+      </button>
+    )
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        aria-expanded={true}
+        className="ds-overline text-red-400 flex items-center gap-1 px-1 mb-2 hover:opacity-80 transition-opacity"
+      >
+        <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+        Danger Zone
+      </button>
+      {children}
     </div>
   )
 }

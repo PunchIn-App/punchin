@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.25.1] — 2026-06-08
+
+### Changed
+- **Settings — the Danger Zone matches the design system.** The destructive-actions section (clear entries · factory reset) now shows as a clear red-outlined card with a warning icon and a one-line summary when collapsed, and a red section heading above icon-tiled rows when expanded — instead of the faint red link it was before.
+
+---
+
 ## [0.25.0] — 2026-06-08
 
 ### Fixed
