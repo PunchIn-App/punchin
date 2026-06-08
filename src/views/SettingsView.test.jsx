@@ -594,13 +594,13 @@ describe('SettingsView — About', () => {
     expect(screen.getByText('Check for updates')).toBeInTheDocument()
   })
 
-  it('opens a feature-request issue from "Help improve PunchIn"', () => {
+  it('opens the account-free feedback feature form from "Help improve PunchIn"', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {})
     render(<SettingsView />)
     expand('About')
     fireEvent.click(screen.getByText('Help improve PunchIn'))
     expect(openSpy).toHaveBeenCalledWith(
-      expect.stringContaining('template=feature_request.yml'),
+      expect.stringContaining('feedback.trackmytime.today/feature'),
       '_blank',
       'noopener,noreferrer',
     )
