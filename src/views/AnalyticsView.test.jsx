@@ -4,6 +4,9 @@ import AnalyticsView from './AnalyticsView'
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({ db: {} }))
+// useSettings calls useLiveQuery internally; mock it so the 3-call queue below
+// stays aligned with AnalyticsView's own entries/jobs/laborTypes queries.
+vi.mock('../hooks/useSettings', () => ({ useSettings: () => ({ settings: {} }) }))
 vi.mock('recharts', () => ({
   BarChart: ({ children }) => <div data-testid="bar-chart">{children}</div>,
   Bar: () => null,
@@ -14,6 +17,7 @@ vi.mock('recharts', () => ({
   PieChart: ({ children }) => <div data-testid="pie-chart">{children}</div>,
   Pie: ({ children }) => <div>{children}</div>,
   Cell: () => null,
+  LabelList: () => null,
 }))
 
 const JOBS = [{ id: 1, name: 'Acme Corp' }]
@@ -59,23 +63,23 @@ describe('AnalyticsView — period toggle', () => {
   it('renders "Last 7 days" and "Last 30 days" buttons', () => {
     setupMocks()
     render(<AnalyticsView />)
-    expect(screen.getByRole('button', { name: /last 7 days/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /last 30 days/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '7 days' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '30 days' })).toBeInTheDocument()
   })
 
   it('"Last 7 days" is active (aria-pressed=true) by default', () => {
     setupMocks()
     render(<AnalyticsView />)
-    expect(screen.getByRole('button', { name: /last 7 days/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /last 30 days/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: '7 days' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '30 days' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('switches to 30d when that button is clicked', () => {
     setupMocks()
     render(<AnalyticsView />)
-    fireEvent.click(screen.getByRole('button', { name: /last 30 days/i }))
-    expect(screen.getByRole('button', { name: /last 30 days/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /last 7 days/i })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: '30 days' }))
+    expect(screen.getByRole('button', { name: '30 days' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '7 days' })).toHaveAttribute('aria-pressed', 'false')
   })
 })
 
@@ -214,5 +218,31 @@ describe('AnalyticsView — with entries', () => {
   it('renders the "By labor type" section label', () => {
     render(<AnalyticsView />)
     expect(screen.getByText('By labor type')).toBeInTheDocument()
+  })
+})
+
+describe('AnalyticsView — billable earnings', () => {
+  const now = new Date()
+  const hoursAgo = h => new Date(now.getTime() - h * 3600000)
+
+  it('shows total earnings when the job has a rate for the entry', () => {
+    setupMocks({
+      entries: [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: hoursAgo(2), punchOut: now }],
+      jobs: [{ id: 1, name: 'Acme', laborRates: { 1: 50 } }],
+      laborTypes: [{ id: 1, name: 'Design', color: '#5FD08A' }],
+    })
+    render(<AnalyticsView />)
+    expect(screen.getByText('Billable earnings')).toBeInTheDocument()
+    expect(screen.getByText(/100/)).toBeInTheDocument() // 2h × 50
+  })
+
+  it('hides the earnings card when no rate is set', () => {
+    setupMocks({
+      entries: [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: hoursAgo(1), punchOut: now }],
+      jobs: [{ id: 1, name: 'Acme', laborRates: {} }],
+      laborTypes: [{ id: 1, name: 'Design', color: '#5FD08A' }],
+    })
+    render(<AnalyticsView />)
+    expect(screen.queryByText('Billable earnings')).toBeNull()
   })
 })

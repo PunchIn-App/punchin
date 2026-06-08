@@ -1,4 +1,4 @@
-import { db } from '../db'
+import { db, getPortableSettings, applyPortableSettings } from '../db'
 import { getDeviceId } from '../utils/deviceId'
 import {
   createGist,
@@ -17,20 +17,30 @@ async function getSettings() {
 }
 
 export async function exportSnapshot() {
-  const [jobs, entries, laborTypes, deletions] = await Promise.all([
+  const [jobs, entries, laborTypes, deletions, settings] = await Promise.all([
     db.jobs.toArray(),
     db.entries.toArray(),
     db.laborTypes.toArray(),
     db.deletions.toArray(),
+    getPortableSettings(), // portable preferences ride along (sync/account keys excluded)
   ])
-  return { version: 1, exportedAt: new Date().toISOString(), jobs, entries, laborTypes, deletions }
+  return { version: 1, exportedAt: new Date().toISOString(), jobs, entries, laborTypes, deletions, settings }
+}
+
+// True when this device has no user data yet — used to decide whether a cloud
+// pull should SEED preferences (a fresh install / installed PWA) vs leave an
+// established device's own preferences alone.
+async function isLocalDataEmpty() {
+  const [j, e, l] = await Promise.all([db.jobs.count(), db.entries.count(), db.laborTypes.count()])
+  return j === 0 && e === 0 && l === 0
 }
 
 // Merge an externally-provided snapshot (e.g. a transfer link, issue #77) into
 // the local database, reusing the same name-based dedup as cloud sync. Returns
-// the number of new time entries added.
+// the number of new time entries added. This is an EXPLICIT user import (file /
+// transfer link), so the snapshot's portable preferences are applied.
 export async function importSnapshot(remote) {
-  return mergeSnapshot(remote)
+  return mergeSnapshot(remote, { applySettings: true })
 }
 
 // laborRates is a map keyed by laborTypeId — a device-local autoincrement id.
@@ -46,10 +56,10 @@ function remapLaborRates(rates, ltMap) {
   return out
 }
 
-async function mergeSnapshot(remote) {
+async function mergeSnapshot(remote, { applySettings = false } = {}) {
   if (!remote?.version || !Array.isArray(remote.jobs)) return 0
 
-  return db.transaction('rw', [db.laborTypes, db.jobs, db.entries, db.deletions], async () => {
+  const imported = await db.transaction('rw', [db.laborTypes, db.jobs, db.entries, db.deletions], async () => {
     // Identity is resolved per-record: a record that carries a `uuid` (written
     // by current app versions) is matched to the local record with the same
     // uuid — stable across renames and edits. Records without a uuid (legacy
@@ -65,13 +75,13 @@ async function mergeSnapshot(remote) {
         ltMap[lt.id] = match.id
         // Last-write-wins for mutable fields (issue #120): name, color, archive.
         if (lt.uuid && (lt.updatedAt ?? 0) > (match.updatedAt ?? 0)) {
-          const fields = { name: lt.name, color: lt.color, isArchived: lt.isArchived ?? false }
+          const fields = { name: lt.name, color: lt.color, glyph: lt.glyph ?? null, isArchived: lt.isArchived ?? false }
           await db.laborTypes.update(match.id, { ...fields, updatedAt: lt.updatedAt })
           Object.assign(match, fields, { updatedAt: lt.updatedAt })
         }
       } else {
         const newId = await db.laborTypes.add({
-          name: lt.name, color: lt.color, isArchived: lt.isArchived ?? false,
+          name: lt.name, color: lt.color, glyph: lt.glyph ?? null, isArchived: lt.isArchived ?? false,
           uuid: lt.uuid, updatedAt: lt.updatedAt,
         })
         ltMap[lt.id] = newId
@@ -177,6 +187,12 @@ async function mergeSnapshot(remote) {
     }
     return imported
   })
+
+  // Apply the snapshot's portable preferences after the data transaction (the
+  // settings table isn't in its scope). Gated by the caller: an explicit import
+  // (file / transfer link) applies always; a cloud pull seeds a fresh install only.
+  if (applySettings && remote.settings) await applyPortableSettings(remote.settings)
+  return imported
 }
 
 // Tag a sync network step so a failure says which side broke (issue #122).
@@ -204,6 +220,9 @@ export async function runSync() {
   const EXPIRY_MARGIN_MS = 30_000
   if (s.syncTokenExpiry && Date.now() > s.syncTokenExpiry - EXPIRY_MARGIN_MS) throw new Error('TOKEN_EXPIRED')
 
+  // Capture freshness BEFORE merging: a cloud pull seeds preferences only into a
+  // brand-new install (after that, each established device keeps its own).
+  const wasEmpty = await isLocalDataEmpty()
   let fileId = s.syncFileId ?? null
 
   if (s.syncProvider === 'github') {
@@ -217,6 +236,10 @@ export async function runSync() {
     if (fileId) {
       const snapshots = await syncStep('download', () => fetchAllDeviceData(token, fileId))
       for (const snapshot of snapshots) await mergeSnapshot(snapshot)
+      if (wasEmpty) {
+        const seed = snapshots.find(snap => snap?.settings)
+        if (seed) await applyPortableSettings(seed.settings)
+      }
     }
 
     const snapshot = await exportSnapshot()
@@ -230,11 +253,13 @@ export async function runSync() {
   } else if (s.syncProvider === 'google') {
     const remote = await syncStep('download', () => pullFromDrive(token))
     if (remote) await mergeSnapshot(remote)
+    if (wasEmpty && remote?.settings) await applyPortableSettings(remote.settings)
     const snapshot = await exportSnapshot()
     await syncStep('upload', () => pushToDrive(token, snapshot))
   } else if (s.syncProvider === 'onedrive') {
     const remote = await syncStep('download', () => pullFromOneDrive(token))
     if (remote) await mergeSnapshot(remote)
+    if (wasEmpty && remote?.settings) await applyPortableSettings(remote.settings)
     const snapshot = await exportSnapshot()
     await syncStep('upload', () => pushToOneDrive(token, snapshot))
   }

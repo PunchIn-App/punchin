@@ -81,6 +81,18 @@ describe('TimerCard — rendering', () => {
   })
 })
 
+describe('TimerCard — colour accent', () => {
+  it("uses the job's colour for the accent, overriding the labor type", () => {
+    render(<TimerCard entry={ENTRY} job={{ ...JOB, color: '#FF0000' }} laborType={LABOR_TYPE} />)
+    expect(screen.getByRole('timer')).toHaveStyle({ color: 'rgb(255, 0, 0)' })
+  })
+
+  it('falls back to the labor type colour when the job has no colour', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByRole('timer')).toHaveStyle({ color: 'rgb(99, 102, 241)' })
+  })
+})
+
 describe('TimerCard — background pause (#142)', () => {
   afterEach(() => {
     vi.useRealTimers()

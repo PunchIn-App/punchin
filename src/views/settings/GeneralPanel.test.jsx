@@ -31,20 +31,21 @@ describe('GeneralPanel — time display & billing (#208)', () => {
     expect(screen.getByRole('switch', { name: /decimal hours/i })).toHaveAttribute('aria-checked', 'true')
   })
 
-  it('sets the rounding increment from the select', () => {
+  it('sets the rounding increment from the dropdown', () => {
     render(<GeneralPanel onBack={() => {}} />)
-    fireEvent.change(screen.getByRole('combobox', { name: /round billed time/i }), { target: { value: '15' } })
+    fireEvent.click(screen.getByRole('button', { name: /round billed time/i }))
+    fireEvent.click(screen.getByRole('option', { name: '¼ hour' }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('roundingMinutes', 15)
   })
 
   it('shows the current rounding selection', () => {
     mockSettings = { roundingMinutes: 30 }
     render(<GeneralPanel onBack={() => {}} />)
-    expect(screen.getByRole('combobox', { name: /round billed time/i })).toHaveValue('30')
+    expect(screen.getByRole('button', { name: /round billed time/i })).toHaveTextContent('½ hour')
   })
 
-  it('defaults the rounding select to Off when unset', () => {
+  it('defaults the rounding dropdown to Off when unset', () => {
     render(<GeneralPanel onBack={() => {}} />)
-    expect(screen.getByRole('combobox', { name: /round billed time/i })).toHaveValue('0')
+    expect(screen.getByRole('button', { name: /round billed time/i })).toHaveTextContent('Off')
   })
 })

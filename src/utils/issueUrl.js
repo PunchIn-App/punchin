@@ -3,6 +3,10 @@
 // without importing the whole settings view (issue #146).
 
 const ISSUES_NEW = 'https://github.com/PunchIn-App/punchin/issues/new'
+// Self-hosted, account-free intake (the punchin-feedback worker). Its /bug and
+// /feature forms derive from the same issue templates, so the same query-param
+// keys prefill either the GitHub form or the self-hosted one.
+const FEEDBACK_BASE = 'https://feedback.trackmytime.today'
 
 function issueUrl(params) {
   const url = new URL(ISSUES_NEW)
@@ -49,21 +53,30 @@ function describeDevice(ua, os) {
     const m = ua.match(/\(Linux; Android [^;]+; ([^)]+)\)/)
     return m ? m[1].trim() : 'Android device'
   }
-  return `Desktop (${screen.width}×${screen.height})`
+  // Guard `screen` (a window-only global) so this never throws off the main thread
+  // or in non-DOM contexts; real browsers always have it.
+  const w = typeof screen !== 'undefined' ? screen.width : 0
+  const h = typeof screen !== 'undefined' ? screen.height : 0
+  return `Desktop (${w}×${h})`
 }
 
-// Opens the bug-report issue form, pre-filling environment metadata so reports
-// arrive with the version / browser / OS / device already captured.
-export function buildBugReportUrl(appVersion, isStandalone, os) {
+// Environment metadata shared by the GitHub and self-hosted bug forms. The keys
+// match the bug_report.yml field ids, so the same params prefill either form.
+function bugMetadata(appVersion, isStandalone, os) {
   const ua = navigator.userAgent
-  return issueUrl(new URLSearchParams({
-    template: 'bug_report.yml',
+  return {
     version: appVersion,
     'install-type': isStandalone ? 'PWA (installed to home screen)' : 'Browser tab',
     browser: describeBrowser(ua),
     os: describeOs(ua, os),
     device: describeDevice(ua, os),
-  }))
+  }
+}
+
+// Opens the bug-report issue form, pre-filling environment metadata so reports
+// arrive with the version / browser / OS / device already captured.
+export function buildBugReportUrl(appVersion, isStandalone, os) {
+  return issueUrl(new URLSearchParams({ template: 'bug_report.yml', ...bugMetadata(appVersion, isStandalone, os) }))
 }
 
 // Opens the feature-request issue form (separate template from bug reports).
@@ -73,4 +86,26 @@ export function buildFeatureRequestUrl(appVersion) {
     template: 'feature_request.yml',
     scope: `Suggested from PunchIn v${appVersion}`,
   }))
+}
+
+// Carry the user's theme + accent so the self-hosted form matches the app. An
+// "auto" theme is omitted so the form follows the device (its default); accent
+// must be a bare hex (the form injects it into a <style>, and drops non-hex).
+function withTheme(params, theme, accent) {
+  if (theme === 'light' || theme === 'dark') params.set('theme', theme)
+  if (typeof accent === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(accent)) params.set('accent', accent)
+  return params
+}
+
+// Self-hosted feedback forms (no GitHub account required). The bug form gets the
+// same prefilled environment metadata as the GitHub form; the feature form
+// carries no environment fields. Both also carry the app's theme + accent.
+export function buildFeedbackBugUrl(appVersion, isStandalone, os, theme, accent) {
+  const params = withTheme(new URLSearchParams(bugMetadata(appVersion, isStandalone, os)), theme, accent)
+  return `${FEEDBACK_BASE}/bug?${params.toString()}`
+}
+
+export function buildFeedbackFeatureUrl(theme, accent) {
+  const qs = withTheme(new URLSearchParams(), theme, accent).toString()
+  return qs ? `${FEEDBACK_BASE}/feature?${qs}` : `${FEEDBACK_BASE}/feature`
 }

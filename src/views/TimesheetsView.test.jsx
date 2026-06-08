@@ -1,15 +1,28 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import TimesheetsView from './TimesheetsView'
+import { openPrintWindow } from '../utils/printDocument'
+
+// Printing goes through openPrintWindow (a hidden iframe, not a popup). Mock just
+// that fn so these tests assert the html the view builds; the iframe mechanics are
+// covered in printDocument.test.js (PRINT_FONT_HEAD/laborBadgeHTML stay real).
+vi.mock('../utils/printDocument', async (importOriginal) => ({
+  ...(await importOriginal()),
+  openPrintWindow: vi.fn(() => true),
+}))
 
 const mockEntriesDelete = vi.fn().mockResolvedValue(undefined)
 const mockDeleteEntry   = vi.fn().mockResolvedValue(undefined)
+// Controls what db.entries.where(...).between(...).toArray() resolves with.
+// Default is []; tests that exercise the print path (which queries db directly)
+// can push entries into this before firing the print button.
+let mockDbEntries = []
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({
   db: {
     entries: {
-      where: vi.fn(() => ({ between: vi.fn(() => ({ toArray: vi.fn().mockResolvedValue([]) })) })),
+      where: vi.fn(() => ({ between: vi.fn(() => ({ toArray: vi.fn(() => Promise.resolve(mockDbEntries)) })) })),
       get delete() { return mockEntriesDelete },
     },
   },
@@ -60,11 +73,10 @@ function setupWithEntries(entries = [AN_ENTRY]) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockDbEntries = []
   useLiveQuery.mockReturnValue([])
   global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
   global.URL.revokeObjectURL = vi.fn()
-  const fakeWindow = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-  vi.spyOn(window, 'open').mockReturnValue(fakeWindow)
 })
 
 afterEach(() => {
@@ -115,14 +127,16 @@ describe('TimesheetsView — search and filter', () => {
     expect(screen.getByRole('searchbox', { name: /search time entries/i })).toBeInTheDocument()
   })
 
-  it('renders the job filter select', () => {
+  it('renders the job filter picker', () => {
     render(<TimesheetsView />)
-    expect(screen.getByRole('combobox', { name: /filter by job/i })).toBeInTheDocument()
+    // The native <select> filters are now bespoke EntitySelect (compact) pickers,
+    // whose trigger is a button (aria-haspopup="listbox"), not a combobox.
+    expect(screen.getByRole('button', { name: /filter by job/i })).toBeInTheDocument()
   })
 
-  it('renders the labor type filter select', () => {
+  it('renders the labor type filter picker', () => {
     render(<TimesheetsView />)
-    expect(screen.getByRole('combobox', { name: /filter by labor type/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /filter by labor type/i })).toBeInTheDocument()
   })
 })
 
@@ -182,15 +196,16 @@ describe('TimesheetsView — DailySheet with entries', () => {
   it('renders the entry job name', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    // "Acme Corp" appears in both the filter dropdown and the entry card
-    expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(2)
+    // The job filter is now a collapsed EntitySelect picker (its options only
+    // render when the menu is open), so "Acme Corp" appears once — in the card.
+    expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders the entry labor type badge', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    // "Design" appears in both the filter dropdown and the entry badge
-    expect(screen.getAllByText('Design').length).toBeGreaterThanOrEqual(2)
+    // Likewise the labor filter is collapsed, so "Design" appears in the badge.
+    expect(screen.getAllByText('Design').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders a non-zero formatted duration', () => {
@@ -344,17 +359,43 @@ describe('TimesheetsView — CSV export', () => {
 // ─── Print timesheet ─────────────────────────────────────────────────────────
 
 describe('TimesheetsView — print timesheet', () => {
-  it('calls window.open when Print button is clicked (daily)', async () => {
+  it('hands the print document to openPrintWindow (daily)', async () => {
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
-    await waitFor(() => expect(window.open).toHaveBeenCalled())
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
   })
 
-  it('calls window.open when Print button is clicked (weekly)', async () => {
+  it('hands the print document to openPrintWindow (weekly)', async () => {
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
-    await waitFor(() => expect(window.open).toHaveBeenCalled())
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+  })
+
+  it('prints the timesheet in the Noto brand font, loading the webfont (not the system-UI fallback)', async () => {
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain("font-family: 'Noto Sans', sans-serif")
+    expect(html).toContain("'Noto Sans Mono', monospace")
+    expect(html).toContain("'Noto Sans Display'")
+    expect(html).toContain('/fonts/noto-sans-latin-wght-normal.woff2')
+    expect(html).not.toContain('-apple-system')
+    expect(html).not.toContain('SF Mono')
+  })
+
+  it('printed timesheet badge shows the labor glyph (svg) and labor name, not colour-only', async () => {
+    // The print function queries db directly (not via useLiveQuery), so populate
+    // both: useLiveQuery for the on-screen sheet, mockDbEntries for the print path.
+    setupWithEntries()
+    mockDbEntries = [AN_ENTRY]
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain('<svg')
+    expect(html).toContain('Design')
   })
 })
 
@@ -376,10 +417,24 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
     expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders edit and delete buttons in the day-by-day view', () => {
+  it('keeps a populated day collapsed by default and reveals its entries on expand', () => {
+    // The weekly view is a clean day-totals list (design-system fidelity); each
+    // populated day discloses its entries on tap rather than rendering them inline.
     setupWithEntries()
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    // Collapsed: the entry's edit button is not in the DOM yet.
+    expect(screen.queryByRole('button', { name: /edit entry for acme corp/i })).not.toBeInTheDocument()
+    // Expand the only populated day.
+    fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
+    expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
+  })
+
+  it('renders edit and delete buttons in the day-by-day view (once expanded)', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /delete entry for acme corp/i })).toBeInTheDocument()
   })
@@ -388,6 +443,7 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
     setupWithEntries()
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     fireEvent.click(screen.getByRole('button', { name: /edit entry for acme corp/i }))
     expect(screen.getByTestId('edit-entry-modal')).toBeInTheDocument()
   })
@@ -396,6 +452,7 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
     setupWithEntries()
     render(<TimesheetsView />)
     fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     fireEvent.click(screen.getByRole('button', { name: /delete entry for acme corp/i }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
@@ -424,48 +481,69 @@ function setupWithTwoOptions(entries = [AN_ENTRY]) {
   })
 }
 
+// The filters are bespoke EntitySelect (compact) pickers, not native <select>:
+// open the picker by its accessible name, then click an option by role.
+function pickFilter(filterName, optionName) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(filterName, 'i') }))
+  fireEvent.click(screen.getByRole('option', { name: new RegExp(optionName, 'i') }))
+}
+
 describe('TimesheetsView — job filter', () => {
   it('hides entry when job filter does not match', () => {
-    // AN_ENTRY.jobId = 1; filter to job id=2 → no match → empty state
+    // AN_ENTRY.jobId = 1; filter to Beta LLC (id=2) → no match → empty state
     setupWithTwoOptions()
     render(<TimesheetsView />)
-    fireEvent.change(screen.getByRole('combobox', { name: /filter by job/i }), {
-      target: { value: '2' },
-    })
+    pickFilter('filter by job', 'Beta LLC')
     expect(screen.getByText('No entries this day')).toBeInTheDocument()
   })
 
   it('keeps entry visible when job filter matches the entry job', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    // value '1' matches AN_ENTRY.jobId = 1
-    fireEvent.change(screen.getByRole('combobox', { name: /filter by job/i }), {
-      target: { value: '1' },
-    })
+    // Acme Corp (id=1) matches AN_ENTRY.jobId = 1
+    pickFilter('filter by job', 'Acme Corp')
     expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
   })
 })
 
 // ─── Labor type filter dropdown ───────────────────────────────────────────────
 
+describe('TimesheetsView — client filter (the job picker also selects a whole client)', () => {
+  it('keeps every entry whose job belongs to the chosen client and drops the rest', () => {
+    const jobs = [
+      { id: 1, name: 'Acme Web', clientName: 'Acme', isActive: true },
+      { id: 2, name: 'Acme App', clientName: 'Acme', isActive: true },
+      { id: 3, name: 'Solo',     clientName: null,   isActive: true },
+    ]
+    const mk = (id, jobId) => ({ id, jobId, laborTypeId: 1, punchIn: new Date(TODAY.getTime() - 3600000), punchOut: new Date(TODAY), notes: null })
+    const entries = [mk(1, 1), mk(2, 2), mk(3, 3)]
+    let n = 0
+    useLiveQuery.mockImplementation((_fn, deps) => {
+      if (!deps || deps.length === 0) return (n++ % 2 === 0) ? jobs : LABOR_TYPES
+      return entries
+    })
+    render(<TimesheetsView />)
+    pickFilter('filter by job', 'whole client') // the only client option: "Acme · whole client"
+    expect(screen.getByRole('button', { name: /edit entry for acme web/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /edit entry for acme app/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit entry for solo/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('TimesheetsView — labor type filter', () => {
   it('hides entry when labor type filter does not match', () => {
-    // AN_ENTRY.laborTypeId = 1; filter to type id=2 → no match → empty state
+    // AN_ENTRY.laborTypeId = 1 (Design); filter to Dev (id=2) → no match → empty
     setupWithTwoOptions()
     render(<TimesheetsView />)
-    fireEvent.change(screen.getByRole('combobox', { name: /filter by labor type/i }), {
-      target: { value: '2' },
-    })
+    pickFilter('filter by labor type', '^Dev$')
     expect(screen.getByText('No entries this day')).toBeInTheDocument()
   })
 
   it('keeps entry visible when labor type filter matches the entry', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    // value '1' matches AN_ENTRY.laborTypeId = 1
-    fireEvent.change(screen.getByRole('combobox', { name: /filter by labor type/i }), {
-      target: { value: '1' },
-    })
+    // Design (id=1) matches AN_ENTRY.laborTypeId = 1
+    pickFilter('filter by labor type', 'Design')
     expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
   })
 })

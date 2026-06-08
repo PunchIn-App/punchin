@@ -7,7 +7,11 @@ import {
   startOfDay, endOfDay, subWeeks, subMonths,
 } from 'date-fns'
 import { db } from '../db'
-import { getEntryDuration, roundEntry } from '../utils/time'
+import EntitySelect from './EntitySelect'
+import { getEntryDuration, roundEntry, formatTime } from '../utils/time'
+import { formatMoney, currencySymbol } from '../utils/format'
+import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
+import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 
@@ -37,12 +41,23 @@ function toLocalDateString(d) {
 
 export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab, onClose }) {
   const { isStandalone, os } = usePlatformContext()
-  const { settings } = useSettings()
+  const { settings, updateSetting } = useSettings()
   const wsMon = settings.weekStartsMonday // complete via DEFAULT_SETTINGS merge (issue #134)
+  const timeFormat = settings.timeFormat
+  const currency = settings.defaultCurrency
+  const money = (n) => formatMoney(n, currency)
+
+  // Editable invoice number: defaults to the next number, but the user can
+  // override it with anything (manual / per-client / a custom alphanumeric code).
+  // It's free text — letters/symbols are allowed on top of plain numbers. Plain
+  // numbers zero-pad and advance the auto-counter; a custom code prints verbatim
+  // and leaves the counter alone (you can't "+1" a string).
+  const [numOverride, setNumOverride] = useState(null)
+  const invoiceNum = numOverride ?? String(settings.nextInvoiceNumber ?? 1)
+  const invoiceNumIsPlain = /^\d+$/.test(invoiceNum)
 
   const uid      = useId()
   const titleId  = `${uid}-title`
-  const jobSelId = `${uid}-job`
   const dialogRef = useRef(null)
 
   const initialPreset = currentTab === 'daily' ? 4 : 0
@@ -67,31 +82,48 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     return { start: s, end: e }
   }, [preset, customStart, customEnd, currentDate, wsMon])
 
+  // The picker selects either a single job (numeric id) or a whole client
+  // ("client:<name>" → every active job billed to that client, aggregated).
+  const isClientSel = typeof selectedJobId === 'string' && selectedJobId.startsWith('client:')
+  const selClient = isClientSel ? selectedJobId.slice('client:'.length) : null
+  const jobMap = useMemo(() => new Map((jobs ?? []).map(j => [j.id, j])), [jobs])
+
   const allEntries = useLiveQuery(async () => {
     if (!start || !end || !selectedJobId) return []
-    return db.entries
+    const inRange = await db.entries
       .filter(e => {
         const d = new Date(e.punchIn)
-        return e.jobId === Number(selectedJobId) && d >= start && d <= end && !!e.punchOut
+        return d >= start && d <= end && !!e.punchOut
       })
       .toArray()
-  }, [start?.getTime(), end?.getTime(), selectedJobId])
+    return isClientSel
+      ? inRange.filter(e => jobMap.get(e.jobId)?.clientName === selClient)
+      : inRange.filter(e => e.jobId === Number(selectedJobId))
+  }, [start?.getTime(), end?.getTime(), selectedJobId, jobs])
 
-  const job = jobs?.find(j => j.id === Number(selectedJobId))
+  const job = isClientSel ? null : jobs?.find(j => j.id === Number(selectedJobId))
+  // Display identity for the title / billed-to band: a client invoice bills the
+  // client across its jobs; a single-job invoice bills that job's client (or the
+  // job's own name when it has no client).
+  const targetName = isClientSel ? selClient : (job?.name ?? '')
+  const billToName = isClientSel ? selClient : (job?.clientName || job?.name || '')
+  const billToSub  = isClientSel ? null : (job?.clientName ? job?.name : null)
+  const previewSub = isClientSel ? 'All jobs' : (job?.clientName || null) // in-modal preview header subtitle
 
   const lineItems = useMemo(() => {
-    if (!allEntries?.length || !job) return []
+    if (!allEntries?.length) return []
     return allEntries.map(raw => {
       // Bill in the user's favour: round the entry (start down, end up) so the
       // invoiced hours, amount, and shown Start/End times are consistent (#208).
       const e = roundEntry(raw, settings.roundingMinutes)
+      const eJob = jobMap.get(e.jobId)   // the entry's OWN job — a client invoice spans several, each at its own rate
       const lt = laborTypes?.find(l => l.id === e.laborTypeId)
       const hours = getEntryDuration(e) / 3600000
-      const rate  = (job.laborRates?.[e.laborTypeId]) ?? null
+      const rate  = (eJob?.laborRates?.[e.laborTypeId]) ?? null
       const amount = rate != null ? hours * rate : null
-      return { entry: e, lt, hours, rate, amount }
+      return { entry: e, job: eJob, lt, hours, rate, amount }
     }).sort((a, b) => new Date(a.entry.punchIn) - new Date(b.entry.punchIn))
-  }, [allEntries, job, laborTypes, settings.roundingMinutes])
+  }, [allEntries, jobMap, laborTypes, settings.roundingMinutes])
 
   const totalHours  = lineItems.reduce((s, li) => s + li.hours, 0)
   const totalAmount = lineItems.every(li => li.amount != null)
@@ -99,26 +131,27 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     : null
 
   const exportCsv = () => {
-    if (!job || !lineItems.length) return
+    if (!lineItems.length) return
     const rows = [
-      [`Invoice — ${job.name}${job.clientName ? ` / ${job.clientName}` : ''}`],
+      [`Invoice — ${targetName}`],
       [`Period: ${start ? format(start, 'yyyy-MM-dd') : ''} to ${end ? format(end, 'yyyy-MM-dd') : ''}`],
       [],
-      ['Date', 'Labor Type', 'Start', 'End', 'Hours', 'Rate ($/hr)', 'Amount ($)'],
+      ['Date', ...(isClientSel ? ['Job'] : []), 'Labor Type', 'Start', 'End', 'Hours', `Rate (${currencySymbol(currency)}/hr)`, `Amount (${currencySymbol(currency)})`],
       ...lineItems.map(li => [
         format(new Date(li.entry.punchIn), 'yyyy-MM-dd'),
+        ...(isClientSel ? [li.job?.name || ''] : []),
         li.lt?.name || '',
-        format(new Date(li.entry.punchIn), 'HH:mm'),
-        format(new Date(li.entry.punchOut), 'HH:mm'),
+        formatTime(li.entry.punchIn, timeFormat),
+        formatTime(li.entry.punchOut, timeFormat),
         li.hours.toFixed(2),
         li.rate != null ? li.rate.toFixed(2) : '',
         li.amount != null ? li.amount.toFixed(2) : '',
       ]),
       [],
-      ['', '', '', 'Total', totalHours.toFixed(2), '', totalAmount != null ? totalAmount.toFixed(2) : ''],
+      ['', ...(isClientSel ? [''] : []), '', '', 'Total', totalHours.toFixed(2), '', totalAmount != null ? totalAmount.toFixed(2) : ''],
     ]
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const slug = `${job.name.replace(/\s+/g, '-').toLowerCase()}-invoice`
+    const slug = `${targetName.replace(/\s+/g, '-').toLowerCase()}-invoice`
     const dateStr = start ? format(start, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
@@ -129,26 +162,52 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   }
 
   const printInvoice = () => {
-    if (!job || !lineItems.length) return
+    if (!lineItems.length) return
+    // Escape the free-text fields (billing profile, job names) for the print HTML.
+    const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
     const periodStr = start && end
       ? `${format(start, 'MMM d, yyyy')} – ${format(end, 'MMM d, yyyy')}`
       : ''
     const rows = lineItems.map(li => `
       <tr>
         <td>${format(new Date(li.entry.punchIn), 'MMM d, yyyy')}</td>
-        <td>${li.lt?.name || '—'}</td>
-        <td class="mono">${format(new Date(li.entry.punchIn), 'HH:mm')} – ${format(new Date(li.entry.punchOut), 'HH:mm')}</td>
+        ${isClientSel ? `<td>${esc(li.job?.name || '')}</td>` : ''}
+        <td>${laborBadgeHTML(li.lt)}</td>
+        <td class="mono">${formatTime(li.entry.punchIn, timeFormat)} – ${formatTime(li.entry.punchOut, timeFormat)}</td>
         <td class="right mono">${li.hours.toFixed(2)}</td>
-        <td class="right mono">${li.rate != null ? `$${li.rate.toFixed(2)}` : '—'}</td>
-        <td class="right mono">${li.amount != null ? `$${li.amount.toFixed(2)}` : '—'}</td>
+        <td class="right mono">${li.rate != null ? money(li.rate) : '—'}</td>
+        <td class="right mono">${li.amount != null ? money(li.amount) : '—'}</td>
       </tr>`).join('')
+
+    // Billed-from (the billing profile) / Billed-to (the client) band + optional
+    // invoice number (display-only).
+    const fromLines = [settings.billingBusiness, settings.billingEmail, settings.billingPhone, settings.billingAddress].filter(Boolean)
+    const logo = (settings.billingLogo || '').startsWith('data:image/') ? settings.billingLogo : ''
+    const hasFrom = settings.billingName || fromLines.length || logo
+    const invNo = settings.numberInvoices ? `${settings.invoicePrefix || ''}${invoiceNumIsPlain ? invoiceNum.padStart(3, '0') : invoiceNum}` : ''
+    const bandHtml = hasFrom ? `
+<div class="band">
+  <div class="party">
+    ${logo ? `<img class="logo" src="${logo}" alt="">` : ''}
+    <div class="cap">Billed from</div>
+    ${settings.billingName ? `<div class="pname">${esc(settings.billingName)}</div>` : ''}
+    ${fromLines.map(l => `<div class="pline">${esc(l).replace(/\n/g, '<br>')}</div>`).join('')}
+  </div>
+  <div class="party to">
+    <div class="cap">Billed to</div>
+    <div class="pname">${esc(billToName)}</div>
+    ${billToSub ? `<div class="pline">${esc(billToSub)}</div>` : ''}
+  </div>
+</div>` : ''
+
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<title>Invoice — ${job.name}</title>
+<title>Invoice — ${esc(targetName)}</title>
+${PRINT_FONT_HEAD}
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #111; padding: 48px; }
+  body { font-family: 'Noto Sans', sans-serif; font-size: 13px; color: #111; padding: 48px; }
   .header { margin-bottom: 32px; }
-  .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .header h1 { font-family: 'Noto Sans Display', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
   .header .meta { color: #666; font-size: 13px; margin-top: 6px; }
   .header .period { color: #333; font-size: 13px; margin-top: 2px; }
   table { width: 100%; border-collapse: collapse; margin-top: 8px; }
@@ -158,41 +217,70 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   tbody tr:last-child td { border-bottom: none; }
   .tfoot td { padding: 10px 8px 4px 0; border-top: 2px solid #111; font-weight: 700; }
   .right { text-align: right; }
-  .mono { font-family: 'SF Mono', 'Fira Mono', monospace; }
-  .lt-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+  .mono { font-family: 'Noto Sans Mono', monospace; }
+  .paperfoot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 36px; padding-top: 18px; border-top: 1px solid #e8e8e8; }
+  .paperfoot .thanks { font-size: 12px; color: #888; }
+  .paperfoot .due { text-align: right; }
+  .paperfoot .due .cap { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+  .paperfoot .due .amt { font-size: 24px; font-weight: 700; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .invno { text-align: right; }
+  .invno .cap { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+  .invno .num { font-family: 'Noto Sans Mono', monospace; font-size: 15px; font-weight: 700; }
+  .band { display: flex; justify-content: space-between; gap: 24px; margin: 0 0 24px; padding: 14px 0; border-top: 1px solid #e5e5e5; border-bottom: 1px solid #e5e5e5; }
+  .party .cap { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+  .party .pname { font-weight: 700; font-size: 13px; }
+  .party .pline { color: #555; font-size: 12px; margin-top: 1px; }
+  .party .logo { max-height: 52px; max-width: 200px; margin-bottom: 8px; display: block; }
+  .party.to { text-align: right; }
   @media print { @page { margin: 24mm 20mm; } body { padding: 0; } }
 </style></head><body>
 <div class="header">
-  <h1>Invoice</h1>
-  <p class="meta">${job.name}${job.clientName ? ` · ${job.clientName}` : ''}</p>
-  ${periodStr ? `<p class="period">${periodStr}</p>` : ''}
+  <div class="header-row">
+    <div>
+      <h1>Invoice</h1>
+      <p class="meta">${esc(targetName)}</p>
+      ${periodStr ? `<p class="period">${periodStr}</p>` : ''}
+    </div>
+    ${invNo ? `<div class="invno"><div class="cap">Invoice №</div><div class="num">${esc(invNo)}</div></div>` : ''}
+  </div>
 </div>
+${bandHtml}
 <table>
   <thead><tr>
-    <th>Date</th><th>Labor Type</th><th>Time</th>
+    <th>Date</th>${isClientSel ? '<th>Job</th>' : ''}<th>Labor Type</th><th>Time</th>
     <th class="right">Hours</th><th class="right">Rate</th><th class="right">Amount</th>
   </tr></thead>
   <tbody>${rows}</tbody>
   <tfoot><tr class="tfoot">
-    <td colspan="3"><strong>Total</strong></td>
+    <td colspan="${isClientSel ? 4 : 3}"><strong>Total</strong></td>
     <td class="right mono">${totalHours.toFixed(2)}</td>
     <td></td>
-    <td class="right mono">${totalAmount != null ? `$${totalAmount.toFixed(2)}` : '—'}</td>
+    <td class="right mono">${totalAmount != null ? money(totalAmount) : '—'}</td>
   </tr></tfoot>
 </table>
+${totalAmount != null ? `<div class="paperfoot">
+  <span class="thanks">Generated by PunchIn · Thank you</span>
+  <div class="due"><span class="cap">Amount due</span><span class="amt mono">${money(totalAmount)}</span></div>
+</div>` : ''}
 </body></html>`
-    const w = window.open('', '_blank', 'width=800,height=600')
-    // A popup blocker returns null; without this guard the next line throws in an
-    // onClick (the ErrorBoundary can't catch it) and the button silently dies.
-    // CSV export remains available as a fallback (issue #150).
-    if (!w) {
+    // openPrintWindow writes the doc and prints once the Noto webfonts load. It
+    // returns false when the popup is blocked (window.open → null); without this
+    // guard the throw inside the onClick is uncatchable and the button silently
+    // dies, so we alert and leave CSV as the fallback (issue #150).
+    if (openPrintWindow(html)) {
+      // The invoice was generated — advance the counter so the next invoice gets
+      // the next number. Only on a successful open (a blocked popup won't burn a
+      // number); re-generating the same invoice intentionally takes a new number.
+      if (settings.numberInvoices) {
+        // Only advance the counter for a plain number; a custom alphanumeric code
+        // can't be incremented, so it's left as-is for the user to manage.
+        if (invoiceNumIsPlain) updateSetting('nextInvoiceNumber', Number(invoiceNum) + 1)
+        setNumOverride(null) // next time, show the new auto number
+      }
+    } else {
       alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use Export CSV instead.')
-      return
     }
-    w.document.write(html)
-    w.document.close()
-    w.focus()
-    setTimeout(() => { w.print() }, 250)
   }
 
   // Focus trap, Escape, and focus restoration (issues #151/#152/#154)
@@ -210,10 +298,24 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   const inputCls = 'bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-appAccent/60 transition-colors'
 
   const activeJobs = jobs?.filter(j => j.isActive !== false) ?? []
+  // A job's dot colour is its own colour, else its labor type's.
+  const laborColorOf = (id) => laborTypes?.find(l => l.id === id)?.color
+  // The picker offers each client (bill all their jobs together, "client:<name>")
+  // first, then the individual jobs.
+  const clientNames = [...new Set(activeJobs.map(j => j.clientName).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  const jobOptions = [
+    ...clientNames.map(c => ({ value: `client:${c}`, label: c, sublabel: 'whole client' })),
+    ...activeJobs.map(j => ({
+      value: j.id,
+      label: j.name,
+      sublabel: j.clientName || undefined,
+      color: j.color || laborColorOf(j.laborTypeId),
+    })),
+  ]
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex ${isMobileSheet ? 'items-center justify-center' : 'items-end sm:items-center'} ${scrimCls}`}
+      className={`fixed inset-0 z-50 flex justify-center ${isMobileSheet ? 'items-center' : 'items-end sm:items-center'} ${scrimCls}`}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -228,7 +330,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-appBorderLight flex-shrink-0">
-          <h2 id={titleId} className="font-display font-bold text-appText text-lg">Generate Invoice</h2>
+          <h2 id={titleId} className="font-display font-bold text-appText text-lg">Create invoice</h2>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -239,21 +341,35 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Job selector */}
-          <div>
-            <label htmlFor={jobSelId} className="block text-xs text-appTextMuted mb-1.5">Job *</label>
-            <select
-              id={jobSelId}
-              value={selectedJobId}
-              onChange={e => setJobId(e.target.value)}
-              className={`w-full ${inputCls}`}
-            >
-              <option value="">Select a job…</option>
-              {activeJobs.map(j => (
-                <option key={j.id} value={j.id}>{j.name}{j.clientName ? ` — ${j.clientName}` : ''}</option>
-              ))}
-            </select>
-          </div>
+          {/* Job selector — bespoke colour/client picker (replaces the native select) */}
+          <EntitySelect
+            label="Job *"
+            value={selectedJobId}
+            onChange={setJobId}
+            options={jobOptions}
+            placeholder="Select a job or client…"
+          />
+
+          {/* Invoice number — editable; defaults to the next number */}
+          {settings.numberInvoices && (
+            <div>
+              <label htmlFor={`${uid}-invno`} className="block text-xs text-appTextMuted mb-1.5">Invoice number</label>
+              <div className="flex items-center">
+                {settings.invoicePrefix && (
+                  <span className="px-3 py-2 text-sm font-mono rounded-l-lg border border-r-0 border-appBorder bg-appInput text-appTextMuted select-none">{settings.invoicePrefix}</span>
+                )}
+                <input
+                  id={`${uid}-invno`}
+                  type="text"
+                  autoComplete="off"
+                  value={invoiceNum}
+                  onChange={e => setNumOverride(e.target.value)}
+                  className={`w-40 font-mono ${inputCls} ${settings.invoicePrefix ? 'rounded-l-none' : ''}`}
+                />
+              </div>
+              <p className="text-[11px] text-appTextMuted mt-1">Manual, per-client, or a custom code — letters and symbols are allowed. The counter only auto-advances for plain numbers.</p>
+            </div>
+          )}
 
           {/* Date range presets */}
           <div>
@@ -265,7 +381,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
                   onClick={() => setPreset(i)}
                   aria-pressed={preset === i}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-                    ${preset === i ? 'bg-appAccent text-[#0F1117]' : 'bg-appInput border border-appBorder text-appTextMuted hover:text-appText'}`}
+                    ${preset === i ? 'bg-appAccent text-appOnAccent' : 'bg-appInput border border-appBorder text-appTextMuted hover:text-appText'}`}
                 >
                   {p.label}
                 </button>
@@ -306,8 +422,8 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
                 <div className="rounded-xl border border-appBorder overflow-hidden">
                   {/* Invoice header */}
                   <div className="bg-appInput px-4 py-3 border-b border-appBorder">
-                    <p className="font-display font-bold text-appText text-sm">{job?.name}</p>
-                    {job?.clientName && <p className="text-xs text-appTextMuted">{job.clientName}</p>}
+                    <p className="font-display font-bold text-appText text-sm">{targetName}</p>
+                    {previewSub && <p className="text-xs text-appTextMuted">{previewSub}</p>}
                     {start && end && (
                       <p className="text-xs text-appTextMuted mt-0.5">
                         {format(start, 'MMM d, yyyy')} – {format(end, 'MMM d, yyyy')}
@@ -328,20 +444,15 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
                     {lineItems.map((li, i) => (
                       <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-4 py-2.5 items-center">
                         <div className="min-w-0">
-                          <p className="text-xs text-appText">{format(new Date(li.entry.punchIn), 'MMM d')}</p>
-                          {li.lt && (
-                            <span className="text-[10px] px-1 py-0.5 rounded mt-0.5 inline-block"
-                              style={{ backgroundColor: `${li.lt.color}25`, color: li.lt.color }}>
-                              {li.lt.name}
-                            </span>
-                          )}
+                          <p className="text-xs text-appText">{format(new Date(li.entry.punchIn), 'MMM d')}{isClientSel && li.job ? ` · ${li.job.name}` : ''}</p>
+                          {li.lt && <LaborTag laborType={li.lt} className="mt-0.5" />}
                         </div>
                         <span className="font-mono text-xs text-appText text-right">{li.hours.toFixed(2)}</span>
                         <span className="font-mono text-xs text-appTextMuted text-right">
-                          {li.rate != null ? `$${li.rate.toFixed(2)}` : '—'}
+                          {li.rate != null ? money(li.rate) : '—'}
                         </span>
                         <span className="font-mono text-xs text-appText text-right">
-                          {li.amount != null ? `$${li.amount.toFixed(2)}` : '—'}
+                          {li.amount != null ? money(li.amount) : '—'}
                         </span>
                       </div>
                     ))}
@@ -353,7 +464,7 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
                     <span className="font-mono text-xs font-bold text-appText text-right">{totalHours.toFixed(2)}</span>
                     <span />
                     <span className="font-mono text-xs font-bold text-appText text-right">
-                      {totalAmount != null ? `$${totalAmount.toFixed(2)}` : '—'}
+                      {totalAmount != null ? money(totalAmount) : '—'}
                     </span>
                   </div>
                 </div>
@@ -362,25 +473,25 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
           )}
         </div>
 
-        {/* Footer actions */}
+        {/* Footer actions — Print is the primary CTA, Export CSV the ghost (per the design) */}
         <div className="flex items-center gap-2 px-5 py-4 border-t border-appBorderLight flex-shrink-0">
-          <button
-            onClick={printInvoice}
-            disabled={!lineItems.length}
-            aria-disabled={!lineItems.length}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-appInput border border-appBorder hover:bg-appBg text-appTextMuted text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Printer className="w-4 h-4" aria-hidden="true" />
-            Print / PDF
-          </button>
           <button
             onClick={exportCsv}
             disabled={!lineItems.length}
             aria-disabled={!lineItems.length}
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90 text-[#0F1117] text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-appInput border border-appBorder hover:bg-appBg text-appTextMuted text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" aria-hidden="true" />
             Export CSV
+          </button>
+          <button
+            onClick={printInvoice}
+            disabled={!lineItems.length}
+            aria-disabled={!lineItems.length}
+            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90 text-appOnAccent text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Printer className="w-4 h-4" aria-hidden="true" />
+            Print
           </button>
         </div>
       </div>

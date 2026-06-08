@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronLeft, ChevronRight, Calendar, Pencil, Trash2, Plus, Search, FileDown, Receipt, Printer } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar, Pencil, Trash2, Plus, Search, FileDown, Receipt, Printer } from 'lucide-react'
 import { format, addDays, subDays, addWeeks, subWeeks } from 'date-fns'
 import { db, deleteEntry } from '../db'
 import { useSettings } from '../hooks/useSettings'
@@ -9,6 +9,9 @@ import {
   getDayRange, getWeekRange, getWeekDays,
   entryOverlapsRange, getEntryDurationInRange, sumDurationsInRange,
 } from '../utils/time'
+import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
+import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
+import EntitySelect from '../components/EntitySelect'
 import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
 import ConfirmModal from '../components/ConfirmModal'
@@ -59,7 +62,11 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
         if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
       }
 
-      if (filterJobId && e.jobId !== Number(filterJobId)) return false
+      if (filterJobId) {
+        if (filterJobId.startsWith('client:')) {
+          if (job?.clientName !== filterJobId.slice('client:'.length)) return false
+        } else if (e.jobId !== Number(filterJobId)) return false
+      }
       if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
 
       return true
@@ -90,34 +97,36 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
           // today, keeping the card durations summing to the day Total (#136).
           // Round for billing first (issue #208) so cards agree with the Total.
           const dur = getEntryDurationInRange(roundEntry(entry, rm), start, end)
+          // Leading dot is the JOB's own colour (its identity cue), falling back to
+          // its labor type's colour — distinct from the LaborTag's labor colour.
+          const jobColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
           return (
-            <div key={entry.id} className="rounded-xl border border-appBorder bg-appCard p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+            // Compact entry row (design-system pcts-entry): job dot · name + tag +
+            // time, with the duration and actions pinned right. The tag/time pair
+            // wraps under the name on narrow phones.
+            <div key={entry.id} className="rounded-xl border border-appBorder bg-appCard px-4 py-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: jobColor }} aria-hidden="true" />
+                <div className="min-w-0 flex-1">
                   <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || '—'}</p>
-                  {lt && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded mt-0.5 inline-block"
-                      style={{ backgroundColor: `${lt.color}25`, color: lt.color }}>
-                      {lt.name}
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    {lt && <LaborTag laborType={lt} />}
+                    <span className="font-mono text-xs text-appTextDarker whitespace-nowrap">
+                      {formatTime(entry.punchIn, settings.timeFormat)} → {entry.punchOut ? formatTime(entry.punchOut, settings.timeFormat) : 'running'}
                     </span>
-                  )}
-                </div>
-                <div className="text-right flex-shrink-0 flex flex-col items-end">
-                  <p className="font-mono text-appText font-semibold text-sm">{formatDuration(dur, decimal)}</p>
-                  <p className="text-appTextDarker text-xs mt-0.5">
-                    {formatTime(entry.punchIn)} → {entry.punchOut ? formatTime(entry.punchOut) : 'running'}
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <button onClick={() => onEdit(entry)} aria-label={`Edit entry for ${getJob(entry.jobId)?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
-                      <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
-                    </button>
-                    <button onClick={() => onDelete(entry.id)} aria-label={`Delete entry for ${getJob(entry.jobId)?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                    </button>
                   </div>
                 </div>
+                <span className="font-mono text-appText font-semibold text-sm flex-shrink-0">{formatDuration(dur, decimal)}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => onEdit(entry)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
+                    <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                  <button onClick={() => onDelete(entry.id)} aria-label={`Delete entry for ${job?.name || 'job'}`} className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-              {entry.notes && <p className="mt-2 text-xs text-appTextMuted">{entry.notes}</p>}
+              {entry.notes && <p className="mt-2 text-xs text-appTextMuted pl-[22px]">{entry.notes}</p>}
             </div>
           )
         })
@@ -134,6 +143,9 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const { start, end } = getWeekRange(date, wsMon)
   const days = getWeekDays(date, wsMon)
   const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
+  // Which day rows are expanded. The weekly view reads as a clean day-totals list
+  // (design-system fidelity); a populated day discloses its entries on tap.
+  const [expanded, setExpanded] = useState({})
 
   const allEntries = useLiveQuery(
     // Indexed range query (issue #132) with a one-day look-back (issue #136) so
@@ -165,7 +177,11 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
         if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
       }
 
-      if (filterJobId && e.jobId !== Number(filterJobId)) return false
+      if (filterJobId) {
+        if (filterJobId.startsWith('client:')) {
+          if (job?.clientName !== filterJobId.slice('client:'.length)) return false
+        } else if (e.jobId !== Number(filterJobId)) return false
+      }
       if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
 
       return true
@@ -206,70 +222,99 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   if (!filteredEntries) return null
 
   return (
-    <div className="space-y-3">
-      {/* Week total */}
-      <div className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
-        <span className="text-sm text-appTextMuted">Week total</span>
-        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(total, decimal)}</span>
+    <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-4 lg:items-start">
+      {/* Summary — on top on mobile, a sticky right rail on desktop */}
+      <div className="space-y-3 mb-3 lg:mb-0 lg:order-2 lg:sticky lg:top-4">
+        {/* Hero week total */}
+        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-widest text-appTextMuted">Week total</p>
+          <p className="font-mono font-bold text-appText text-3xl mt-1">{formatDuration(total, decimal)}</p>
+        </div>
+
+        {/* By job */}
+        {Object.keys(jobTotals).length > 0 && (
+          <div className="rounded-xl border border-appBorder bg-appCard p-4 shadow-sm">
+            <p className="text-[10px] uppercase tracking-widest text-appTextMuted mb-3">By job</p>
+            <div className="space-y-3">
+              {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
+                const job = getJob(Number(jid))
+                const barColor = getLT(job?.laborTypeId)?.color || 'var(--accent)'
+                const pct = total > 0 ? (ms / total) * 100 : 0
+                return (
+                  <div key={jid}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm text-appText font-medium truncate">{job?.name || '—'}</span>
+                      <span className="font-mono text-sm text-appTextMuted flex-shrink-0 ml-2">{formatDuration(ms, decimal)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-appBg">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Job breakdown */}
-      {Object.keys(jobTotals).length > 0 && (
-        <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight shadow-sm">
-          {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
-            const job = getJob(Number(jid))
-            const pct = total > 0 ? (ms / total) * 100 : 0
-            return (
-              <div key={jid} className="px-4 py-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-appText font-medium">{job?.name || '—'}</span>
-                  <span className="font-mono text-sm text-appTextMuted">{formatDuration(ms, decimal)}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-appBg">
-                  <div className="h-full rounded-full bg-appAccent transition-all" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Day-by-day */}
-      {dayData.map(({ day, ds, de, dayEntries, dayTotal }) => {
+      {/* Day-by-day — one unified card of day-total rows (design-system daylist);
+          a populated day toggles open to reveal its entries (edit/delete intact). */}
+      <div className="lg:order-1">
+      <div className="rounded-xl border border-appBorder bg-appCard shadow-sm overflow-hidden">
+      {dayData.map(({ day, ds, de, dayEntries, dayTotal }, idx) => {
         const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+        const hasEntries = dayEntries.length > 0
+        const key = day.toISOString()
+        const isOpen = !!expanded[key]
+        const dayLabel = format(day, 'EEE, MMM d')
+        const durLabel = formatDuration(dayTotal, decimal)
 
         return (
-          <div key={day.toISOString()}
-            className={`rounded-xl border bg-appCard shadow-sm transition-colors duration-200 ${isToday ? 'border-appAccent/30' : 'border-appBorder'}`}>
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2">
-                {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
-                <span className={`text-sm font-medium ${isToday ? 'text-appAccent' : 'text-appTextMuted'}`}>
-                  {format(day, 'EEE, MMM d')}
+          <div key={key} className={idx > 0 ? 'border-t border-appBorder' : ''}>
+            {hasEntries ? (
+              <button
+                type="button"
+                onClick={() => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))}
+                aria-expanded={isOpen}
+                aria-label={`${dayLabel}, ${durLabel} — ${isOpen ? 'hide' : 'show'} entries`}
+                className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-appInput/40 transition-colors"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
+                  <span className={`text-sm font-medium truncate ${isToday ? 'text-appAccent' : 'text-appText'}`}>{dayLabel}</span>
                 </span>
+                <span className="flex items-center gap-2.5 flex-shrink-0">
+                  <span className="font-mono text-sm text-appTextMuted">{durLabel}</span>
+                  <ChevronDown className={`w-4 h-4 text-appTextMuted transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </span>
+              </button>
+            ) : (
+              <div className="flex items-center justify-between px-4 py-3.5">
+                <span className="flex items-center gap-2 min-w-0">
+                  {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
+                  <span className={`text-sm font-medium truncate ${isToday ? 'text-appAccent' : 'text-appTextMuted'}`}>{dayLabel}</span>
+                </span>
+                <span className="font-mono text-sm text-appTextDisabled">—</span>
               </div>
-              <span className="font-mono text-sm text-appText">
-                {dayEntries.length > 0 ? formatDuration(dayTotal, decimal) : '—'}
-              </span>
-            </div>
-            {dayEntries.length > 0 && (
-              <div className="px-4 pb-3 space-y-1 divide-y divide-appBorderLight/30">
+            )}
+            {hasEntries && isOpen && (
+              <div className="px-4 pb-3 space-y-1 divide-y divide-appBorderLight/30 bg-appBg/20">
                 {dayEntries.map(e => {
                   const lt = getLT(e.laborTypeId)
                   const job = getJob(e.jobId)
                   return (
-                    <div key={e.id} className="flex items-center justify-between text-xs py-1.5">
+                    <div key={e.id} className="flex items-center justify-between text-xs py-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        {lt && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: lt.color }} />}
+                        {lt && <LaborGlyphChip laborType={lt} className="w-4 h-4" />}
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                         <span className="font-mono text-appTextDarker">{formatDuration(getEntryDurationInRange(roundEntry(e, rm), ds, de), decimal)}</span>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${getJob(e.jobId)?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
+                          <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
                           </button>
-                          <button onClick={() => onDelete(e.id)} aria-label={`Delete entry for ${getJob(e.jobId)?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
+                          <button onClick={() => onDelete(e.id)} aria-label={`Delete entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
                             <Trash2 className="w-3 h-3" aria-hidden="true" />
                           </button>
                         </div>
@@ -282,6 +327,8 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
           </div>
         )
       })}
+      </div>
+      </div>
     </div>
   )
 }
@@ -306,6 +353,18 @@ export default function TimesheetsView() {
 
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
+
+  // A job's filter dot is its own colour, else its labor type's (mirrors the
+  // job card's left-rail colour resolution).
+  const laborColorOf = (id) => laborTypes?.find(l => l.id === id)?.color
+
+  // The job filter also offers each client ("client:<name>" → every job billed to
+  // that client), listed first, then the individual jobs.
+  const jobFilterOptions = [
+    ...[...new Set((jobs ?? []).map(j => j.clientName).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+      .map(c => ({ value: `client:${c}`, label: c, sublabel: 'whole client' })),
+    ...(jobs ?? []).map(j => ({ value: j.id, label: j.name, sublabel: j.clientName || undefined, color: j.color || laborColorOf(j.laborTypeId) })),
+  ]
 
   const go = dir => {
     setDate(d => tab === 'daily'
@@ -364,8 +423,8 @@ export default function TimesheetsView() {
         job?.name || '',
         job?.clientName || '',
         lt?.name || '',
-        format(new Date(e.punchIn), 'HH:mm'),
-        format(new Date(e.punchOut), 'HH:mm'),
+        formatTime(e.punchIn, settings.timeFormat),
+        formatTime(e.punchOut, settings.timeFormat),
         dur.toFixed(2),
         raw.notes || '',
       ])
@@ -407,8 +466,8 @@ export default function TimesheetsView() {
         return `<tr>
           <td>${format(new Date(e.punchIn), 'EEE, MMM d')}</td>
           <td>${job?.name || '—'}${job?.clientName ? `<br><span class="sub">${job.clientName}</span>` : ''}</td>
-          <td>${lt ? `<span class="badge" style="background:${lt.color}22;color:${lt.color}">${lt.name}</span>` : '—'}</td>
-          <td class="mono">${format(new Date(e.punchIn), 'HH:mm')} – ${format(new Date(e.punchOut), 'HH:mm')}</td>
+          <td>${laborBadgeHTML(lt)}</td>
+          <td class="mono">${formatTime(e.punchIn, settings.timeFormat)} – ${formatTime(e.punchOut, settings.timeFormat)}</td>
           <td class="right mono">${hrs}</td>
           ${e.notes ? `<td class="notes">${e.notes}</td>` : '<td></td>'}
         </tr>`
@@ -416,10 +475,11 @@ export default function TimesheetsView() {
 
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <title>Timesheet — ${titleStr}</title>
+${PRINT_FONT_HEAD}
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #111; padding: 48px; }
-  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  body { font-family: 'Noto Sans', sans-serif; font-size: 13px; color: #111; padding: 48px; }
+  h1 { font-family: 'Noto Sans Display', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
   .sub-title { color: #666; font-size: 13px; margin-bottom: 28px; }
   table { width: 100%; border-collapse: collapse; }
   thead th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #888; padding: 6px 8px 6px 0; border-bottom: 2px solid #111; }
@@ -427,10 +487,9 @@ export default function TimesheetsView() {
   tbody td { padding: 7px 8px 7px 0; border-bottom: 1px solid #e5e5e5; vertical-align: middle; }
   tfoot td { padding: 10px 8px 4px 0; border-top: 2px solid #111; font-weight: 700; }
   .right { text-align: right; }
-  .mono { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 12px; }
+  .mono { font-family: 'Noto Sans Mono', monospace; font-size: 12px; }
   .sub { font-size: 11px; color: #888; }
   .notes { font-size: 11px; color: #666; font-style: italic; }
-  .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
   .empty { text-align: center; padding: 32px; color: #888; }
   @media print { @page { margin: 24mm 20mm; } body { padding: 0; } }
 </style></head><body>
@@ -449,59 +508,64 @@ export default function TimesheetsView() {
 </table>
 </body></html>`
 
-    const w = window.open('', '_blank', 'width=900,height=700')
-    // Popup blocked → window.open returns null; guard so the button doesn't throw
-    // in its onClick handler (same hardening as InvoiceModal print, issue #150).
-    if (!w) {
+    // openPrintWindow writes the doc and prints once the Noto webfonts load; it
+    // returns false when the popup is blocked (window.open → null), same hardening
+    // as InvoiceModal print so the button doesn't throw in its onClick (issue #150).
+    if (!openPrintWindow(html)) {
       alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use the CSV export instead.')
-      return
     }
-    w.document.write(html)
-    w.document.close()
-    w.focus()
-    setTimeout(() => { w.print() }, 250)
   }
 
   return (
     <div className="h-full flex flex-col">
-      {/* Tabs */}
-      <div role="tablist" className="flex-shrink-0 flex border-b border-appBorderLight">
-        {['daily','weekly'].map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            role="tab"
-            aria-selected={tab === t}
-            className={`flex-1 py-3 text-sm font-medium capitalize transition-colors
-              ${tab === t ? 'text-appAccent border-b-2 border-appAccent' : 'text-appTextMuted'}`}>
-            {t}
+      {/* Toolbar row 1 — segmented period tabs, centered date nav, Log Manual.
+          Stacks on mobile; a single grouped control bar at lg. */}
+      <div className="flex-shrink-0 flex flex-col gap-2.5 px-4 py-2.5 border-b border-appBorderLight lg:flex-row lg:items-center">
+        <div role="tablist" className="flex lg:inline-flex flex-shrink-0 bg-appInput border border-appBorder rounded-xl p-1">
+          {['daily','weekly'].map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              role="tab"
+              aria-selected={tab === t}
+              className={`flex-1 lg:flex-initial px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors
+                ${tab === t ? 'bg-appCard text-appText shadow-sm' : 'text-appTextMuted hover:text-appText'}`}>
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-center gap-1 lg:mx-auto">
+          <button
+            onClick={() => go(-1)}
+            aria-label={tab === 'daily' ? 'Previous day' : 'Previous week'}
+            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
           </button>
-        ))}
-      </div>
+          <button onClick={() => setDate(new Date())}
+            aria-label={`${isCurrent() ? 'Current period: ' : 'Jump to today, currently viewing: '}${title()}`}
+            className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors
+              ${isCurrent() ? 'text-appAccent' : 'text-appText hover:bg-appInput'}`}>
+            {title()}
+          </button>
+          <button
+            onClick={() => go(1)}
+            aria-label={tab === 'daily' ? 'Next day' : 'Next week'}
+            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" aria-hidden="true" />
+          </button>
+        </div>
 
-      {/* Period nav */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-appBorderLight">
         <button
-          onClick={() => go(-1)}
-          aria-label={tab === 'daily' ? 'Previous day' : 'Previous week'}
-          className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center justify-center gap-1 flex-shrink-0 px-3 py-2 rounded-lg bg-appAccent hover:brightness-110 active:brightness-90 text-appOnAccent text-xs font-bold transition-all"
         >
-          <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-        </button>
-        <button onClick={() => setDate(new Date())}
-          aria-label={`${isCurrent() ? 'Current period: ' : 'Jump to today, currently viewing: '}${title()}`}
-          className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors
-            ${isCurrent() ? 'text-appAccent' : 'text-appText hover:bg-appInput'}`}>
-          {title()}
-        </button>
-        <button
-          onClick={() => go(1)}
-          aria-label={tab === 'daily' ? 'Next day' : 'Next week'}
-          className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
-        >
-          <ChevronRight className="w-5 h-5" aria-hidden="true" />
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
+          Log Manual
         </button>
       </div>
 
-      {/* Search, Filter & Quick Manual Log Actions */}
+      {/* Toolbar row 2 — search, filters, and the grouped export cluster */}
       <div className="flex-shrink-0 px-4 py-2.5 border-b border-appBorderLight bg-appNav flex gap-2 flex-wrap items-center">
         {/* Search */}
         <div className="relative flex-1 min-w-[150px]">
@@ -517,26 +581,26 @@ export default function TimesheetsView() {
         </div>
 
         {/* Job Filter */}
-        <select
+        <EntitySelect
+          compact
+          hideLabel
+          label="Filter by job"
           value={filterJobId}
-          onChange={e => setFilterJobId(e.target.value)}
-          aria-label="Filter by job"
-          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50"
-        >
-          <option value="">All Jobs</option>
-          {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
-        </select>
+          onChange={setFilterJobId}
+          emptyOption={{ label: 'All Jobs' }}
+          options={jobFilterOptions}
+        />
 
         {/* Labor Type Filter */}
-        <select
+        <EntitySelect
+          compact
+          hideLabel
+          label="Filter by labor type"
           value={filterLaborTypeId}
-          onChange={e => setFilterLaborTypeId(e.target.value)}
-          aria-label="Filter by labor type"
-          className="bg-appCard border border-appBorder text-appTextMuted rounded-lg px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50"
-        >
-          <option value="">All Types</option>
-          {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
-        </select>
+          onChange={setFilterLaborTypeId}
+          emptyOption={{ label: 'All Types' }}
+          options={laborTypes?.map(lt => ({ value: lt.id, label: lt.name, glyph: lt.glyph, color: lt.color })) || []}
+        />
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 ml-auto">
@@ -563,13 +627,6 @@ export default function TimesheetsView() {
           >
             <Receipt className="w-3.5 h-3.5" aria-hidden="true" />
             Invoice
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-appAccent hover:brightness-110 active:brightness-90 text-[#0F1117] text-xs font-bold transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
-            Log Manual
           </button>
         </div>
       </div>

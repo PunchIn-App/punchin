@@ -47,6 +47,15 @@ function setupMocks() {
   useLiveQuery.mockImplementation(() => (++n % 2 === 1 ? JOBS : LABOR_TYPES))
 }
 
+// Job & labor are now bespoke EntitySelect comboboxes (colour dot / glyph +
+// label), not native <select>. Open the picker by its label and click an option.
+function pick(label, optionName) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + label, 'i') }))
+  fireEvent.click(screen.getByRole('option', { name: new RegExp(optionName, 'i') }))
+}
+const pickJob   = () => pick('Job', 'Acme Corp')
+const pickLabor = () => pick('Labor', 'Design')
+
 describe('EditEntryModal — manual add mode', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -169,9 +178,7 @@ describe('EditEntryModal — validation', () => {
 
   it('shows "Please select a labor type" when job is selected but no labor type', async () => {
     render(<EditEntryModal onClose={vi.fn()} />)
-    const combos = screen.getAllByRole('combobox')
-    fireEvent.change(combos[0], { target: { value: '1' } })
-    fireEvent.change(combos[1], { target: { value: '' } })
+    pickJob() // Acme Corp has no default labor type, so labor stays empty
     fireEvent.click(screen.getByRole('button', { name: /add time entry/i }))
     await waitFor(() =>
       expect(screen.getByText('Please select a labor type')).toBeInTheDocument()
@@ -180,9 +187,8 @@ describe('EditEntryModal — validation', () => {
 
   it('shows "End must be after start." when end time is before start time', async () => {
     render(<EditEntryModal onClose={vi.fn()} />)
-    const combos = screen.getAllByRole('combobox')
-    fireEvent.change(combos[0], { target: { value: '1' } })
-    fireEvent.change(combos[1], { target: { value: '1' } })
+    pickJob()
+    pickLabor()
 
     const timeInputs = document.querySelectorAll('input[type="time"]')
     fireEvent.change(timeInputs[0], { target: { value: '22:00' } })
@@ -215,9 +221,8 @@ describe('EditEntryModal — save', () => {
   it('calls db.entries.add with {jobId:1,laborTypeId:1} on successful add', async () => {
     const onClose = vi.fn()
     render(<EditEntryModal onClose={onClose} />)
-    const combos = screen.getAllByRole('combobox')
-    fireEvent.change(combos[0], { target: { value: '1' } })
-    fireEvent.change(combos[1], { target: { value: '1' } })
+    pickJob()
+    pickLabor()
     // Set explicit times so the test is not flaky near midnight
     const timeInputs = document.querySelectorAll('input[type="time"]')
     fireEvent.change(timeInputs[0], { target: { value: '09:00' } })

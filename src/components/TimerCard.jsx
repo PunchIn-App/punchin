@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { Square, Pencil, AlertTriangle } from 'lucide-react'
 import { db } from '../db'
 import { formatElapsed, formatTime } from '../utils/time'
+import { formatMoney } from '../utils/format'
 import EditEntryModal from './EditEntryModal'
+import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
@@ -40,7 +42,9 @@ export default function TimerCard({ entry, job, laborType }) {
     await db.entries.update(entry.id, { punchOut: new Date() })
   }
 
-  const color = laborType?.color || '#6366F1'
+  // The card's accent (left rail + live clock) is the job's identity colour,
+  // falling back to its labor type's colour, then the default.
+  const color = job?.color || laborType?.color || '#6366F1'
   const isOvernight = elapsed > 43200000 // 12 hours in milliseconds
 
   return (
@@ -55,7 +59,7 @@ export default function TimerCard({ entry, job, laborType }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-display font-semibold text-appText truncate">{job?.name || 'Unknown Job'}</p>
+              <p className="font-display font-extrabold text-appText truncate">{job?.name || 'Unknown Job'}</p>
               {isOvernight && (
                 <div className="flex items-center gap-1 text-appAccent text-[10px] font-bold uppercase tracking-wider bg-appAccent/10 px-2 py-0.5 rounded-full animate-bounce">
                   <AlertTriangle className="w-3 h-3" />
@@ -64,17 +68,9 @@ export default function TimerCard({ entry, job, laborType }) {
               )}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              {laborType && (
-                <span
-                  className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium"
-                  style={{ backgroundColor: `${color}25`, color }}
-                  aria-label={laborType.name}
-                >
-                  {laborType.name}
-                </span>
-              )}
+              <LaborTag laborType={laborType} />
               <div className="flex items-center gap-1 text-appTextDarker text-xs font-mono">
-                <span>since {formatTime(entry.punchIn)}</span>
+                <span>started {formatTime(entry.punchIn, settings.timeFormat)}</span>
                 <button
                   onClick={() => setShowEditModal(true)}
                   aria-label="Edit start time and notes"
@@ -107,11 +103,25 @@ export default function TimerCard({ entry, job, laborType }) {
           role="timer"
           aria-live="off"
           aria-label={`Elapsed time: ${formatElapsed(elapsed)}`}
-          className="mt-3 font-mono text-4xl font-medium tracking-wider"
+          className="mt-3 font-mono text-4xl font-extrabold tracking-wider"
           style={{ color }}
         >
           {formatElapsed(elapsed)}
         </div>
+
+        {/* Footer: client + live earnings (when a rate is set for this work) */}
+        {(() => {
+          const rate = job?.laborRates?.[entry.laborTypeId]
+          if (!job?.clientName && rate == null) return null
+          return (
+            <div className="mt-3 pt-3 border-t border-dashed border-appBorderLight flex items-center justify-between gap-2 text-xs">
+              <span className="font-mono uppercase tracking-wider text-appTextDarker truncate">{job?.clientName || ''}</span>
+              {rate != null && (
+                <span className="font-mono text-appTextMuted flex-shrink-0">{formatMoney((elapsed / 3600000) * rate, settings.defaultCurrency)}</span>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {showEditModal && (

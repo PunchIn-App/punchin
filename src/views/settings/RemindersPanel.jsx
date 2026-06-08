@@ -1,6 +1,7 @@
 import { Bell, Hourglass, AlarmClock, CalendarClock, CalendarCheck } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { notificationsSupported, requestNotificationPermission } from '../../utils/notifications'
+import EntitySelect from '../../components/EntitySelect'
 import { Panel, SettingsRow, ReminderRow, WeekdayPicker, Toggle, WEEKDAYS, ALL_DAYS } from './components'
 import LongRunningMinutesInput from './LongRunningMinutesInput'
 
@@ -125,6 +126,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                     value={settings.remindIdleDays}
                     onChange={days => setReminderDays('remindIdle', 'remindIdleDays', days)}
                     label="Days for the no-timer reminder"
+                    weekStartsMonday={settings.weekStartsMonday !== false}
                   />
                 </ReminderRow>
 
@@ -149,6 +151,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                     value={settings.remindStillRunningDays}
                     onChange={days => setReminderDays('remindStillRunning', 'remindStillRunningDays', days)}
                     label="Days for the still-running reminder"
+                    weekStartsMonday={settings.weekStartsMonday !== false}
                   />
                 </ReminderRow>
 
@@ -173,6 +176,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                     value={settings.remindTimesheetDailyDays}
                     onChange={days => setReminderDays('remindTimesheetDaily', 'remindTimesheetDailyDays', days)}
                     label="Days for the daily timesheet reminder"
+                    weekStartsMonday={settings.weekStartsMonday !== false}
                   />
                 </ReminderRow>
 
@@ -183,17 +187,19 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                   enabled={!!settings.remindTimesheetWeekly}
                   onToggle={v => updateSetting('remindTimesheetWeekly', v)}
                 >
-                  <label className="flex items-center gap-2 text-xs text-appTextMuted">
+                  <span className="flex items-center gap-2 text-xs text-appTextMuted">
                     On
-                    <select
-                      value={settings.remindTimesheetWeeklyDay ?? 5}
-                      onChange={e => updateSetting('remindTimesheetWeeklyDay', Number(e.target.value))}
-                      aria-label="Weekly timesheet reminder day"
-                      className={reminderInputClass}
-                    >
-                      {WEEKDAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                    </select>
-                  </label>
+                    <span className="w-36">
+                      <EntitySelect
+                        compact plain hideLabel
+                        label="Weekly timesheet reminder day"
+                        value={settings.remindTimesheetWeeklyDay ?? 5}
+                        onChange={v => updateSetting('remindTimesheetWeeklyDay', Number(v))}
+                        options={(settings.weekStartsMonday !== false ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6])
+                          .map(i => ({ value: i, label: WEEKDAYS[i] }))}
+                      />
+                    </span>
+                  </span>
                   <label className="flex items-center gap-2 text-xs text-appTextMuted">
                     at
                     <input

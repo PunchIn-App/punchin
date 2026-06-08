@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.20.3
+**Version:** 0.23.0
 
 ---
 
@@ -147,8 +147,8 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 | Table | Indexes | Purpose |
 |-------|---------|---------|
 | `settings` | `key` | KV store for app preferences |
-| `laborTypes` | `id, name, uuid` | Billable categories with color; soft-archived via `isArchived` |
-| `jobs` | `id, name, laborTypeId, isActive, uuid` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field |
+| `laborTypes` | `id, name, uuid` | Billable categories with `color` + `glyph` (an icon id — Lucide ids plus `punchin` for the brand mark; unindexed, render-time fallback to the PunchIn brand mark so existing rows need no migration — see `src/components/LaborGlyph.jsx`); soft-archived via `isArchived` |
+| `jobs` | `id, name, laborTypeId, isActive, uuid` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field; optional `color` field (the job's own colour for its card left-rail — unindexed, no migration; falls back to its labor type's colour when unset) |
 | `entries` | `id, jobId, laborTypeId, punchIn, punchOut, uuid` | Time records; optional `notes` (string) field |
 | `deletions` | `uuid, deletedAt` | Delete **tombstones**: when an entry is removed it is hard-deleted from `entries` (so every view/analytics/export query is unaffected) and its `uuid` is recorded here with a `deletedAt` timestamp, so cloud merge propagates the deletion across devices instead of the entry resurrecting from a peer's snapshot. Use `deleteEntry(id)` (in `db.js`) to delete an entry — never `db.entries.delete` directly. |
 | `secrets` | `name` | At-rest-encrypted sync credentials (issue #126): a non-extractable AES-GCM `CryptoKey` and the encrypted sync token. The OAuth token is **never** stored in plaintext IndexedDB. Access only through `src/sync/tokenStore.js` (`setSyncToken`/`getSyncToken`/`clearSyncToken`) — never read/write the token directly. |
@@ -183,12 +183,25 @@ Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archi
 | Key | Type | Default |
 |-----|------|---------|
 | `allowConcurrentTimers` | boolean | `false` |
-| `weekStartsMonday` | boolean | `true` |
+| `weekStartsMonday` | boolean | device-locale default — Sunday-start locales (e.g. en-US) seed `false`, Monday-start locales (e.g. en-GB) seed `true`; falls back to `false` where the locale's week info is unavailable (`localeWeekStartsMonday()` in `db.js`) |
 | `theme` | `"auto"` \| `"dark"` \| `"light"` | `"auto"` |
-| `accentColor` | hex string | `"#1f6feb"` |
+| `accentColor` | hex string | `"#2D5BF5"` (PunchIn Blue; light theme renders the default as the darker `#2348DB`) |
 | `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
 | `decimalHours` | boolean | `false` — show timesheet durations as decimal hours (`1.50 h`) instead of `1h 30m` (issue #208) |
 | `roundingMinutes` | number (`0` \| `15` \| `30`) | `0` — round each billable entry in the user's favour (start floored, end ceiled) for timesheets & invoices; `0` = off (issue #208) |
+| `timeFormat` | `"auto"` \| `"12h"` \| `"24h"` | `"auto"` (match the device's 12/24h preference) — clock-time rendering in timers, timesheets & invoices (`formatTime(date, fmt)`) |
+| `defaultCurrency` | ISO 4217 string | `"USD"` — formats invoice/CSV amounts via `Intl.NumberFormat` (`utils/format.js`) |
+| `billingName` | string | `""` — Billing profile: your name (the invoice "Billed from" identity) |
+| `billingBusiness` | string | `""` — Billing profile: business name |
+| `billingEmail` | string | `""` — Billing profile: email |
+| `billingPhone` | string | `""` — Billing profile: phone |
+| `billingAddress` | string | `""` — Billing profile: address (multi-line) |
+| `billingPaymentTerms` | string | `""` — Billing profile: payment terms |
+| `billingNotes` | string | `""` — Billing profile: notes / payment instructions |
+| `billingLogo` | string | `""` — Billing profile: optional business logo as a downscaled PNG data URL (`utils/image.js`); rendered in the invoice "Billed from" band |
+| `numberInvoices` | boolean | `false` — print an invoice number (advances `nextInvoiceNumber` each time an invoice print is generated) |
+| `invoicePrefix` | string | `""` — prefix prepended to the invoice number (e.g. `PI-`) |
+| `nextInvoiceNumber` | number | `1` — the next invoice number; printed when `numberInvoices` is on and **auto-incremented when an invoice print is generated** (a blocked popup doesn't burn a number) |
 | `remindersEnabled` | boolean | `false` — master switch for local reminder notifications (issue #54); enabling it requests notification permission |
 | `remindLongRunning` | boolean | `true` — alert when an active timer exceeds the threshold |
 | `remindLongRunningMinutes` | number | `60` — long-running timer threshold (minutes) |
@@ -288,9 +301,11 @@ Themes are controlled via CSS custom properties defined in `src/index.css`.
 
 ### Color Conventions
 
-- **Accent:** `appAccent` / `text-appAccent` tokens — active nav, buttons, highlights (user-configurable; defaults to `#1f6feb`)
+- **Accent:** `appAccent` / `text-appAccent` tokens — active nav, buttons, highlights (user-configurable; defaults to PunchIn Blue `#2D5BF5` dark / `#2348DB` light). `App.jsx` writes both `--accent-rgb` (for the Tailwind token) and `--accent` (raw hex, backs `color-mix` tokens like `--shadow-accent`); the default accent shifts to the darker `#2348DB` in light mode, a custom accent is used as-is in both themes
+- **Brand mark:** a **stopwatch** glyph (crown + stem + body + clock hands, Lucide visual language) on the accent tile. One geometry, three renderers kept in sync: `src/iconSvg.js` (SVG → build PNGs + worker), `src/utils/favicon.js` (canvas favicon/apple-touch), and `src/components/BrandMark.jsx` (`PunchMark` inline SVG for the header/sidebar). The glyph flips between white and dark ink (`#0F1117`) via `src/utils/inkOnAccent.js` `readableInk()` so it reads on any accent (incl. light pastels). The **wordmark** is `PunchIn` in `font-display` with the capital **I** tinted `text-appAccent` (`Wordmark`). All accent-driven — never hardcode the mark colour. The `scripts/social-preview.py` card mirrors the same stopwatch + tinted I (with a `readable_ink` port — keep it in sync).
 - **Stop/end actions:** red (`red-500`, `red-600`) — punch-out buttons and other irreversible-but-non-destructive actions; also used for destructive confirmations
-- **Labor type colors:** 9 preset hex values defined in `JobsView.jsx` (`#6366F1 #F59E0B #22C55E #3B82F6 #EF4444 #EC4899 #8B5CF6 #14B8A6 #F97316`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
+- **Labor type colors:** 10 suggested pastel presets defined in `JobsView.jsx` (`#FF8FA3 #FFB163 #E6C84B #5FD08A #4FC6E8 #6FA8FF #9B8CFF #C77DFF #FF8FD9 #9AA4B2` — the design-system pastel rainbow, mirrored as `--pastel-*` tokens in `index.css`) + custom picker via `ColorPicker.jsx`; stored as hex strings in the `laborTypes` table
+- **Labor type glyphs:** each labor type also carries a **glyph** (a Lucide icon — or `punchin`, the PunchIn brand stopwatch, which is also the default when none is chosen; accessibility — read by shape + colour, not colour alone). Render labor types via the shared `LaborTag` (tinted pill + glyph + name) or `LaborGlyphChip` (solid colour chip + glyph) from `src/components/LaborGlyph.jsx` — **never** a bare colour dot/pill — so the glyph rides along on every surface (timer ticket, timesheets, analytics legend, invoice line items, management lists)
 
 ### Typography & Fonts
 
@@ -302,8 +317,9 @@ The UI uses Google's **Noto** type family, mapped to Tailwind tokens in `tailwin
 | `font-display` | Noto Sans Display (falls back to Noto Sans) | Headings, the brand wordmark |
 | `font-mono` | Noto Sans Mono | Timers / numerals |
 
-- The fonts are **loaded from the Google Fonts CDN** via the `<link>` in `app/index.html` — they are **not** self-hosted or committed. The repo redistributes no font binaries.
-- All three Noto families are licensed under the **SIL Open Font License 1.1**. The license text lives at `docs/licenses/OFL-1.1.txt`, and `docs/THIRD-PARTY-LICENSES.md` records the attribution and how the fonts are used. If you ever switch to self-hosting (committing the binaries), the OFL then requires shipping that license alongside them — it already is.
+- The fonts are **self-hosted** (no CDN): five variable WOFF2 files (Noto Sans normal+italic, Noto Sans Display normal+italic, Noto Sans Mono normal) live in `app/public/fonts/`, served at `/fonts/`, with `@font-face` rules at the top of `src/index.css` (each spans the full 100–900 weight axis). The Google Fonts `<link>` is gone from `app/index.html` (which now `preload`s the body face); the worker CSP (`worker/oauth.js`) is correspondingly tightened to `font-src 'self'` / `style-src 'self' 'unsafe-inline'`. The fonts are precached by the service worker (they sit in `app/public`, outside the `icons/**` glob-ignore) so the brand renders offline. **Noto Sans JP is intentionally not shipped** — it only existed in the design system for a "bad font" illustration the app never renders.
+- **Print / export documents use the brand font too.** The invoice (`InvoiceModal.jsx`) and timesheet (`TimesheetsView.jsx`) print/PDF paths build a standalone print popup, which does **not** inherit the app stylesheet — so they go through `src/utils/printDocument.js`: `PRINT_FONT_HEAD` declares the same self-hosted `@font-face` (the popup is same-origin, so `/fonts/*.woff2` resolve), and `openPrintWindow()` waits for `document.fonts.ready` before printing (falling back to a short delay) so exports render in Noto instead of a system-UI fallback. Set print `font-family` to `'Noto Sans'` / `'Noto Sans Display'` / `'Noto Sans Mono'` (never `-apple-system` or `SF Mono`).
+- All three Noto families are licensed under the **SIL Open Font License 1.1**. The license text lives at `docs/licenses/OFL-1.1.txt`, and `docs/THIRD-PARTY-LICENSES.md` records the attribution and how the fonts are used. Now that the binaries are committed and redistributed, the OFL requires shipping that license alongside them — it does.
 - The social-preview cards render the wordmark/tagline as **outlined vector paths** (not `<text>` + font, and not embedded font binaries) so they show Noto on GitHub without a webfont. Regenerate them with `scripts/social-preview.py` whenever the wordmark, tagline, or brand mark changes — never hand-edit the `<path>` data.
 
 ### Tailwind Custom Color Tokens
@@ -321,7 +337,8 @@ The UI uses Google's **Noto** type family, mapped to Tailwind tokens in `tailwin
 | `text-appText` | `--text-primary` | `#FFFFFF` | `#111827` |
 | `text-appTextMuted` | `--text-muted` | `#6B7280` | `#6B7280` |
 | `text-appTextDisabled` | `--text-disabled` | `#374151` | `#D1D5DB` |
-| `bg-appAccent` / `text-appAccent` | `--accent-rgb` | `#1f6feb` (user-configurable) | same |
+| `bg-appAccent` / `text-appAccent` | `--accent-rgb` | `#2D5BF5` (user-configurable) | `#2348DB` (default; user-configurable) |
+| `text-appOnAccent` | `--on-accent` | `#FFFFFF` (legible ink ON the accent) | flips to `#0F1117` on a light/pastel accent |
 
 Two additional CSS variables exist in `index.css` but have **no Tailwind token** — use them via `var()` in CSS files or Recharts style props only, not via Tailwind utilities:
 
@@ -330,9 +347,22 @@ Two additional CSS variables exist in `index.css` but have **no Tailwind token**
 | `--text-secondary` | `#E2E8F0` | `#374151` | secondary labels, axis text |
 | `--text-darker` | `#4B5563` | `#9CA3AF` | tertiary/dimmed text |
 
-The accent color is stored as a hex string in the `accentColor` setting. `App.jsx` converts it to space-separated RGB values and writes them to `--accent-rgb` on the root element. The Tailwind token uses `rgb(var(--accent-rgb) / <alpha-value>)` so opacity modifiers like `bg-appAccent/30` work correctly. **Never use hardcoded `amber-*` Tailwind classes** — always use `appAccent` so the user's chosen color is respected.
+The accent color is stored as a hex string in the `accentColor` setting. `App.jsx` converts it to space-separated RGB values and writes them to `--accent-rgb` on the root element (plus `--accent` as raw hex, and `--on-accent` = `readableInk(accent)` for legible on-accent text). The Tailwind token uses `rgb(var(--accent-rgb) / <alpha-value>)` so opacity modifiers like `bg-appAccent/30` work correctly. **Never use hardcoded `amber-*` Tailwind classes** — always use `appAccent` so the user's chosen color is respected. **For text/icons sitting ON an accent fill, use `text-appOnAccent`** (never a hardcoded `text-[#0F1117]` / `text-white`) so the foreground stays legible when the user picks a light/pastel accent.
 
 In JSX, use Tailwind token classes rather than raw hex values or inline `var()` calls — except for `--text-secondary` and `--text-darker` which have no token. `color-scheme: dark/light` is set on `:root`/`.light` in `index.css` so browser-native controls (date/time pickers, caret, scrollbars) render in the correct scheme.
+
+### Design-system tokens
+
+`index.css` also defines the PunchIn design-system token layer (CSS custom properties; reference via `var()`):
+
+- **Type scale / weights / tracking:** `--text-display|h1|h2|lg|base|sm|xs|2xs`, `--weight-regular…black`, `--track-tight|normal|over`
+- **Radii:** `--radius-sm` 8 · `--radius` 11 · `--radius-md` 13 · `--radius-lg` 16 · `--radius-xl` 20 · `--radius-pill`
+- **Spacing:** `--space-1…8` (4px base)
+- **Elevation:** `--shadow-card|pop|modal` + `--shadow-accent` (`color-mix` against `--accent`)
+- **Status colours (per theme):** `--green --violet --amber --red`
+- **Pastel presets:** `--pastel-red…gray` — the suggested accent + labor-type colours (users may still pick any custom hex)
+
+The radii/spacing/type/shadow/pastel scales are theme-independent; `--accent`, `--accent-rgb`, and the status colours are overridden under `.light`.
 
 ---
 
@@ -374,7 +404,7 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `formatDurationHM(ms)` → `"Xh Ym"` for summaries
 - `formatDecimalHours(ms)` → `"1.50 h"` decimal-hours string for billing display (issue #208)
 - `formatDuration(ms, decimal)` → decimal hours when `decimal` is set, else `"Xh Ym"` (issue #208)
-- `roundEntry(entry, roundingMinutes)` → entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off or still running (issue #208)
+- `roundEntry(entry, roundingMinutes)` → entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off, still running, or under a minute (a "0m" entry must not inflate to a full increment, e.g. 0.25 h) (issue #208)
 - `getEntryDuration(entry)` → milliseconds (handles active entries)
 - `formatTime(date)` → `"h:mm a"` time-only string (date-fns)
 - `formatDate(date)` → `"EEE, MMM d"` date-only string (date-fns)

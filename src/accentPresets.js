@@ -3,16 +3,21 @@
 // icon generator (scripts/icons.mjs) so the pre-rendered per-accent icon sets
 // never drift from the colours offered in the UI (issue #228).
 export const ACCENT_PRESETS = [
-  { name: 'Blue', hex: '#1f6feb' },
+  { name: 'Blue', hex: '#2D5BF5' },
   { name: 'Amber', hex: '#F59E0B' },
   { name: 'Orange', hex: '#F97316' },
   { name: 'Lime', hex: '#84CC16' },
   { name: 'Teal', hex: '#2DD4BF' },
 ]
 
-// The default accent (first preset) — its icon set is the one shipped at the
-// manifest root, so it needs no per-accent swap.
+// The default accent (first preset) — PunchIn Blue. Its icon set is the one
+// shipped at the manifest root, so it needs no per-accent swap.
 export const DEFAULT_ACCENT = ACCENT_PRESETS[0].hex
+
+// The light theme uses a slightly darker blue for the DEFAULT accent so it keeps
+// enough contrast on the light surfaces (App.jsx applies this when the user is on
+// the default accent in light mode; a custom accent is used as-is in both themes).
+export const DEFAULT_ACCENT_LIGHT = '#2348DB'
 
 // Folder/key for a preset's pre-rendered install-icon set: the hex without '#',
 // lowercased (e.g. '#F59E0B' -> 'f59e0b'). Returns null for a non-preset

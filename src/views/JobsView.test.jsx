@@ -209,6 +209,74 @@ describe('JobsView — add job', () => {
   })
 })
 
+describe('JobsView — default labor type picker', () => {
+  it('selects a default labor type via the EntitySelect picker', () => {
+    setupMocks(
+      JOBS,
+      [
+        { id: 1, name: 'Design', color: '#6366F1', isArchived: false },
+        { id: 3, name: 'Dev',    color: '#3B82F6', isArchived: false },
+      ],
+    )
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: /add job/i }))
+
+    // The default-labor-type control is now a bespoke EntitySelect, not a
+    // native <select>. Open it by its trigger, then click an option by role.
+    fireEvent.click(screen.getByRole('button', { name: /default labor type/i }))
+    fireEvent.click(screen.getByRole('option', { name: /design/i }))
+
+    // The trigger's accessible name reflects the chosen labor type.
+    expect(
+      screen.getByRole('button', { name: /default labor type, design/i })
+    ).toBeInTheDocument()
+  })
+})
+
+describe('JobsView — job color', () => {
+  it('renders a color picker in the job add form', () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: /add job/i }))
+    expect(screen.getByTestId('color-picker')).toBeInTheDocument()
+  })
+
+  it('persists the chosen color when adding a job', async () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: /add job/i }))
+    fireEvent.change(screen.getByPlaceholderText('Job name *'), { target: { value: 'Tinted Co' } })
+    fireEvent.click(screen.getByTestId('color-picker')) // mock → onChange('#FF0000')
+    fireEvent.click(screen.getByRole('button', { name: /^add job$/i }))
+    await waitFor(() =>
+      expect(mockJobsAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Tinted Co', color: '#FF0000' })
+      )
+    )
+  })
+
+  it("uses the job's own color for the card rail, overriding its labor type", () => {
+    setupMocks(
+      [{ id: 1, name: 'Acme Corp', isActive: true, laborTypeId: 1, laborRates: {}, color: '#FF0000' }],
+      [{ id: 1, name: 'Design', color: '#6366F1', isArchived: false }],
+    )
+    const { container } = render(<JobsView />)
+    const rail = container.querySelector('div.absolute.w-1')
+    expect(rail).toBeTruthy()
+    expect(rail.style.backgroundColor).toBe('rgb(255, 0, 0)')
+  })
+
+  it('falls back to the labor type color when the job has no color', () => {
+    setupMocks(
+      [{ id: 1, name: 'Acme Corp', isActive: true, laborTypeId: 1, laborRates: {} }],
+      [{ id: 1, name: 'Design', color: '#6366F1', isArchived: false }],
+    )
+    const { container } = render(<JobsView />)
+    const rail = container.querySelector('div.absolute.w-1')
+    expect(rail.style.backgroundColor).toBe('rgb(99, 102, 241)')
+  })
+})
+
 describe('JobsView — Labor Types tab: add and edit', () => {
   it('shows LaborTypeForm when "Add Labor Type" is clicked', () => {
     setupMocks()

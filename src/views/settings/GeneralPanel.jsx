@@ -1,10 +1,19 @@
-import { Layers, Calendar, Vibrate, Clock, Hourglass } from 'lucide-react'
+import { Layers, Calendar, Vibrate, Clock, Hourglass, Watch } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { usePlatformContext } from '../../hooks/usePlatformContext'
+import EntitySelect from '../../components/EntitySelect'
 import { Panel, SettingsRow, Toggle } from './components'
 
-const selectClass =
-  'bg-appInput border border-appBorder text-appText rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-appAccent/50'
+const TIME_FORMAT_OPTIONS = [
+  { value: 'auto', label: 'Auto (match device)' },
+  { value: '12h', label: '12-hour' },
+  { value: '24h', label: '24-hour' },
+]
+const ROUNDING_OPTIONS = [
+  { value: 0, label: 'Off' },
+  { value: 15, label: '¼ hour' },
+  { value: 30, label: '½ hour' },
+]
 
 export default function GeneralPanel({ onBack }) {
   const { settings, updateSetting } = useSettings()
@@ -42,6 +51,22 @@ export default function GeneralPanel({ onBack }) {
           }
         />
         <SettingsRow
+          icon={Watch}
+          title="Time format"
+          subtitle="How clock times show in timesheets and invoices"
+          right={
+            <div className="w-44 flex-shrink-0">
+              <EntitySelect
+                compact plain hideLabel
+                label="Time format"
+                value={settings.timeFormat || 'auto'}
+                onChange={v => updateSetting('timeFormat', v)}
+                options={TIME_FORMAT_OPTIONS}
+              />
+            </div>
+          }
+        />
+        <SettingsRow
           icon={Clock}
           title="Decimal hours"
           subtitle="Show timesheet durations as 1.50 h instead of 1h 30m"
@@ -58,16 +83,15 @@ export default function GeneralPanel({ onBack }) {
           title="Round billed time"
           subtitle="Rounds each entry in your favour (start down, end up) in timesheets and invoices"
           right={
-            <select
-              aria-label="Round billed time to the nearest"
-              value={settings.roundingMinutes ?? 0}
-              onChange={e => updateSetting('roundingMinutes', Number(e.target.value))}
-              className={selectClass}
-            >
-              <option value={0}>Off</option>
-              <option value={15}>¼ hour</option>
-              <option value={30}>½ hour</option>
-            </select>
+            <div className="w-44 flex-shrink-0">
+              <EntitySelect
+                compact plain hideLabel
+                label="Round billed time to the nearest"
+                value={settings.roundingMinutes ?? 0}
+                onChange={v => updateSetting('roundingMinutes', Number(v))}
+                options={ROUNDING_OPTIONS}
+              />
+            </div>
           }
         />
         {canHaptic && (

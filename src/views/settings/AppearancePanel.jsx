@@ -2,7 +2,7 @@ import { Monitor, Sun, Moon, Palette } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import ColorPicker from '../../components/ColorPicker'
 import { Panel, SettingsRow } from './components'
-import { ACCENT_PRESETS } from '../../accentPresets'
+import { ACCENT_PRESETS, DEFAULT_ACCENT } from '../../accentPresets'
 
 export default function AppearancePanel({ onBack }) {
   const { settings, updateSetting } = useSettings()
@@ -26,7 +26,7 @@ export default function AppearancePanel({ onBack }) {
                   onClick={() => updateSetting('theme', value)}
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors
                     ${(settings.theme || 'auto') === value
-                      ? 'bg-appAccent text-[#0F1117]'
+                      ? 'bg-appAccent text-appOnAccent'
                       : 'text-appTextMuted hover:text-appText'}`}
                 >
                   <Icon className="w-3 h-3" />
@@ -46,7 +46,7 @@ export default function AppearancePanel({ onBack }) {
           </div>
           <ColorPicker
             presets={ACCENT_PRESETS}
-            value={settings.accentColor || '#1f6feb'}
+            value={settings.accentColor || DEFAULT_ACCENT}
             onChange={hex => updateSetting('accentColor', hex)}
             size="md"
             label="Choose accent color"

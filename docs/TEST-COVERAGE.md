@@ -16,7 +16,16 @@
 | `src/utils/reminders.test.js` | `parseHHMM`, `dayKey`, `dayAllowed`, `evaluateReminders` (gating, long-running threshold crossing/de-dup/cleanup, idle/still-running/daily/weekly time-of-day rules, day-of-week gating + back-compat when day arrays absent) |
 | `src/utils/transfer.test.js` | `encodeSnapshot`/`decodeSnapshot` round-trip (gzip + raw), error paths (empty/bad flag/corrupt/non-PunchIn), `buildShareUrl`, `parseImportCode`, `parseImportFromHash` |
 | `src/utils/deviceId.test.js` | `getDeviceId` — generates 8-char hex, persists across calls, falls back to `'default'` when localStorage is unavailable |
-| `src/db.test.js` | Schema validation, default settings seed (29 keys incl. the sync keys seeded as null, the per-reminder weekday defaults = all 7 days, and the time-display defaults `decimalHours`/`roundingMinutes`; matches `DEFAULT_SETTINGS`), indexed `punchIn` range queries (`between`/`aboveOrEqual`, issue #132), `deleteEntry` tombstones, basic CRUD for jobs/labor types/entries |
+| `src/utils/printDocument.test.js` | `PRINT_FONT_HEAD` (loads the three Noto webfonts); `openPrintWindow` — waits for `document.fonts.ready` before printing, falls back to a timed print when `document.fonts` is absent, returns `false` without throwing when the popup is blocked |
+| `src/utils/inkOnAccent.test.js` | `readableInk` — white on dark/saturated accents, dark ink (`#0F1117`) on light/pastel accents (matches the design reference tiles), `#`/case tolerant |
+| `src/iconSvg.test.js` | `iconSvg` — draws the stopwatch body + crown (not the old clock polyline), tints the glyph via the contrast guard (white on dark accent, ink on light), fills the tile with the accent |
+| `src/components/TimerRail.test.jsx` | Desktop Timer rail — renders "This week" once entries load, lists only active jobs for quick punch + calls `onPunch` on click, renders the last session when provided |
+| `src/components/LaborGlyph.test.jsx` | `glyphComponent` (Tag fallback for unknown ids), `LaborTag` (glyph + name + `aria-label`, renders nothing without a type), `LaborGlyphChip` (renders with color/glyph fallbacks), curated `LABOR_GLYPH_IDS` |
+| `src/utils/format.test.js` | `formatMoney` (USD default, other ISO currencies, empty for null/NaN, no-throw fallback on an invalid/empty code); `currencySymbol` (symbol + no-throw on bad code) |
+| `src/utils/image.test.js` | `fileToLogoDataUrl` — downscales via canvas to a PNG data URL; falls back to the raw data URL when canvas 2D is unavailable or the image can't be decoded |
+| `src/views/settings/BillingPanel.test.jsx` | Edits a billing-profile field, changes the default currency, reveals the prefix/next-number inputs only when numbering is on, toggles "Number invoices" |
+| `src/views/settings/components.test.jsx` | `WeekdayPicker` display order vs stored value (Monday-first display still stores absolute indices; Sunday-first when off); `PanelGroup` opt-in collapse (hidden when `defaultCollapsed`, reveals on click; renders directly when not collapsible) |
+| `src/db.test.js` | Schema validation, default settings seed (41 keys incl. the sync + billing keys seeded as null, the per-reminder weekday defaults = all 7 days, and the time-display defaults `decimalHours`/`roundingMinutes`; matches `DEFAULT_SETTINGS`), indexed `punchIn` range queries (`between`/`aboveOrEqual`, issue #132), `deleteEntry` tombstones, basic CRUD for jobs/labor types/entries |
 | `src/hooks/useSettings.test.js` | Loading state, settings object, `updateSetting` (boolean and string values) |
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), `isIOSSafari` (Safari vs CriOS/FxiOS/EdgiOS), `isIPad` incl. desktop-mode iPad (touch-capable "Macintosh" → iOS) vs real Mac, standalone mode detection |
 | `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
@@ -25,7 +34,10 @@
 | `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap, device-Back (popstate) dismiss |
 | `src/components/LicenseModal.test.jsx` | Dialog a11y, default app-license (BUSL) tab, switch to third-party (aria-pressed), close button/Escape/backdrop, device-Back (popstate) dismiss |
 | `src/components/InstallPromptModal.test.jsx` | All three modes (native / ios-safari / ios-other), dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
+| `src/components/FirstRunImport.test.jsx` | Renders the carry-over prompt; import/sync/dismiss actions; valid-backup import → importSnapshot + dismiss; invalid file → alert, no import |
 | `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
+| `src/components/GlyphPicker.test.jsx` | Quick-pick row + "more" button, `onChange` on pick, `aria-checked` selection, search-chosen glyph stays visible, search filter + select, empty-state |
+| `src/components/EntitySelect.test.jsx` | Placeholder + visible label, selected label/sublabel on trigger, opens listbox, `onChange` with string value + close, `aria-selected`, glyph rendering, configurable empty/clear row, filter-style empty label, capture-Escape without bubbling, absent-value fallback |
 | `src/components/ConfirmModal.test.jsx` | Render, `onConfirm`/`onCancel`, Escape/backdrop, focus management, unique title id per instance (#156) |
 | `src/hooks/useFocusTrap.test.jsx` | Initial focus (first / `[data-autofocus]` / `opts.initialFocus`), Escape→onClose, focus restoration on unmount (#152), focus pulled back into the dialog on Tab (#154) |
 | `src/components/DataTransfer.test.jsx` | Share-link + QR generation, "Includes N jobs/entries" summary, import junk rejection, end-to-end import of a real encoded link with count (issue #77) |
@@ -39,7 +51,7 @@
 | `src/views/AnalyticsView.test.jsx` | Loading state, period toggle, summary cards, empty state, charts |
 | `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
 | `src/views/SettingsView.test.jsx` | Drill-in root list + sub-pages, device-Back/Settings-tab-reselect returns to root, Data & Sync consolidation, toggles, theme, export/import, sync UI, danger zone, About rows (help-improve, License modal, Support link) |
-| `src/utils/issueUrl.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` (template/scope/URL) — browser/OS/device/install-type detection |
+| `src/utils/issueUrl.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` + `buildFeedbackBugUrl` + `buildFeedbackFeatureUrl` (template/scope/URL) — browser/OS/device/install-type detection |
 | `src/utils/backup.test.js` | `exportBackup` JSON shape (version + 3 tables); `exportCsv` header + skips running entries |
 | `src/hooks/usePwaUpdate.test.js` | Initial state from window flag, `pwa:update-ready` event, on-mount `reg.waiting` re-surface (#57), apply-when-available, no-registration "latest" path |
 | `src/views/SettingsView.syncUnconfigured.test.jsx` | Sync section with empty client IDs: friendly "not set up" message, no env-var jargon, no provider buttons (issue #59) |

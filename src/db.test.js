@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { db, deleteEntry, DEFAULT_SETTINGS } from './db'
+import { db, deleteEntry, startTimer, DEFAULT_SETTINGS } from './db'
 
 afterAll(async () => {
   await db.close()
@@ -24,10 +24,10 @@ describe('db — schema', () => {
 })
 
 describe('db — populate seed', () => {
-  it('seeds exactly the DEFAULT_SETTINGS keys (29, incl. the sync keys) on fresh install', async () => {
+  it('seeds exactly the DEFAULT_SETTINGS keys (42, incl. the sync + billing keys) on fresh install', async () => {
     const all = await db.settings.toArray()
     expect(all).toHaveLength(Object.keys(DEFAULT_SETTINGS).length)
-    expect(all).toHaveLength(29)
+    expect(all).toHaveLength(42)
     // Single source of truth (issue #131): the seeded rows match DEFAULT_SETTINGS exactly.
     const seeded = Object.fromEntries(all.map(({ key, value }) => [key, value]))
     expect(seeded).toEqual(DEFAULT_SETTINGS)
@@ -54,9 +54,10 @@ describe('db — populate seed', () => {
     expect(s?.value).toBe(false)
   })
 
-  it('seeds weekStartsMonday = true', async () => {
+  it('seeds weekStartsMonday from the device locale (matches the computed default)', async () => {
     const s = await db.settings.get('weekStartsMonday')
-    expect(s?.value).toBe(true)
+    expect(s?.value).toBe(DEFAULT_SETTINGS.weekStartsMonday)
+    expect(typeof s?.value).toBe('boolean')
   })
 
   it('seeds theme = "auto"', async () => {
@@ -64,9 +65,9 @@ describe('db — populate seed', () => {
     expect(s?.value).toBe('auto')
   })
 
-  it('seeds accentColor = "#1f6feb"', async () => {
+  it('seeds accentColor = "#2D5BF5"', async () => {
     const s = await db.settings.get('accentColor')
-    expect(s?.value).toBe('#1f6feb')
+    expect(s?.value).toBe('#2D5BF5')
   })
 
   it('seeds hapticFeedback = true', async () => {
@@ -124,6 +125,32 @@ describe('db — basic CRUD', () => {
     const id = await db.entries.add({ jobId: 1, laborTypeId: 1, punchIn, punchOut: null })
     const entry = await db.entries.get(id)
     expect(entry?.punchIn).toEqual(punchIn)
+  })
+})
+
+describe('db — startTimer', () => {
+  afterEach(async () => { await db.entries.clear() })
+
+  it('adds a running entry (punchOut null) for the job/labor type', async () => {
+    await startTimer({ jobId: 3, laborTypeId: 7, notes: 'hi' })
+    const running = await db.entries.filter(e => !e.punchOut).toArray()
+    expect(running).toHaveLength(1)
+    expect(running[0]).toMatchObject({ jobId: 3, laborTypeId: 7, punchOut: null, notes: 'hi' })
+  })
+
+  it('punches out already-running timers when concurrent timers are off', async () => {
+    await db.entries.add({ jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null })
+    await startTimer({ jobId: 2, laborTypeId: 1, allowConcurrentTimers: false })
+    const running = await db.entries.filter(e => !e.punchOut).toArray()
+    expect(running).toHaveLength(1)
+    expect(running[0].jobId).toBe(2)
+  })
+
+  it('keeps existing timers running when concurrent timers are allowed', async () => {
+    await db.entries.add({ jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null })
+    await startTimer({ jobId: 2, laborTypeId: 1, allowConcurrentTimers: true })
+    const running = await db.entries.filter(e => !e.punchOut).toArray()
+    expect(running).toHaveLength(2)
   })
 })
 

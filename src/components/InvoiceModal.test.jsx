@@ -1,6 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import InvoiceModal from './InvoiceModal'
+import { openPrintWindow } from '../utils/printDocument'
+
+// Printing goes through openPrintWindow (a hidden iframe, not a popup). Mock just
+// that fn so these tests assert WHAT html the modal builds and hands off — the
+// iframe mechanics are covered in printDocument.test.js. PRINT_FONT_HEAD and
+// laborBadgeHTML stay real so the built html is faithful.
+vi.mock('../utils/printDocument', async (importOriginal) => ({
+  ...(await importOriginal()),
+  openPrintWindow: vi.fn(() => true),
+}))
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 
@@ -13,8 +23,9 @@ vi.mock('../hooks/usePlatformContext', () => ({
 }))
 
 let mockSettings = { weekStartsMonday: true }
+const mockUpdateSetting = vi.fn()
 vi.mock('../hooks/useSettings', () => ({
-  useSettings: () => ({ settings: mockSettings, updateSetting: vi.fn() }),
+  useSettings: () => ({ settings: mockSettings, updateSetting: mockUpdateSetting }),
 }))
 
 // A job with a rate of $100/hr for labor type 1
@@ -40,8 +51,16 @@ function renderModal(props = {}) {
   )
 }
 
+// The job select is now a bespoke EntitySelect (colour dot + label/sublabel),
+// not a native <select>. Open the picker by its label and click the job option.
+function pickJob(name = 'Acme Corp') {
+  fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+  fireEvent.click(screen.getByRole('option', { name: new RegExp(name, 'i') }))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  openPrintWindow.mockReturnValue(true) // clearAllMocks keeps return overrides — reset to the success default
   mockSettings = { weekStartsMonday: true }
   // Return [] when no job selected, ENTRIES when selectedJobId is non-empty (deps[2])
   useLiveQuery.mockImplementation((_fn, deps) => {
@@ -51,14 +70,14 @@ beforeEach(() => {
 })
 
 describe('InvoiceModal — rendering', () => {
-  it('renders the "Generate Invoice" header', () => {
+  it('renders the "Create invoice" header', () => {
     renderModal()
-    expect(screen.getByText('Generate Invoice')).toBeInTheDocument()
+    expect(screen.getByText('Create invoice')).toBeInTheDocument()
   })
 
   it('renders the job select', () => {
     renderModal()
-    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^job/i })).toBeInTheDocument()
   })
 
   it('renders date-range preset buttons', () => {
@@ -96,7 +115,7 @@ describe('InvoiceModal — rendering', () => {
 describe('InvoiceModal — line items calculation', () => {
   it('displays correct hours, rate, and amount after selecting a job', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     // 1 hr × $100/hr = $100.00
     await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
     expect(screen.getAllByText('$100.00').length).toBeGreaterThanOrEqual(1)
@@ -110,7 +129,7 @@ describe('InvoiceModal — line items calculation', () => {
            punchOut: new Date('2025-06-01T09:50:00') }]
       : [])
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     // 9:05–9:50 is 0.75 h raw; rounded in the user's favour to the half hour it's
     // 9:00–10:00 = 1.00 h, billed at $100/hr → $100.00 (not the raw $75.00).
     await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
@@ -121,7 +140,7 @@ describe('InvoiceModal — line items calculation', () => {
   it('shows "—" for amount when job has no rate set for that labor type', async () => {
     const jobNoRates = [{ id: 1, name: 'No Rates Job', isActive: true, laborRates: {} }]
     renderModal({ jobs: jobNoRates })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob('No Rates Job')
     // "1.00" appears twice (line-item hours + total hours); "—" for rate and amount
     await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1)
@@ -129,7 +148,7 @@ describe('InvoiceModal — line items calculation', () => {
 
   it('enables Export CSV once line items are present', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /export csv/i })).not.toBeDisabled()
     )
@@ -138,7 +157,7 @@ describe('InvoiceModal — line items calculation', () => {
   it('shows "No completed entries" when entries list is empty', async () => {
     useLiveQuery.mockImplementation(() => [])
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() =>
       expect(screen.getByText(/no completed entries/i)).toBeInTheDocument()
     )
@@ -148,7 +167,7 @@ describe('InvoiceModal — line items calculation', () => {
     const jobNoRates = [{ id: 1, name: 'Plain Job', isActive: true, laborRates: {} }]
     useLiveQuery.mockImplementation(() => [])
     renderModal({ jobs: jobNoRates })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob('Plain Job')
     await waitFor(() =>
       expect(screen.getByText(/no hourly rates set/i)).toBeInTheDocument()
     )
@@ -214,8 +233,6 @@ describe('InvoiceModal — export and print', () => {
   beforeEach(() => {
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
     global.URL.revokeObjectURL = vi.fn()
-    const fakeWin = { document: { write: vi.fn(), close: vi.fn() }, focus: vi.fn(), print: vi.fn() }
-    vi.spyOn(window, 'open').mockReturnValue(fakeWin)
   })
 
   afterEach(() => {
@@ -224,28 +241,151 @@ describe('InvoiceModal — export and print', () => {
 
   it('calls URL.createObjectURL when Export CSV is clicked with line items', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /export csv/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /export csv/i }))
     expect(global.URL.createObjectURL).toHaveBeenCalled()
   })
 
-  it('calls window.open when Print is clicked with line items', async () => {
+  it('hands the print document to openPrintWindow when Print is clicked with line items', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     fireEvent.click(screen.getByRole('button', { name: /print/i }))
-    expect(window.open).toHaveBeenCalled()
+    expect(openPrintWindow).toHaveBeenCalled()
   })
 
-  it('alerts instead of throwing when the popup is blocked (window.open → null) (#150)', async () => {
-    window.open.mockReturnValue(null)
+  it('alerts instead of throwing when printing fails (openPrintWindow → false) (#150)', async () => {
+    openPrintWindow.mockReturnValue(false)
     global.alert = vi.fn()
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
     expect(() => fireEvent.click(screen.getByRole('button', { name: /print/i }))).not.toThrow()
-    expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('pop-ups'))
+    expect(global.alert).toHaveBeenCalled()
+  })
+
+  it('prints the invoice in the Noto brand font, loading the webfont (not the system-UI fallback)', async () => {
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain("font-family: 'Noto Sans', sans-serif")
+    expect(html).toContain("'Noto Sans Mono', monospace")
+    expect(html).toContain("'Noto Sans Display'")
+    expect(html).toContain('/fonts/noto-sans-latin-wght-normal.woff2')
+    expect(html).not.toContain('-apple-system')
+    expect(html).not.toContain('SF Mono')
+  })
+
+  it('renders the Billed-from band + invoice number in the print HTML when configured', async () => {
+    mockSettings = { weekStartsMonday: true, billingName: 'Jane Doe', billingEmail: 'jane@example.com', numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain('Billed from')
+    expect(html).toContain('Jane Doe')
+    expect(html).toContain('Billed to')
+    expect(html).toContain('PI-007') // prefix + zero-padded nextInvoiceNumber
+    expect(html).toContain('<svg')   // line items carry a labor glyph badge
+    expect(html).toContain('Amount due') // paperfoot total band
+  })
+
+  it('renders the business logo in the print band when set', async () => {
+    mockSettings = { weekStartsMonday: true, billingName: 'Jane Doe', billingLogo: 'data:image/png;base64,LOGO123' }
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain('data:image/png;base64,LOGO123')
+  })
+
+  it('lets the user override the invoice number; the printout + counter follow it', async () => {
+    mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.change(screen.getByLabelText('Invoice number'), { target: { value: '50' } })
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain('PI-050')                                    // printed number follows the edit
+    expect(mockUpdateSetting).toHaveBeenCalledWith('nextInvoiceNumber', 51) // counter advances to edited + 1
+  })
+
+  it('accepts a custom alphanumeric invoice number; prints it verbatim and leaves the counter untouched', async () => {
+    // The number field allows letters/symbols (e.g. a per-client code) on top of
+    // plain numbers. A non-numeric value is used as-is (no zero-padding) and the
+    // auto-increment counter must NOT advance (you can't "+1" a string).
+    mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    const field = screen.getByLabelText('Invoice number')
+    fireEvent.change(field, { target: { value: 'INV-2024-A' } })
+    expect(field).toHaveValue('INV-2024-A')                 // letters kept, not coerced to a number
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain('PI-INV-2024-A')                 // prefix + verbatim value, no zero-padding
+    expect(mockUpdateSetting).not.toHaveBeenCalledWith('nextInvoiceNumber', expect.anything())
+  })
+
+  it('advances nextInvoiceNumber when a numbered invoice is generated', async () => {
+    mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    expect(mockUpdateSetting).toHaveBeenCalledWith('nextInvoiceNumber', 8)
+  })
+
+  it('printed invoice badge shows the labor glyph (svg) and labor name, not colour-only', async () => {
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain('<svg')
+    expect(html).toContain('Design')
+  })
+
+  it('invoices a whole client — aggregates entries across the client’s jobs with per-job rates', async () => {
+    // Two jobs for the same client at different rates; selecting the client bills
+    // them together, each entry priced at ITS OWN job's rate (not one shared rate).
+    const jobsTwo = [
+      { id: 1, name: 'Acme Web', clientName: 'Acme', isActive: true, laborRates: { 1: 100 } },
+      { id: 2, name: 'Acme App', clientName: 'Acme', isActive: true, laborRates: { 1: 150 } },
+    ]
+    const entriesTwo = [
+      { id: 1, jobId: 1, laborTypeId: 1, punchIn: new Date('2025-06-01T09:00:00'), punchOut: new Date('2025-06-01T10:00:00') }, // 1h @ $100 = 100
+      { id: 2, jobId: 2, laborTypeId: 1, punchIn: new Date('2025-06-02T09:00:00'), punchOut: new Date('2025-06-02T11:00:00') }, // 2h @ $150 = 300
+    ]
+    useLiveQuery.mockImplementation((_fn, deps) => (deps?.[2] ? entriesTwo : []))
+    render(<InvoiceModal jobs={jobsTwo} laborTypes={LABOR_TYPES} currentDate={new Date('2025-06-01')} currentTab="weekly" onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    fireEvent.click(screen.getByRole('option', { name: /whole client/i })) // the "Acme · whole client" option
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain('Acme')        // billed to the client
+    expect(html).toContain('Acme Web')    // each job shown (per-job column)
+    expect(html).toContain('Acme App')
+    expect(html).toContain('3.00')        // total hours 1 + 2
+    expect(html).toContain('400')         // total amount 100 + 300
+  })
+
+  it('does not advance the number when printing fails to open', async () => {
+    mockSettings = { weekStartsMonday: true, numberInvoices: true, invoicePrefix: 'PI-', nextInvoiceNumber: 7 }
+    openPrintWindow.mockReturnValue(false)
+    global.alert = vi.fn()
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    expect(mockUpdateSetting).not.toHaveBeenCalledWith('nextInvoiceNumber', expect.anything())
   })
 })
 
@@ -259,7 +399,7 @@ describe('InvoiceModal — backdrop and label', () => {
 
   it('shows job name and client name in the invoice header once a job is selected', async () => {
     renderModal()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    pickJob()
     await waitFor(() => expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1))
   })
 

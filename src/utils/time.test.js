@@ -121,6 +121,16 @@ describe('formatTime', () => {
   it('formats noon as 12:00 PM', () => {
     expect(formatTime(new Date(2024, 0, 15, 12, 0))).toBe('12:00 PM')
   })
+  it('honours an explicit 24-hour format', () => {
+    expect(formatTime(new Date(2024, 0, 15, 14, 5), '24h')).toBe('14:05')
+    expect(formatTime(new Date(2024, 0, 15, 0, 0), '24h')).toBe('00:00')
+  })
+  it('honours an explicit 12-hour format regardless of locale', () => {
+    expect(formatTime(new Date(2024, 0, 15, 14, 5), '12h')).toBe('2:05 PM')
+  })
+  it("'auto' resolves to a valid time string (device preference)", () => {
+    expect(formatTime(new Date(2024, 0, 15, 14, 5), 'auto')).toMatch(/^(2:05 PM|14:05)$/)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -500,5 +510,15 @@ describe('roundEntry', () => {
     const e = { punchIn: new Date(2024, 0, 15, 8, 0, 0), punchOut: new Date(2024, 0, 15, 8, 30, 1) }
     const r = roundEntry(e, 15)
     expect(r.punchOut).toEqual(new Date(2024, 0, 15, 8, 45))
+  })
+
+  it('does NOT inflate a 0-minute (sub-minute) entry to a full increment', () => {
+    // Punch in and straight back out: 0 minutes must stay 0, not become 0.25 h.
+    const zero = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: new Date(2024, 0, 15, 8, 7) }
+    expect(roundEntry(zero, 15)).toBe(zero)
+    expect(getEntryDuration(roundEntry(zero, 15))).toBe(0)
+    // A 30-second entry is still "0m" — leave it untouched rather than bill 15 min.
+    const subMinute = { punchIn: new Date(2024, 0, 15, 8, 7, 0), punchOut: new Date(2024, 0, 15, 8, 7, 30) }
+    expect(roundEntry(subMinute, 15)).toBe(subMinute)
   })
 })

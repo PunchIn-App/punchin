@@ -68,6 +68,7 @@ vi.mock('./components/Layout', () => ({
     <div data-testid="layout">
       <button onClick={() => onNavigate('jobs')}>go-jobs</button>
       <button onClick={() => onNavigate('settings')}>go-settings</button>
+      <button onClick={() => onNavigate('timer')}>go-timer</button>
       {children}
     </div>
   ),
@@ -112,10 +113,45 @@ describe('App — accent color CSS variable', () => {
     expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('255 0 0')
   })
 
-  it('falls back to #1f6feb when accentColor is missing', () => {
-    mockUseSettings.mockReturnValue({ settings: {}, updateSetting: vi.fn() })
+  it('also writes the raw hex to the --accent token', () => {
+    mockUseSettings.mockReturnValue({
+      settings: { theme: 'dark', accentColor: '#FF0000' },
+      updateSetting: vi.fn(),
+    })
     render(<App />)
-    expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('31 111 235')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#FF0000')
+  })
+
+  it('writes --on-accent = white for legible text on a dark accent', () => {
+    mockUseSettings.mockReturnValue({
+      settings: { theme: 'dark', accentColor: '#2D5BF5' },
+      updateSetting: vi.fn(),
+    })
+    render(<App />)
+    expect(document.documentElement.style.getPropertyValue('--on-accent')).toBe('#FFFFFF')
+  })
+
+  it('flips --on-accent to dark ink on a light accent', () => {
+    mockUseSettings.mockReturnValue({
+      settings: { theme: 'dark', accentColor: '#FFD66B' },
+      updateSetting: vi.fn(),
+    })
+    render(<App />)
+    expect(document.documentElement.style.getPropertyValue('--on-accent')).toBe('#0F1117')
+  })
+
+  it('defaults to PunchIn Blue #2D5BF5 (dark) when accentColor is missing', () => {
+    mockUseSettings.mockReturnValue({ settings: { theme: 'dark' }, updateSetting: vi.fn() })
+    render(<App />)
+    expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('45 91 245')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#2D5BF5')
+  })
+
+  it('uses the darker light-mode default #2348DB when accentColor is missing in light theme', () => {
+    mockUseSettings.mockReturnValue({ settings: { theme: 'light' }, updateSetting: vi.fn() })
+    render(<App />)
+    expect(document.documentElement.style.getPropertyValue('--accent-rgb')).toBe('35 72 219')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#2348DB')
   })
 })
 
@@ -185,6 +221,44 @@ describe('App — back-button navigation (#65)', () => {
     fireEvent.click(screen.getByText('go-settings'))
     expect(history.length).toBe(before + 1)
     expect(history.state?.piView).toBe('settings')
+  })
+
+  it('returns home with history.go(-1) when no sub-panel is open', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('go-jobs'))
+    const goSpy = vi.spyOn(history, 'go')
+    fireEvent.click(screen.getByText('go-timer'))
+    expect(goSpy).toHaveBeenCalledWith(-1)
+  })
+
+  it('unwinds past a Settings sub-panel entry with history.go(-2) so Timer is not swallowed', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('go-settings'))
+    // A Settings drill-in pushes a {settingsPanel} entry on top of our tab entry.
+    act(() => history.pushState({ settingsPanel: 'general' }, ''))
+    const goSpy = vi.spyOn(history, 'go')
+    fireEvent.click(screen.getByText('go-timer'))
+    expect(goSpy).toHaveBeenCalledWith(-2)
+  })
+
+  it('does not resurface Settings on Back after switching tabs from a drilled-in Settings panel', () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('go-settings'))
+    // Drill into a sub-panel — SettingsView pushes a {settingsPanel} entry on top
+    // of our {piView:'settings'} tab entry.
+    act(() => history.pushState({ settingsPanel: 'billing' }, ''))
+    // Switch to another tab from inside the panel. A bare replaceState here would
+    // swap the panel entry but leave {piView:'settings'} beneath it, so the next
+    // Back would throw the user to Settings. The fix unwinds the panel entry first.
+    fireEvent.click(screen.getByText('go-jobs'))
+    // The browser performs the pending Back unwind, firing popstate. (Its state is
+    // the {piView:'settings'} entry that used to sit beneath the panel.)
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { piView: 'settings' } }))
+    })
+    // We end up on Jobs — NOT thrown back to Settings.
+    expect(screen.getByText('JobsView')).toBeInTheDocument()
+    expect(screen.queryByText('SettingsView')).not.toBeInTheDocument()
   })
 })
 

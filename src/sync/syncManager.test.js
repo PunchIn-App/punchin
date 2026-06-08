@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { db, deleteEntry } from '../db'
-import { exportSnapshot, runSync, disconnectSync } from './syncManager'
+import { exportSnapshot, importSnapshot, runSync, disconnectSync } from './syncManager'
 import { getSyncToken } from './tokenStore'
 import * as github from './providers/github'
 import * as google from './providers/google'
@@ -52,9 +52,7 @@ beforeEach(async () => {
   await db.entries.clear()
   await db.deletions.clear()
   await db.secrets.clear() // encrypted sync token store (issue #126)
-  for (const key of ['syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId', 'lastSyncedAt', 'syncUsername']) {
-    await db.settings.delete(key)
-  }
+  await db.settings.clear() // full reset so preference keys don't leak between tests
 })
 
 afterAll(async () => {
@@ -113,6 +111,76 @@ describe('exportSnapshot', () => {
     expect(snap.jobs).toEqual([])
     expect(snap.entries).toEqual([])
     expect(snap.laborTypes).toEqual([])
+  })
+
+  it('includes portable user preferences but never the sync/account keys', async () => {
+    await db.settings.bulkPut([
+      { key: 'theme', value: 'light' },
+      { key: 'defaultCurrency', value: 'EUR' },
+      { key: 'billingName', value: 'Jane Doe' },
+      { key: 'syncProvider', value: 'github' },
+      { key: 'syncToken', value: 'secret' },
+      { key: 'syncFileId', value: 'gist-123' },
+    ])
+    const snap = await exportSnapshot()
+    expect(snap.settings).toMatchObject({ theme: 'light', defaultCurrency: 'EUR', billingName: 'Jane Doe' })
+    expect(snap.settings).not.toHaveProperty('syncProvider')
+    expect(snap.settings).not.toHaveProperty('syncToken')
+    expect(snap.settings).not.toHaveProperty('syncFileId')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// importSnapshot — portable preferences (issue: web→installed-PWA carry-over)
+// ---------------------------------------------------------------------------
+
+describe('importSnapshot — portable preferences', () => {
+  it('applies the snapshot’s preferences to local settings (an explicit import)', async () => {
+    const snap = { version: 1, jobs: [], entries: [], laborTypes: [], deletions: [], settings: { theme: 'light', defaultCurrency: 'EUR' } }
+    await importSnapshot(snap)
+    expect((await db.settings.get('theme'))?.value).toBe('light')
+    expect((await db.settings.get('defaultCurrency'))?.value).toBe('EUR')
+  })
+
+  it('never plants sync/account keys carried in an imported snapshot', async () => {
+    const snap = { version: 1, jobs: [], entries: [], laborTypes: [], deletions: [], settings: { theme: 'dark', syncToken: 'evil', syncProvider: 'github' } }
+    await importSnapshot(snap)
+    expect(await db.settings.get('syncToken')).toBeUndefined()
+    expect(await db.settings.get('syncProvider')).toBeUndefined()
+    expect((await db.settings.get('theme'))?.value).toBe('dark')
+  })
+
+  it('is a no-op on settings when the snapshot carries none (legacy backup)', async () => {
+    await db.settings.put({ key: 'theme', value: 'dark' })
+    await importSnapshot({ version: 1, jobs: [], entries: [], laborTypes: [], deletions: [] })
+    expect((await db.settings.get('theme'))?.value).toBe('dark') // untouched
+  })
+})
+
+// ---------------------------------------------------------------------------
+// runSync — seed preferences on a FRESH install only (seed-not-sync)
+// ---------------------------------------------------------------------------
+
+describe('runSync — seeds preferences on a fresh install only', () => {
+  it('applies remote preferences when the local install has no data (fresh)', async () => {
+    await seedSyncSettings()
+    const remote = { version: 1, jobs: [], entries: [], laborTypes: [], deletions: [], settings: { theme: 'light', defaultCurrency: 'EUR' } }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remote])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+    expect((await db.settings.get('theme'))?.value).toBe('light')
+    expect((await db.settings.get('defaultCurrency'))?.value).toBe('EUR')
+  })
+
+  it('does NOT overwrite local preferences when the device already has data', async () => {
+    await seedSyncSettings()
+    await db.settings.put({ key: 'theme', value: 'dark' })
+    await db.jobs.add({ name: 'Existing', isActive: true, laborRates: {} }) // not a fresh install
+    const remote = { version: 1, jobs: [], entries: [], laborTypes: [], deletions: [], settings: { theme: 'light' } }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remote])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+    expect((await db.settings.get('theme'))?.value).toBe('dark') // each established device keeps its own
   })
 })
 

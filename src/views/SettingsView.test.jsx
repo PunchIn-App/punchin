@@ -5,8 +5,15 @@ import SettingsView from './SettingsView'
 // per category, and tapping a row reveals that category's sub-page. Each row's
 // accessible name is its title followed by a subtitle, so match on the leading
 // title. Backup / Sync / Transfer / Danger Zone all live inside "Data & Sync".
-const expand = (title) =>
+const expand = (title) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${title}`, 'i') }))
+  // The Danger Zone inside Data & Sync is collapsed by default; open it so its
+  // destructive rows are reachable in these tests.
+  if (/data & sync/i.test(title)) {
+    const dz = screen.queryByRole('button', { name: /^danger zone/i })
+    if (dz) fireEvent.click(dz)
+  }
+}
 
 const mockUpdateSetting       = vi.fn()
 const mockDbJobsToArray       = vi.fn().mockResolvedValue([])
@@ -40,9 +47,12 @@ vi.mock('../db', () => ({
     { key: 'allowConcurrentTimers', value: false },
     { key: 'weekStartsMonday', value: true },
     { key: 'theme', value: 'auto' },
-    { key: 'accentColor', value: '#1f6feb' },
+    { key: 'accentColor', value: '#2D5BF5' },
     { key: 'syncProvider', value: null },
   ],
+  // exportBackup pulls portable preferences through this (real impl tested in
+  // syncManager.test.js / db.test.js); the export test only needs it to resolve.
+  getPortableSettings: async () => ({}),
   db: {
     jobs: {
       get toArray() { return mockDbJobsToArray },
@@ -142,6 +152,51 @@ beforeEach(() => {
   global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
   global.URL.revokeObjectURL = vi.fn()
   global.alert = vi.fn()
+})
+
+// The lg+ master-detail is JS-gated on matchMedia('(min-width: 1024px)'); the
+// global test-setup stub returns matches:false, so the rest of the suite only
+// exercises the mobile drill-in. Override it true here to cover the desktop
+// branch — rail + detail render together and selection swaps in place.
+describe('SettingsView — desktop master-detail (lg+)', () => {
+  let originalMatchMedia
+  beforeEach(() => {
+    originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn().mockImplementation((q) => ({
+      matches: q.includes('1024px'),
+      media: q,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: () => false,
+    }))
+  })
+  afterEach(() => { window.matchMedia = originalMatchMedia })
+
+  it('shows the category rail and a default General detail pane at the same time', () => {
+    render(<SettingsView />)
+    // Rail is present…
+    expect(screen.getByRole('button', { name: /^appearance/i })).toBeInTheDocument()
+    // …alongside the General detail pane. Rail + detail visible at the same time
+    // is unique to desktop: the mobile root list shows EITHER the list OR a panel,
+    // never both (cf. "shows only the root list by default"). The "‹ Settings"
+    // back button is CSS-hidden at lg (lg:hidden), which jsdom can't assert, so
+    // the rail+detail coexistence is the regression signal here.
+    expect(screen.getByRole('switch', { name: /allow concurrent timers/i })).toBeInTheDocument()
+  })
+
+  it('selecting a category swaps the detail pane while the rail persists', () => {
+    render(<SettingsView />)
+    fireEvent.click(screen.getByRole('button', { name: /^billing/i }))
+    // Detail swapped from General to Billing…
+    expect(screen.queryByRole('switch', { name: /allow concurrent timers/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/billed from/i)).toBeInTheDocument()
+    // …and the rail stays put — selection swapped the detail in place, it didn't
+    // drill in and replace the list the way the mobile path does.
+    expect(screen.getByRole('button', { name: /^appearance/i })).toBeInTheDocument()
+  })
 })
 
 describe('SettingsView — root list & drill-in', () => {
@@ -481,7 +536,7 @@ describe('SettingsView — Danger Zone', () => {
     }
   })
 
-  it('re-seeds the default blue accent (#1f6feb), not amber, after factory reset (#69)', async () => {
+  it('re-seeds the default PunchIn Blue accent (#2D5BF5), not amber, after factory reset (#69)', async () => {
     render(<SettingsView />)
     expand('Data & Sync')
     fireEvent.click(screen.getByText('Factory Reset'))
@@ -490,7 +545,7 @@ describe('SettingsView — Danger Zone', () => {
     await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalled())
     const seeded = mockDbSettingsBulkPut.mock.calls.at(-1)[0]
     const accent = seeded.find(s => s.key === 'accentColor')
-    expect(accent.value).toBe('#1f6feb')
+    expect(accent.value).toBe('#2D5BF5')
   })
 
   it('returns to null stage after factory reset completes', async () => {
@@ -539,13 +594,13 @@ describe('SettingsView — About', () => {
     expect(screen.getByText('Check for updates')).toBeInTheDocument()
   })
 
-  it('opens a feature-request issue from "Help improve PunchIn"', () => {
+  it('opens the account-free feedback feature form from "Help improve PunchIn"', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {})
     render(<SettingsView />)
     expand('About')
     fireEvent.click(screen.getByText('Help improve PunchIn'))
     expect(openSpy).toHaveBeenCalledWith(
-      expect.stringContaining('template=feature_request.yml'),
+      expect.stringContaining('feedback.trackmytime.today/feature'),
       '_blank',
       'noopener,noreferrer',
     )

@@ -1,24 +1,24 @@
-import { useState, useEffect, useCallback, useId } from 'react'
-import { X } from 'lucide-react'
+import { useState, useEffect, useCallback, useId, useRef } from 'react'
+import { X, Play, Check, ChevronDown } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db'
+import { db, startTimer } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { useSwipeDismiss, useAndroidBackDismiss, useSheetStyles } from '../hooks/useBottomSheet'
+import { glyphComponent, DEFAULT_LABOR_COLOR } from './LaborGlyph'
 
-export default function StartTimerModal({ onClose }) {
-  const [jobId, setJobId]             = useState('')
+export default function StartTimerModal({ onClose, initialJobId = null }) {
+  const [jobId, setJobId]             = useState(initialJobId ? String(initialJobId) : '')
   const [laborTypeId, setLaborTypeId] = useState('')
   const [notes, setNotes]             = useState('')
   const [error, setError]             = useState('')
   const [submitting, setSubmitting]   = useState(false)
+  const [jobMenuOpen, setJobMenuOpen] = useState(false)
 
   const uid = useId()
   const titleId   = `${uid}-title`
-  const jobId_    = `${uid}-job`
-  const ltId_     = `${uid}-lt`
   const notesId_  = `${uid}-notes`
   const errorId_  = `${uid}-error`
 
@@ -48,11 +48,39 @@ export default function StartTimerModal({ onClose }) {
   // Focus trap, Escape, and focus restoration (issues #151/#152/#154)
   useFocusTrap(swipeRef, stableClose)
 
+  // Selecting a job auto-fills its default labor type (the chip lights up) — but
+  // NOT for a job preselected via initialJobId (quick-punch opens the sheet with
+  // no task so the user picks it). Subsequent manual job changes still auto-fill.
+  const skipInitialLabor = useRef(initialJobId != null)
   useEffect(() => {
     if (!jobId || !jobs) return
+    if (skipInitialLabor.current) { skipInitialLabor.current = false; return }
     const job = jobs.find(j => j.id === Number(jobId))
     if (job?.laborTypeId) setLaborTypeId(String(job.laborTypeId))
   }, [jobId, jobs])
+
+  // Job picker popover: outside-click + capture-phase Escape so closing the menu
+  // doesn't fall through to the modal's Escape→onClose (same contract as the
+  // ColorPicker / GlyphPicker popovers, issue #155).
+  const jobWrapRef = useRef(null)
+  useEffect(() => {
+    if (!jobMenuOpen) return
+    const onOutside = (e) => {
+      if (jobWrapRef.current && !jobWrapRef.current.contains(e.target)) setJobMenuOpen(false)
+    }
+    const onEscape = (e) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      e.preventDefault()
+      setJobMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onOutside)
+    document.addEventListener('keydown', onEscape, true)
+    return () => {
+      document.removeEventListener('mousedown', onOutside)
+      document.removeEventListener('keydown', onEscape, true)
+    }
+  }, [jobMenuOpen])
 
   const handleStart = async () => {
     setError('')
@@ -63,21 +91,11 @@ export default function StartTimerModal({ onClose }) {
     hapticTrigger()
     setSubmitting(true)
     try {
-      await db.transaction('rw', db.entries, async () => {
-        if (!settings.allowConcurrentTimers) {
-          const now = new Date()
-          const running = await db.entries.filter(e => !e.punchOut).toArray()
-          for (const e of running) {
-            await db.entries.update(e.id, { punchOut: now })
-          }
-        }
-        await db.entries.add({
-          jobId:       Number(jobId),
-          laborTypeId: Number(laborTypeId),
-          punchIn:     new Date(),
-          punchOut:    null,
-          notes:       notes.trim() || null,
-        })
+      await startTimer({
+        jobId,
+        laborTypeId,
+        notes: notes.trim() || null,
+        allowConcurrentTimers: settings.allowConcurrentTimers,
       })
       onClose()
     } catch (err) {
@@ -86,7 +104,18 @@ export default function StartTimerModal({ onClose }) {
     }
   }
 
-  const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2.5 text-sm
+  // A job's dot colour is its own colour, else its labor type's, else neutral.
+  const laborColorOf = (id) => laborTypes?.find(lt => lt.id === Number(id))?.color
+  const jobDotColor  = (job) => job?.color || laborColorOf(job?.laborTypeId) || DEFAULT_LABOR_COLOR
+
+  const selectedJob = jobs?.find(j => j.id === Number(jobId)) || null
+  const jobTriggerName = selectedJob
+    ? `Job, ${selectedJob.name}${selectedJob.clientName ? ', ' + selectedJob.clientName : ''}`
+    : 'Job, none selected'
+
+  // Mono uppercase overline — the design system's field-label treatment (.pcm-lbl).
+  const overlineCls = 'block mb-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-appTextMuted'
+  const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-xl px-4 py-3 text-[14.5px]
                     placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors`
 
   return (
@@ -106,39 +135,123 @@ export default function StartTimerModal({ onClose }) {
         {/* Platform drag handle (iOS / Android standalone only) */}
         {handle}
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-appBorder">
-          <h2 id={titleId} className="font-display font-semibold text-appText text-lg">Start Timer</h2>
+        {/* Header — title + subtitle, bordered close affordance */}
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-appBorder">
+          <div>
+            <h2 id={titleId} className="font-display font-extrabold text-appText text-[22px] tracking-tight leading-tight">Start Timer</h2>
+            <p className="text-[13px] text-appTextMuted mt-0.5">Pick a job and what you're working on</p>
+          </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="p-1.5 rounded-lg hover:bg-appInput text-appTextMuted transition-colors"
+            className="flex-shrink-0 p-2 rounded-lg border border-appBorder bg-appBg text-appTextMuted hover:bg-appInput transition-colors"
           >
-            <X className="w-5 h-5" aria-hidden="true" />
+            <X className="w-[18px] h-[18px]" aria-hidden="true" />
           </button>
         </div>
 
         {/* Fields */}
         <div className="px-5 py-4 space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor={jobId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Job</label>
-            <select id={jobId_} value={jobId} onChange={e => setJobId(e.target.value)} className={inputCls}>
-              <option value="">Select a job...</option>
-              {jobs?.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
-            </select>
+          {/* Job — custom combobox (colour dot + client line, beyond a native select) */}
+          <div>
+            <span className={overlineCls} aria-hidden="true">Job</span>
+            <div ref={jobWrapRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setJobMenuOpen(o => !o)}
+                aria-haspopup="listbox"
+                aria-expanded={jobMenuOpen}
+                aria-label={jobTriggerName}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border bg-appBg text-left transition-colors
+                  ${jobMenuOpen ? 'border-appAccent ring-2 ring-appAccent/20' : 'border-appBorder hover:border-appAccent/40'}`}
+              >
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: selectedJob ? jobDotColor(selectedJob) : 'var(--text-disabled)' }}
+                  aria-hidden="true"
+                />
+                {selectedJob ? (
+                  <>
+                    <span className="text-[15px] font-bold text-appText truncate">{selectedJob.name}</span>
+                    {selectedJob.clientName && (
+                      <span className="text-xs text-appTextMuted truncate">{selectedJob.clientName}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-[15px] text-appTextMuted">Select a job…</span>
+                )}
+                <ChevronDown
+                  className={`w-[18px] h-[18px] ml-auto flex-shrink-0 text-appTextMuted transition-transform ${jobMenuOpen ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {jobMenuOpen && (
+                <div
+                  role="listbox"
+                  aria-label="Job"
+                  className="absolute left-0 right-0 top-full mt-1.5 z-20 bg-appCard border border-appBorder rounded-xl shadow-[var(--shadow-pop)] p-1.5 max-h-60 overflow-y-auto"
+                >
+                  {jobs?.length ? jobs.map(j => {
+                    const sel = j.id === Number(jobId)
+                    return (
+                      <button
+                        key={j.id}
+                        type="button"
+                        role="option"
+                        aria-selected={sel}
+                        onClick={() => { setJobId(String(j.id)); setJobMenuOpen(false) }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-appInput transition-colors"
+                      >
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: jobDotColor(j) }} aria-hidden="true" />
+                        <span className="text-sm font-bold text-appText truncate">{j.name}</span>
+                        {j.clientName && <span className="text-xs text-appTextMuted truncate">{j.clientName}</span>}
+                        {sel && <Check className="w-4 h-4 ml-auto flex-shrink-0 text-appAccent" aria-hidden="true" />}
+                      </button>
+                    )
+                  }) : (
+                    <p className="px-3 py-2 text-xs text-appTextMuted">No active jobs — add one first.</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor={ltId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">Labor Type</label>
-            <select id={ltId_} value={laborTypeId} onChange={e => setLaborTypeId(e.target.value)} className={inputCls}>
-              <option value="">Select labor type...</option>
-              {laborTypes?.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
-            </select>
+          {/* Labor type — selectable chips (radiogroup), each carrying its glyph */}
+          <div>
+            <span className={overlineCls} id={`${uid}-lt`}>Labor type</span>
+            {laborTypes === undefined ? null : laborTypes.length === 0 ? (
+              <p className="text-xs text-appTextMuted">No labor types yet — add one in Jobs.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-labelledby={`${uid}-lt`}>
+                {laborTypes.map(lt => {
+                  const sel = lt.id === Number(laborTypeId)
+                  const color = lt.color || DEFAULT_LABOR_COLOR
+                  const Glyph = glyphComponent(lt.glyph)
+                  return (
+                    <button
+                      key={lt.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={sel}
+                      onClick={() => setLaborTypeId(String(lt.id))}
+                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-[10px] border text-[13.5px] font-semibold transition-colors
+                        ${sel ? 'border-transparent' : 'border-appBorder text-appTextMuted hover:text-appText hover:border-appBorderLight'}`}
+                      style={sel ? { backgroundColor: `${color}22`, borderColor: `${color}99`, color } : undefined}
+                    >
+                      <Glyph className="w-4 h-4 flex-shrink-0" style={{ color }} strokeWidth={2} aria-hidden="true" />
+                      {lt.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor={notesId_} className="text-[10px] font-semibold text-appTextMuted uppercase tracking-widest">
-              Notes <span className="text-appTextMuted normal-case font-normal">— optional</span>
+          {/* Notes */}
+          <div>
+            <label htmlFor={notesId_} className={overlineCls}>
+              Notes <span className="text-appTextMuted normal-case font-normal tracking-normal">· optional</span>
             </label>
             <input
               id={notesId_}
@@ -157,15 +270,17 @@ export default function StartTimerModal({ onClose }) {
         </div>
 
         {/* CTA */}
-        <div className="px-5 pb-5">
+        <div className="px-5 pb-5 pt-1">
           <button
             onClick={handleStart}
             disabled={submitting}
-            className="w-full py-3.5 rounded-xl bg-appAccent hover:brightness-110 active:brightness-90
-                       text-[#0F1117] font-display font-bold text-base transition-colors
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[13px] bg-appAccent
+                       text-appOnAccent font-display font-bold text-base shadow-[var(--shadow-accent)]
+                       hover:brightness-110 active:brightness-90 transition
                        disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Starting…' : 'Punch In'}
+            <Play className="w-4 h-4 flex-shrink-0" fill="currentColor" aria-hidden="true" />
+            {submitting ? 'Starting…' : 'PunchIn'}
           </button>
         </div>
 

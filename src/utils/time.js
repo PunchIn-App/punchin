@@ -71,7 +71,10 @@ function roundLocalTime(date, increment, dir) {
  * @param {Entry} entry @param {number} [roundingMinutes] @returns {Entry}
  */
 export function roundEntry(entry, roundingMinutes) {
-  if (!roundingMinutes || !entry.punchOut) return entry
+  // No rounding when it's off, the entry is still running, or it's under a minute
+  // ("0m"): flooring punch-in and ceiling punch-out would inflate a ~0-duration
+  // entry up to a full increment (e.g. 0m → 0.25 h), which is a bug, not a favour.
+  if (!roundingMinutes || !entry.punchOut || getEntryDuration(entry) < 60000) return entry
   return {
     ...entry,
     punchIn:  roundLocalTime(entry.punchIn,  roundingMinutes, 'floor'),
@@ -85,9 +88,19 @@ export function getEntryDuration(entry) {
   return end.getTime() - new Date(entry.punchIn).getTime()
 }
 
-/** @param {Date|string|number} date @returns {string} */
-export function formatTime(date) {
-  return format(new Date(date), 'h:mm a')
+// The device's 12h/24h preference, used when timeFormat is 'auto' (the default).
+function deviceHour12() {
+  try {
+    return new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12 ?? true
+  } catch {
+    return true
+  }
+}
+
+/** @param {Date|string|number} date @param {'auto'|'12h'|'24h'} [fmt] @returns {string} */
+export function formatTime(date, fmt = 'auto') {
+  const use24 = fmt === '24h' || (fmt !== '12h' && !deviceHour12())
+  return format(new Date(date), use24 ? 'HH:mm' : 'h:mm a')
 }
 
 /** @param {Date|string|number} date @returns {string} */

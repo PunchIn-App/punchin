@@ -1,10 +1,12 @@
-// Renders the PunchIn brand mark (a Clock on a rounded accent square) to a PNG
-// data URL and installs it as the browser-tab favicon, so the tab icon tracks
-// the user's chosen accent color.
+// Renders the PunchIn brand mark (a stopwatch on a rounded accent square) to a
+// PNG data URL and installs it as the browser-tab favicon, so the tab icon
+// tracks the user's chosen accent color. Mirrors the stopwatch geometry in
+// src/iconSvg.js; the glyph flips white/dark-ink via readableInk for contrast.
 //
 // Scope note: this only affects the in-browser favicon. The installed
 // PWA/home-screen icon is baked from the manifest at install time and cannot
 // follow the accent afterwards — that's a platform constraint, not a bug.
+import { readableInk } from './inkOnAccent'
 
 function roundRectPath(ctx, x, y, w, h, r) {
   ctx.beginPath()
@@ -24,26 +26,33 @@ export function drawFaviconDataUrl(hex, size = 64) {
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
 
-  // Accent rounded square (matches the in-app logo badge).
+  // Accent rounded square (matches the in-app logo badge). Keep this the last
+  // fillStyle set — the glyph is stroked, not filled — so the tile colour stands.
   ctx.fillStyle = hex
   roundRectPath(ctx, 0, 0, size, size, size * 0.22)
   ctx.fill()
 
-  // Clock glyph in the dark brand ink, mirroring the lucide Clock used in-app.
-  const c = size / 2
-  const r = size * 0.28
-  ctx.strokeStyle = '#0F1117'
-  ctx.lineWidth = size * 0.075
+  // Stopwatch glyph, mapped from the 24×24 mark geometry (src/iconSvg.js). The
+  // ink flips white/dark so it reads on any accent. The tiny centre pip is
+  // omitted at favicon scale (and to keep the tile fillStyle intact).
+  const g = (size * 0.58) / 24            // unit scale: 24-space → px
+  const o = (size - 24 * g) / 2           // centre the 24×24 glyph box
+  const X = (u) => o + u * g
+  const Y = (u) => o + u * g
+  ctx.strokeStyle = readableInk(hex)
+  ctx.lineWidth = 2 * g
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.beginPath()
-  ctx.arc(c, c, r, 0, Math.PI * 2)
+  ctx.moveTo(X(9.5), Y(2.6)); ctx.lineTo(X(14.5), Y(2.6)) // crown bar
+  ctx.moveTo(X(12), Y(2.6));  ctx.lineTo(X(12), Y(5))      // stem
   ctx.stroke()
   ctx.beginPath()
-  ctx.moveTo(c, c)
-  ctx.lineTo(c, c - r * 0.55)          // hand → 12
-  ctx.moveTo(c, c)
-  ctx.lineTo(c + r * 0.5, c + r * 0.22) // hand → ~4
+  ctx.arc(X(12), Y(13.4), 8.2 * g, 0, Math.PI * 2)         // body
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(X(12), Y(13.4)); ctx.lineTo(X(12), Y(8.6))    // minute hand
+  ctx.moveTo(X(12), Y(13.4)); ctx.lineTo(X(15), Y(15.3))   // second hand
   ctx.stroke()
 
   return canvas.toDataURL('image/png')

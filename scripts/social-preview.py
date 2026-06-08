@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Generate the GitHub social-preview cards (docs/social-preview*.svg + .png).
 
-The cards mirror the in-app brand: the lucide-style Clock mark on the accent
-square (#1f6feb), the "PunchIn" wordmark, and the product tagline. The wordmark
-and tagline are rendered in the app's own type family — Noto Sans Display
-(wordmark) and Noto Sans (tagline) — to match the UI.
+The cards mirror the in-app brand: the stopwatch mark on the accent square
+(PunchIn Blue #2D5BF5), the "PunchIn" wordmark (with the accent-tinted capital
+I), and the product tagline. The wordmark and tagline are rendered in the app's
+own type family — Noto Sans Display (wordmark) and Noto Sans (tagline).
 
 Why outlines instead of <text>?
   GitHub does not load the Google Fonts stylesheet for an inline SVG, so a
@@ -36,11 +36,44 @@ import sys
 import tempfile
 import urllib.request
 
-ACCENT = "#1f6feb"
+ACCENT = "#2D5BF5"             # PunchIn Blue (default accent)
 DARK = "#0F1117"
 MUTED = "#6B7280"
 WORDMARK_DARK_BG = "#FFFFFF"   # wordmark fill on dark backgrounds
 WORDMARK_LIGHT_BG = "#111827"  # wordmark fill on light backgrounds
+
+
+def readable_ink(hex_color):
+    """Foreground ink that stays legible on `hex_color`: white by default, dark
+    ink once white drops below WCAG 3:1 graphic contrast. Mirror of
+    src/utils/inkOnAccent.js readableInk — keep the two in sync."""
+    h = hex_color.lstrip("#")
+    def lin(c):
+        s = int(c, 16) / 255
+        return s / 12.92 if s <= 0.04045 else ((s + 0.055) / 1.055) ** 2.4
+    lum = 0.2126 * lin(h[0:2]) + 0.7152 * lin(h[2:4]) + 0.0722 * lin(h[4:6])
+    white_contrast = (1 + 0.05) / (lum + 0.05)
+    return "#FFFFFF" if white_contrast >= 3 else DARK
+
+
+def stopwatch_group(tile_x, tile_y, tile_side, ink):
+    """The stopwatch mark (24×24 geometry from src/iconSvg.js) scaled into the
+    accent tile and stroked in `ink`."""
+    glyph = tile_side * 0.58
+    gscale = glyph / 24
+    gx = tile_x + (tile_side - glyph) / 2
+    gy = tile_y + (tile_side - glyph) / 2
+    return (
+        f'<g transform="translate({gx:.2f} {gy:.2f}) scale({gscale:.4f})" '
+        f'fill="none" stroke="{ink}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M9.5 2.6h5"/>'
+        '<path d="M12 2.6v2.4"/>'
+        '<circle cx="12" cy="13.4" r="8.2"/>'
+        '<path d="M12 13.4V8.6"/>'
+        '<path d="M12 13.4l3 1.9"/>'
+        f'<circle cx="12" cy="13.4" r="0.9" fill="{ink}" stroke="none"/>'
+        "</g>"
+    )
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
@@ -70,9 +103,11 @@ def ensure_fonts():
     return paths
 
 
-def text_to_paths(font_path, text, font_size, weight, cx, baseline, letter_spacing=0.0):
+def text_to_paths(font_path, text, font_size, weight, cx, baseline, letter_spacing=0.0, tint=None):
     """Return an SVG <g> of outlined glyphs, centered horizontally on cx,
-    sitting on the given baseline (SVG y-down coordinates)."""
+    sitting on the given baseline (SVG y-down coordinates). `tint`, if given, is
+    a (set_of_char_indices, color) pair that fills those glyphs in `color`
+    (overriding the parent group fill) — used for the accent-tinted capital I."""
     from fontTools.ttLib import TTFont
     from fontTools.varLib.instancer import instantiateVariableFont
     from fontTools.pens.svgPathPen import SVGPathPen
@@ -86,15 +121,17 @@ def text_to_paths(font_path, text, font_size, weight, cx, baseline, letter_spaci
     hmtx = f["hmtx"]
     ls_fu = (letter_spacing / scale) if scale else 0  # letter-spacing px → font units
 
+    tint_idx, tint_color = tint or (set(), None)
     pen_x = 0.0
     glyph_paths = []
-    for ch in text:
+    for i, ch in enumerate(text):
         gname = cmap.get(ord(ch), ".notdef")
         pen = SVGPathPen(glyphset)
         glyphset[gname].draw(pen)
         d = pen.getCommands()
         if d:
-            glyph_paths.append(f'<path transform="translate({pen_x:.2f},0)" d="{d}"/>')
+            fill_attr = f' fill="{tint_color}"' if i in tint_idx else ""
+            glyph_paths.append(f'<path transform="translate({pen_x:.2f},0)" d="{d}"{fill_attr}/>')
         pen_x += hmtx[gname][0] + ls_fu
     total_fu = pen_x - ls_fu  # drop trailing letter-spacing
     origin_x = cx - (total_fu * scale) / 2
@@ -107,7 +144,8 @@ def text_to_paths(font_path, text, font_size, weight, cx, baseline, letter_spaci
 
 
 def build_svg(fonts, wordmark_fill, glow_opacity):
-    wordmark = text_to_paths(fonts["display"], "PunchIn", 96, 700, 640, 415, letter_spacing=-2)
+    # Tint the capital I (index 5 of "PunchIn") with the accent, like the wordmark.
+    wordmark = text_to_paths(fonts["display"], "PunchIn", 96, 700, 640, 415, letter_spacing=-2, tint=({5}, ACCENT))
     tagline = text_to_paths(
         fonts["sans"], "Precision time tracking for freelancers", 26, 400, 640, 460
     )
@@ -120,12 +158,10 @@ def build_svg(fonts, wordmark_fill, glow_opacity):
   </defs>
   <!-- Subtle blue glow behind icon -->
   <rect width="1280" height="640" fill="url(#glow)"/>
-  <!-- Icon: blue rounded square (logo icon scaled 48→140, factor ≈2.917) -->
+  <!-- Icon: accent rounded square (logo icon scaled to 140) -->
   <rect x="570" y="180" width="140" height="140" rx="28" fill="{ACCENT}"/>
-  <!-- Clock face -->
-  <circle cx="640" cy="250" r="41" fill="none" stroke="{DARK}" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Clock hands -->
-  <polyline points="640,225.5 640,250 656.3,258.2" fill="none" stroke="{DARK}" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Stopwatch mark (matches src/iconSvg.js), tinted for contrast -->
+  {stopwatch_group(570, 180, 140, readable_ink(ACCENT))}
   <!-- Wordmark (Noto Sans Display 700, outlined) -->
   <g fill="{wordmark_fill}">{wordmark}</g>
   <!-- Tagline (Noto Sans 400, outlined) -->

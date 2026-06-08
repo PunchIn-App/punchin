@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { SlidersHorizontal, Palette, Bell, MonitorDown, Database, Info } from 'lucide-react'
+import { SlidersHorizontal, Palette, Bell, MonitorDown, Database, Info, Receipt } from 'lucide-react'
 import { useSettings } from '../hooks/useSettings'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { usePwaUpdate } from '../hooks/usePwaUpdate'
@@ -10,6 +10,7 @@ import AppearancePanel from './settings/AppearancePanel'
 import RemindersPanel from './settings/RemindersPanel'
 import InstallPanel from './settings/InstallPanel'
 import DataSyncPanel from './settings/DataSyncPanel'
+import BillingPanel from './settings/BillingPanel'
 import AboutPanel from './settings/AboutPanel'
 
 // Thin router for the iOS-style drill-in Settings (issue #60): a root list of
@@ -26,6 +27,12 @@ export default function SettingsView() {
     (typeof window !== 'undefined' && window.__pwaUpdateAvailable) ? 'about' : null
   )
   const [notifPerm, setNotifPerm] = useState(() => notificationPermission())
+  // Desktop (lg+) shows a persistent category rail + detail pane (master-detail);
+  // narrower viewports keep the iOS-style drill-in. jsdom's matchMedia stub
+  // returns matches:false, so tests exercise the mobile path unchanged.
+  const [isWide, setIsWide] = useState(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.('(min-width: 1024px)')?.matches
+  )
   const pwaUpdate = usePwaUpdate()
   const { canInstall, isInstalled, isIOS } = useInstallPrompt()
 
@@ -33,6 +40,9 @@ export default function SettingsView() {
   // so the hardware/gesture Back closes the panel instead of switching tabs;
   // App.jsx's popstate handler ignores states without `piView`, so this composes.
   const openPanel = (id) => {
+    // On the desktop master-detail there's no Back affordance — selecting a
+    // category just swaps the detail pane, so don't push a history entry.
+    if (isWide) { setActivePanel(id); return }
     history.pushState({ settingsPanel: id }, '')
     setActivePanel(id)
   }
@@ -65,38 +75,68 @@ export default function SettingsView() {
     return () => window.removeEventListener('pi:reselect-tab', onReselect)
   }, [])
 
+  // Track the lg breakpoint so the layout switches between drill-in and
+  // master-detail live on resize (guarded for environments without matchMedia).
+  useEffect(() => {
+    const mq = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1024px)')
+    if (!mq) return
+    const onChange = () => setIsWide(mq.matches)
+    mq.addEventListener?.('change', onChange)
+    return () => mq.removeEventListener?.('change', onChange)
+  }, [])
+
   const remindersOn = !!settings.remindersEnabled && notifPerm === 'granted'
 
+  // Desktop detail pane defaults to General when nothing is drilled into; mobile
+  // shows the root list (effectivePanel null) until the user picks a category.
+  const effectivePanel = isWide ? (activePanel ?? 'general') : activePanel
+
   return (
-    <div className="h-full scrollable px-4 pt-4 pb-24 space-y-3 lg:max-w-2xl lg:mx-auto lg:w-full">
+    <div className="h-full scrollable px-4 pt-4 pb-24 lg:max-w-5xl lg:mx-auto lg:w-full">
+      <div className="lg:grid lg:grid-cols-[300px_1fr] lg:gap-6 lg:items-start">
 
-      {/* Root list — tap a category to drill into its sub-page (issue #60) */}
-      {activePanel === null && (
-        <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
-          <CategoryRow icon={SlidersHorizontal} title="General" subtitle="Timers, week start, haptics" onClick={() => openPanel('general')} />
-          <CategoryRow icon={Palette} title="Appearance" subtitle="Theme and accent color" onClick={() => openPanel('appearance')} />
-          <CategoryRow icon={Bell} title="Reminders" subtitle="Local notification nudges" badge={remindersOn} onClick={() => openPanel('reminders')} />
-          {(isInstalled || canInstall || isIOS) && (
-            <CategoryRow icon={MonitorDown} title="Install" subtitle="Add PunchIn to your device" onClick={() => openPanel('install')} />
+        {/* Category rail — the root list on mobile (tap to drill in, issue #60);
+            a persistent selectable rail on desktop. Conditionally rendered (not
+            CSS-hidden) so drilling in on mobile truly removes the root list.
+            Kept a plain div, not a nav landmark, so it adds no third navigation
+            region to the page. */}
+        {(activePanel === null || isWide) && (
+          <div className="lg:sticky lg:top-0">
+            <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
+              <CategoryRow icon={SlidersHorizontal} title="General" subtitle="Timers, week start, haptics" active={effectivePanel === 'general'} onClick={() => openPanel('general')} />
+              <CategoryRow icon={Palette} title="Appearance" subtitle="Theme and accent color" active={effectivePanel === 'appearance'} onClick={() => openPanel('appearance')} />
+              <CategoryRow icon={Bell} title="Reminders" subtitle="Local notification nudges" badge={remindersOn} active={effectivePanel === 'reminders'} onClick={() => openPanel('reminders')} />
+              {(isInstalled || canInstall || isIOS) && (
+                <CategoryRow icon={MonitorDown} title="Install" subtitle="Add PunchIn to your device" active={effectivePanel === 'install'} onClick={() => openPanel('install')} />
+              )}
+              <CategoryRow icon={Receipt} title="Billing" subtitle="Invoice identity, currency, numbering" active={effectivePanel === 'billing'} onClick={() => openPanel('billing')} />
+              <CategoryRow icon={Database} title="Data & Sync" subtitle="Backup, sync, transfer, reset" active={effectivePanel === 'data'} onClick={() => openPanel('data')} />
+              <CategoryRow icon={Info} title="About" subtitle={`v${__APP_VERSION__}`} badge={pwaUpdate.updateAvailable} active={effectivePanel === 'about'} onClick={() => openPanel('about')} />
+            </div>
+          </div>
+        )}
+
+        {/* Detail pane — the drilled-in sub-page on mobile; always visible on
+            desktop (defaults to General via effectivePanel). */}
+        {(activePanel !== null || isWide) && (
+        <div>
+          {effectivePanel === 'general'    && <GeneralPanel onBack={closePanel} />}
+          {effectivePanel === 'appearance' && <AppearancePanel onBack={closePanel} />}
+          {effectivePanel === 'reminders'  && <RemindersPanel onBack={closePanel} notifPerm={notifPerm} setNotifPerm={setNotifPerm} />}
+          {effectivePanel === 'install'    && <InstallPanel onBack={closePanel} />}
+          {effectivePanel === 'billing'    && <BillingPanel onBack={closePanel} />}
+          {effectivePanel === 'data'       && <DataSyncPanel onBack={closePanel} />}
+          {effectivePanel === 'about'      && (
+            <AboutPanel
+              onBack={closePanel}
+              updateAvailable={pwaUpdate.updateAvailable}
+              updateStatus={pwaUpdate.updateStatus}
+              checkForUpdates={pwaUpdate.checkForUpdates}
+            />
           )}
-          <CategoryRow icon={Database} title="Data & Sync" subtitle="Backup, sync, transfer, reset" onClick={() => openPanel('data')} />
-          <CategoryRow icon={Info} title="About" subtitle={`v${__APP_VERSION__}`} badge={pwaUpdate.updateAvailable} onClick={() => openPanel('about')} />
         </div>
-      )}
-
-      {activePanel === 'general'    && <GeneralPanel onBack={closePanel} />}
-      {activePanel === 'appearance' && <AppearancePanel onBack={closePanel} />}
-      {activePanel === 'reminders'  && <RemindersPanel onBack={closePanel} notifPerm={notifPerm} setNotifPerm={setNotifPerm} />}
-      {activePanel === 'install'    && <InstallPanel onBack={closePanel} />}
-      {activePanel === 'data'       && <DataSyncPanel onBack={closePanel} />}
-      {activePanel === 'about'      && (
-        <AboutPanel
-          onBack={closePanel}
-          updateAvailable={pwaUpdate.updateAvailable}
-          updateStatus={pwaUpdate.updateStatus}
-          checkForUpdates={pwaUpdate.checkForUpdates}
-        />
-      )}
+        )}
+      </div>
     </div>
   )
 }

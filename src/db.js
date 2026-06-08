@@ -30,6 +30,7 @@ export function genUuid() {
  *   uuid?: string,
  *   name: string,
  *   color: string,
+ *   glyph?: string,
  *   isArchived: boolean,
  *   updatedAt?: number,
  * }} LaborType
@@ -41,6 +42,7 @@ export function genUuid() {
  *   laborTypeId: number,
  *   isActive: boolean,
  *   laborRates?: Record<number, number>,
+ *   color?: string,
  *   updatedAt?: number,
  * }} Job
  *
@@ -138,6 +140,42 @@ export async function deleteEntry(id) {
   })
 }
 
+// Punch in a new timer. Single source of truth for the punch-in flow, shared by
+// StartTimerModal and the Timer rail's quick-punch so the "stop the running
+// timer(s) first unless concurrent timers are allowed" rule can never diverge.
+// Atomic: any punch-outs + the new entry are written in one transaction.
+export async function startTimer({ jobId, laborTypeId, notes = null, allowConcurrentTimers = false }) {
+  return db.transaction('rw', db.entries, async () => {
+    if (!allowConcurrentTimers) {
+      const now = new Date()
+      const running = await db.entries.filter(e => !e.punchOut).toArray()
+      for (const e of running) {
+        await db.entries.update(e.id, { punchOut: now })
+      }
+    }
+    await db.entries.add({
+      jobId:       Number(jobId),
+      laborTypeId: Number(laborTypeId),
+      punchIn:     new Date(),
+      punchOut:    null,
+      notes:       notes || null,
+    })
+  })
+}
+
+// Default the week start to the device locale's first day of week: Sunday-start
+// locales (e.g. en-US) → false, Monday-start locales (e.g. en-GB) → true. Falls
+// back to false (Sunday) where the locale's week info isn't available.
+function localeWeekStartsMonday() {
+  try {
+    const loc = new Intl.Locale((typeof navigator !== 'undefined' && navigator.language) || 'en-US')
+    const info = typeof loc.getWeekInfo === 'function' ? loc.getWeekInfo() : loc.weekInfo
+    return info?.firstDay === 1
+  } catch {
+    return false
+  }
+}
+
 // Single source of truth for default settings (issues #131/#134). Seeded on a
 // fresh install (populate) and restored by factoryReset, and merged under the
 // live rows by useSettings so every consumer reads a complete, typed object.
@@ -145,9 +183,9 @@ export async function deleteEntry(id) {
 // matches a factory reset (no undefined-vs-null branching in consumers).
 export const DEFAULT_SETTINGS = {
   allowConcurrentTimers: false,
-  weekStartsMonday: true,
+  weekStartsMonday: localeWeekStartsMonday(),
   theme: 'auto',
-  accentColor: '#1f6feb',
+  accentColor: '#2D5BF5',
   hapticFeedback: true,
   // Time display & billing (issue #208). decimalHours shows durations as decimal
   // hours ("1.50 h") instead of "1h 30m" in timesheets. roundingMinutes rounds
@@ -155,6 +193,26 @@ export const DEFAULT_SETTINGS = {
   // and invoices: 0 = off, 15 = nearest quarter hour, 30 = nearest half hour.
   decimalHours: false,
   roundingMinutes: 0,
+  // Time display + invoice formatting. timeFormat drives clock-time rendering
+  // (in-app default is 12h); defaultCurrency is an ISO 4217 code formatted via
+  // Intl.NumberFormat in invoices/CSV.
+  timeFormat: 'auto',      // 'auto' (match device) | '12h' | '24h'
+  defaultCurrency: 'USD',  // ISO 4217
+  // Billing profile — the invoice "Billed from" identity. Flat keys (the
+  // useSettings merge is shallow, so a nested object wouldn't auto-default new
+  // sub-fields for existing installs). All optional; the invoice band hides
+  // blank lines. Invoice numbering is display-only (set/bump the counter here).
+  billingName: '',
+  billingBusiness: '',
+  billingEmail: '',
+  billingPhone: '',
+  billingAddress: '',
+  billingPaymentTerms: '',
+  billingNotes: '',
+  billingLogo: '',         // optional business logo (downscaled PNG data URL) for the invoice band
+  numberInvoices: false,
+  invoicePrefix: '',
+  nextInvoiceNumber: 1,
   // Reminder notifications (issue #54) — all off by default; the master toggle
   // requests notification permission when first enabled.
   remindersEnabled: false,
@@ -187,6 +245,38 @@ export const DEFAULT_SETTINGS = {
 /** DEFAULT_SETTINGS as Dexie KV rows for bulkPut (populate + factoryReset). */
 export const defaultSettingsRows = () =>
   Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({ key, value }))
+
+// Settings that are device-local or account-bound — they must NOT travel in a
+// backup, transfer link, or cloud snapshot (a new device sets up its own sync,
+// and the token lives encrypted in `secrets`, never here). Everything else is a
+// portable user *preference* (theme, accent, billing profile, currency, time
+// format, reminders, …) that should follow your data so a fresh install / the
+// installed PWA isn't stranded at defaults when the browser's data can't carry.
+export const NON_PORTABLE_SETTING_KEYS = [
+  'syncProvider', 'syncToken', 'syncTokenExpiry', 'syncFileId',
+  'lastSyncedAt', 'syncError', 'syncUsername',
+]
+
+/** The portable preferences as a plain { key: value } object. */
+export async function getPortableSettings() {
+  const rows = await db.settings.toArray()
+  const out = {}
+  for (const { key, value } of rows) {
+    if (!NON_PORTABLE_SETTING_KEYS.includes(key)) out[key] = value
+  }
+  return out
+}
+
+/** Apply a portable-settings object onto the local settings table, defensively
+ *  dropping any sync/account keys so an import can never plant another device's
+ *  credentials. No-op for a missing/empty object. */
+export async function applyPortableSettings(settingsObj) {
+  if (!settingsObj || typeof settingsObj !== 'object') return
+  const rows = Object.entries(settingsObj)
+    .filter(([k]) => !NON_PORTABLE_SETTING_KEYS.includes(k))
+    .map(([key, value]) => ({ key, value }))
+  if (rows.length) await db.settings.bulkPut(rows)
+}
 
 // Seed default settings on first run — no jobs or labor types pre-loaded
 db.on('populate', async () => {
