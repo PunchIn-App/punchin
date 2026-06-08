@@ -12,7 +12,7 @@
 
 > **Status: Draft — pending legal review. Not yet in effect.** Drafted 8 June 2026
 > from the current data practices of the PunchIn app and its supporting services.
-<!--> See the [notes for the reviewer](#notes-for-the-reviewer) at the end.-->
+<!-- > See the [notes for the reviewer](#notes-for-the-reviewer) at the end.-->
 
 <!--**Effective date:** 8 June 2026 _(takes effect on publication)_-->
 
