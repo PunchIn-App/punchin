@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { db, deleteEntry } from '../db'
 import { exportSnapshot, importSnapshot, runSync, disconnectSync } from './syncManager'
-import { getSyncToken } from './tokenStore'
+import { getSyncToken, getRefreshToken, setRefreshToken } from './tokenStore'
 import * as github from './providers/github'
 import * as google from './providers/google'
 import * as onedrive from './providers/onedrive'
@@ -234,6 +234,19 @@ describe('disconnectSync', () => {
     const [url, opts] = fetchMock.mock.calls[0]
     expect(url).toBe('/oauth/revoke')
     expect(JSON.parse(opts.body)).toEqual({ provider: 'google', token: 'goog-token' })
+  })
+
+  it('revokes the Google REFRESH token (cascades to the whole grant) when one is stored (#243)', async () => {
+    await seedSyncSettings({ syncProvider: 'google', syncToken: 'goog-access', syncFileId: null })
+    await setRefreshToken('goog-refresh') // a #243 connection has a stored refresh token
+    await disconnectSync()
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/oauth/revoke')
+    // Revoking the refresh token cascades to its access tokens; revoking only the
+    // access token would leave the long-lived refresh token alive.
+    expect(JSON.parse(opts.body)).toEqual({ provider: 'google', token: 'goog-refresh' })
+    expect(await getSyncToken()).toBeNull()
+    expect(await getRefreshToken()).toBeNull() // both tokens wiped on disconnect
   })
 
   it('does not call the worker revoke for OneDrive (no client-side revoke exists)', async () => {

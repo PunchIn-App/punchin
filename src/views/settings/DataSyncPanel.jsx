@@ -7,7 +7,6 @@ import { buildGitHubOAuthUrl } from '../../sync/providers/github'
 import { buildGoogleOAuthUrl } from '../../sync/providers/google'
 import { buildOneDriveOAuthUrl } from '../../sync/providers/onedrive'
 import { createOAuthState } from '../../sync/oauthState'
-import { createPkceChallenge } from '../../sync/pkce'
 import { SYNC_CONFIG } from '../../sync/config'
 import { exportBackup, exportCsv } from '../../utils/backup'
 import ConfirmModal from '../../components/ConfirmModal'
@@ -36,9 +35,11 @@ export default function DataSyncPanel({ onBack }) {
   const [syncing, setSyncing] = useState(false)
 
   // Sync fields come from the same useSettings() object as everything else (#147).
-  const tokenExpired =
-    (settings.syncTokenExpiry && Date.now() > settings.syncTokenExpiry) ||
-    settings.syncError === 'TOKEN_EXPIRED'
+  // "Reconnect" reflects ONLY a real failure to refresh (issue #243): a lapsed
+  // access-token expiry is now recovered silently in the background, so it must
+  // not show as expired or disable Sync Now — only syncError === 'TOKEN_EXPIRED'
+  // (a dead/absent refresh token) means the user truly needs to reconnect.
+  const tokenExpired = settings.syncError === 'TOKEN_EXPIRED'
 
   const triggerImport = () => {
     fileInputRef.current?.click()
@@ -241,7 +242,7 @@ export default function DataSyncPanel({ onBack }) {
               )}
               {SYNC_CONFIG.google.clientId && (
                 <button
-                  onClick={() => { window.location.href = buildGoogleOAuthUrl(SYNC_CONFIG.google.clientId, createOAuthState()) }}
+                  onClick={() => { window.location.href = buildGoogleOAuthUrl(SYNC_CONFIG.google.clientId, SYNC_CONFIG.google.callbackBase, createOAuthState()) }}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
                 >
                   <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />
@@ -253,7 +254,7 @@ export default function DataSyncPanel({ onBack }) {
               )}
               {SYNC_CONFIG.onedrive.clientId && (
                 <button
-                  onClick={async () => { window.location.href = buildOneDriveOAuthUrl(SYNC_CONFIG.onedrive.clientId, createOAuthState(), await createPkceChallenge()) }}
+                  onClick={() => { window.location.href = buildOneDriveOAuthUrl(SYNC_CONFIG.onedrive.clientId, SYNC_CONFIG.onedrive.callbackBase, createOAuthState()) }}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
                 >
                   <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />

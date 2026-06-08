@@ -12,12 +12,14 @@ describe('SYNC_CONFIG — shape', () => {
     expect(typeof SYNC_CONFIG.github.callbackBase).toBe('string')
   })
 
-  it('google has clientId (string)', () => {
+  it('google has clientId (string) and callbackBase (string)', () => {
     expect(typeof SYNC_CONFIG.google.clientId).toBe('string')
+    expect(typeof SYNC_CONFIG.google.callbackBase).toBe('string')
   })
 
-  it('onedrive has clientId (string)', () => {
+  it('onedrive has clientId (string) and callbackBase (string)', () => {
     expect(typeof SYNC_CONFIG.onedrive.clientId).toBe('string')
+    expect(typeof SYNC_CONFIG.onedrive.callbackBase).toBe('string')
   })
 
   it('clientIds default to empty string when env vars are absent', () => {

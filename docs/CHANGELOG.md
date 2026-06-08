@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.28.0] — 2026-06-08
+
+### Changed
+- **Google Drive & OneDrive sync now stay signed in.** Previously these connections lasted only about an hour before asking you to reconnect. PunchIn now renews the sign-in silently in the background — through the same Cloudflare Worker that already handled GitHub — so auto-sync keeps working seamlessly on every provider, indefinitely (Google) or for ~90 days at a stretch (OneDrive), with no interruption. You're only prompted to reconnect if you revoke access yourself or stay away long enough for the provider to expire the session.
+  - **One-time reconnect:** if you're already connected to Google Drive or OneDrive, your current sign-in has no renewal token yet — it'll expire once as before and show the usual "Reconnect" prompt; reconnecting then enables seamless background renewal from there on.
+
+### Security
+- The OAuth **refresh token** for Google/OneDrive is stored encrypted at rest with the same non-extractable WebCrypto key as the access token (issue #243). OneDrive's sign-in now completes via the Worker (a confidential client) rather than entirely in the browser, so — like Google and GitHub — its token briefly transits the URL fragment on return and is scrubbed immediately. Holding a long-lived refresh token widens the value of an active same-origin XSS beyond a single ~1-hour token; the Worker's Content-Security-Policy remains the primary control. See `SECURITY.md`.
+
+---
+
 ## [0.27.0] — 2026-06-08
 
 ### Added

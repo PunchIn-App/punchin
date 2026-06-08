@@ -2,10 +2,15 @@
   "name": "punchin",
   "compatibility_date": "2026-06-01",
   "main": "./worker/oauth.js",
-  // Preserve dashboard-set runtime vars/secrets (e.g. GITHUB_CLIENT_ID,
-  // GITHUB_CLIENT_SECRET, APP_URL for sync) across deploys. Without this,
-  // each deploy deletes plaintext vars not declared here. Secrets always
-  // persist regardless; this protects the non-secret sync vars too.
+  // Preserve dashboard-set runtime vars/secrets across deploys. Without this,
+  // each deploy deletes plaintext vars not declared here. Secrets always persist
+  // regardless; this protects the non-secret sync vars too. Sync needs, per
+  // provider, a public client-ID *var* and a *secret* the browser never sees:
+  //   GitHub   — GITHUB_CLIENT_ID (var) + GITHUB_CLIENT_SECRET (secret)
+  //   Google   — GOOGLE_CLIENT_ID (var) + GOOGLE_CLIENT_SECRET (secret)   [issue #243]
+  //   OneDrive — ONEDRIVE_CLIENT_ID (var) + ONEDRIVE_CLIENT_SECRET (secret) [issue #243]
+  // plus APP_URL (var) — the deployed origin, which must equal the build's
+  // VITE_APP_URL and the providers' registered redirect URIs (byte-identical).
   "keep_vars": true,
   "assets": {
     "directory": "./dist",

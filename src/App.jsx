@@ -24,11 +24,8 @@ import { hexToRgb } from './utils/color'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
-import { exchangeOneDriveCode } from './sync/providers/onedrive'
 import { consumeOAuthState } from './sync/oauthState'
-import { consumePkceVerifier } from './sync/pkce'
-import { setSyncToken } from './sync/tokenStore'
-import { SYNC_CONFIG } from './sync/config'
+import { setSyncToken, setRefreshToken } from './sync/tokenStore'
 import { db } from './db'
 
 // localStorage keys for the first-run install nudge. Kept out of the Dexie
@@ -309,40 +306,9 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
 
-    // OneDrive Auth Code + PKCE (issue #128) returns a single-use `code` in the
-    // query string — exchanged for the token via a direct POST, so the token is
-    // never in the URL. (GitHub/Google still use the hash, handled below.)
-    const search = new URLSearchParams(window.location.search)
-    if (search.get('code') && search.get('state')?.startsWith('onedrive:')) {
-      const code = search.get('code')
-      const [, nonce] = (search.get('state') || '').split(':')
-      // Scrub the single-use code from the launch entry, then push a Settings
-      // entry so hardware Back returns home rather than exiting the app — a bare
-      // replaceState would leave hasPushedRef stale (issues #139, #141).
-      history.replaceState(history.state ?? { piView: DEFAULT_VIEW }, '', window.location.pathname)
-      history.pushState({ piView: 'settings' }, '', window.location.pathname)
-      hasPushedRef.current = true
-      setActiveView('settings')
-      if (consumeOAuthState(nonce)) {
-        const verifier = consumePkceVerifier()
-        exchangeOneDriveCode(SYNC_CONFIG.onedrive.clientId, code, verifier)
-          .then(data => {
-            if (cancelled || !data?.access_token) throw new Error('no token')
-            return setSyncToken(data.access_token).then(() => db.settings.bulkPut([
-              { key: 'syncProvider', value: 'onedrive' },
-              { key: 'syncTokenExpiry', value: Date.now() + (data.expires_in ?? 3600) * 1000 },
-              { key: 'syncFileId', value: null },
-              { key: 'syncError', value: null },
-              { key: 'autoSync', value: true }, // default background sync ON at connect
-            ]))
-          })
-          .catch(() => { if (!cancelled) db.settings.put({ key: 'syncError', value: describeSyncError('auth_failed') }) })
-      } else {
-        db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
-      }
-      return () => { cancelled = true }
-    }
-
+    // All OAuth callbacks now arrive in the URL hash: the worker exchanges every
+    // provider's code server-side and redirects with #sync_token=…&sync_provider=…
+    // (plus #sync_refresh/#sync_expires for Google/OneDrive — issue #243).
     const hash = window.location.hash
     if (!hash || hash === '#') return () => { cancelled = true }
     const params = new URLSearchParams(hash.slice(1))
@@ -359,54 +325,45 @@ export default function App() {
       history.replaceState({ piView: DEFAULT_VIEW }, '', window.location.pathname + window.location.search)
       db.settings.put({ key: 'syncError', value: describeSyncError(params.get('sync_error')) })
 
-    // GitHub: hold the token in memory and show a confirmation dialog before
-    // saving — GitHub may silently use the already-signed-in account without
-    // showing an account chooser, so we ask the user to confirm it's right.
-    } else if (params.has('sync_token') && params.get('sync_provider') === 'github') {
+    // OAuth success: the worker hands back the access token (+ refresh token and
+    // expiry for Google/OneDrive) in the hash, with the provider named explicitly
+    // and the CSRF nonce echoed in `state` (issue #243).
+    } else if (params.has('sync_token') && params.has('state')) {
       const token = params.get('sync_token')
+      const provider = params.get('sync_provider')
       const cleanUrl = window.location.pathname + window.location.search
-      // Scrub the token from the launch entry, then push a Settings entry so
-      // hardware Back returns home rather than exiting the app (issues #139, #141).
+      // Scrub the token out of the URL FIRST — before the state check or any
+      // await — so a mismatched nonce or a rejected write can't leave it sitting
+      // in the hash (issue #139). Then push a Settings entry so hardware Back
+      // returns home rather than exiting the app (issues #139, #141).
       history.replaceState(history.state ?? { piView: DEFAULT_VIEW }, '', cleanUrl)
       history.pushState({ piView: 'settings' }, '', cleanUrl)
       hasPushedRef.current = true
       setActiveView('settings')
       // Verify the CSRF nonce the worker echoed back before trusting the token (issue #125).
-      if (consumeOAuthState(params.get('state'))) {
+      if (!consumeOAuthState(params.get('state'))) {
+        db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
+      } else if (provider === 'github') {
+        // GitHub may silently reuse the already-signed-in account, so hold the
+        // token in memory and confirm the account before saving (#83). GitHub
+        // gist tokens don't expire, so there's no refresh token / expiry.
         fetchGitHubUser(token)
           .then(user => { if (!cancelled) setPendingGitHubAuth({ token, username: user?.login ?? null }) })
-      } else {
-        db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
-      }
-
-    // Google: token comes via the implicit flow; `state` is `google:<nonce>`.
-    // (OneDrive uses the Auth Code + PKCE query callback handled above, #128.)
-    } else if (params.has('access_token') && params.has('state')) {
-      const cleanUrl = window.location.pathname + window.location.search
-      // Always scrub the token out of the URL first — before the provider check
-      // or any await — so an unrecognised state value or a rejected DB write
-      // can't leave the access_token sitting in the hash (issue #139).
-      history.replaceState(history.state ?? { piView: DEFAULT_VIEW }, '', cleanUrl)
-      const [provider, nonce] = (params.get('state') || '').split(':')
-      if (provider === 'google') {
-        const token = params.get('access_token')
-        const expiresIn = parseInt(params.get('expires_in') || '3600', 10) * 1000
-        // Push a Settings entry so hardware Back returns home, not exits (#141).
-        history.pushState({ piView: 'settings' }, '', cleanUrl)
-        hasPushedRef.current = true
-        setActiveView('settings')
-        // Reject the callback unless the returned nonce matches the one we stored (issue #125).
-        if (consumeOAuthState(nonce)) {
-          setSyncToken(token).then(() => db.settings.bulkPut([ // encrypted at rest (issue #126)
+      } else if (provider === 'google' || provider === 'onedrive') {
+        // Google/OneDrive: the worker already did the confidential-client
+        // code→token exchange and returned a refresh token, so save it (encrypted
+        // at rest, issue #126) for silent background renewal and start auto-sync.
+        const refresh = params.get('sync_refresh')
+        const expiresIn = parseInt(params.get('sync_expires') || '3600', 10) * 1000
+        setSyncToken(token)
+          .then(() => (refresh ? setRefreshToken(refresh) : null))
+          .then(() => db.settings.bulkPut([
             { key: 'syncProvider', value: provider },
             { key: 'syncTokenExpiry', value: Date.now() + expiresIn },
             { key: 'syncFileId', value: null },
             { key: 'syncError', value: null },
             { key: 'autoSync', value: true }, // default background sync ON at connect
           ]))
-        } else {
-          db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
-        }
       }
     }
 

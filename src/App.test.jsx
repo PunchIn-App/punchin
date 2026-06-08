@@ -31,28 +31,14 @@ vi.mock('./sync/providers/github', () => ({
   fetchGitHubUser: (...a) => mockFetchGitHubUser(...a),
 }))
 
-// Token is encrypted at rest via tokenStore (issue #126); mock it so the OAuth
-// tests can assert the token is handed off without real WebCrypto/Dexie.
+// Access + refresh tokens are encrypted at rest via tokenStore (issues #126,
+// #243); mock it so the OAuth tests can assert the hand-off without real
+// WebCrypto/Dexie.
 const mockSetSyncToken = vi.fn().mockResolvedValue(undefined)
+const mockSetRefreshToken = vi.fn().mockResolvedValue(undefined)
 vi.mock('./sync/tokenStore', () => ({
   setSyncToken: (...a) => mockSetSyncToken(...a),
-}))
-
-// OneDrive Auth Code + PKCE (issue #128): mock the token exchange + verifier.
-const mockExchangeOneDriveCode = vi.fn()
-vi.mock('./sync/providers/onedrive', () => ({
-  exchangeOneDriveCode: (...a) => mockExchangeOneDriveCode(...a),
-}))
-const mockConsumePkceVerifier = vi.fn(() => 'verifier')
-vi.mock('./sync/pkce', () => ({
-  consumePkceVerifier: () => mockConsumePkceVerifier(),
-}))
-vi.mock('./sync/config', () => ({
-  SYNC_CONFIG: {
-    github: { clientId: 'gh', callbackBase: 'https://app' },
-    google: { clientId: 'g' },
-    onedrive: { clientId: 'od' },
-  },
+  setRefreshToken: (...a) => mockSetRefreshToken(...a),
 }))
 
 vi.mock('./db', () => ({
@@ -327,27 +313,27 @@ describe('App — OAuth callback handling', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('stores Google token when hash has access_token + state=google', async () => {
-    window.location.hash = `#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google:${NONCE}`
+  it('stores the Google access + refresh token from the worker callback (issue #243)', async () => {
+    window.location.hash = `#sync_token=googletoken&sync_provider=google&sync_refresh=grefresh&sync_expires=3600&state=${NONCE}`
     render(<App />)
     await waitFor(() => expect(mockSetSyncToken).toHaveBeenCalledWith('googletoken'))
+    expect(mockSetRefreshToken).toHaveBeenCalledWith('grefresh')
     expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
       expect.arrayContaining([{ key: 'syncProvider', value: 'google' }])
     )
   })
 
-  it('navigates to Settings after Google OAuth callback', async () => {
-    window.location.hash = `#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google:${NONCE}`
+  it('navigates to Settings after a Google/OneDrive OAuth callback', async () => {
+    window.location.hash = `#sync_token=googletoken&sync_provider=google&sync_refresh=gr&sync_expires=3600&state=${NONCE}`
     render(<App />)
     await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
   })
 
-  it('exchanges the OneDrive auth code (PKCE) and stores the token (issue #128)', async () => {
-    mockExchangeOneDriveCode.mockResolvedValueOnce({ access_token: 'odtoken', expires_in: 3600 })
-    window.history.replaceState(null, '', `/?code=AUTHCODE&state=onedrive:${NONCE}`)
+  it('stores the OneDrive access + refresh token from the worker callback (issue #243)', async () => {
+    window.location.hash = `#sync_token=odtoken&sync_provider=onedrive&sync_refresh=odrefresh&sync_expires=3600&state=${NONCE}`
     render(<App />)
-    await waitFor(() => expect(mockExchangeOneDriveCode).toHaveBeenCalledWith('od', 'AUTHCODE', 'verifier'))
     await waitFor(() => expect(mockSetSyncToken).toHaveBeenCalledWith('odtoken'))
+    expect(mockSetRefreshToken).toHaveBeenCalledWith('odrefresh')
     expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
       expect.arrayContaining([{ key: 'syncProvider', value: 'onedrive' }])
     )
@@ -363,12 +349,14 @@ describe('App — OAuth callback handling', () => {
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
   })
 
-  it('rejects a Google callback when the CSRF nonce does not match (no token saved)', async () => {
-    window.location.hash = `#access_token=googletoken&expires_in=3600&state=google:WRONG-${NONCE}`
+  it('rejects a Google/OneDrive callback when the CSRF nonce does not match (no token saved)', async () => {
+    window.location.hash = `#sync_token=googletoken&sync_provider=google&sync_refresh=gr&sync_expires=3600&state=WRONG-${NONCE}`
     render(<App />)
     await waitFor(() => expect(mockDbSettingsPut).toHaveBeenCalledWith(
       { key: 'syncError', value: 'Sign-in failed: the security check did not match. Please try connecting again.' }
     ))
+    expect(mockSetSyncToken).not.toHaveBeenCalled()
+    expect(mockSetRefreshToken).not.toHaveBeenCalled()
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
   })
 
@@ -388,9 +376,12 @@ describe('App — OAuth callback handling', () => {
     ))
   })
 
-  it('ignores hash with unknown state for implicit flow', () => {
-    window.location.hash = '#access_token=tok&state=unknown_provider'
+  it('saves nothing for a sync_token callback with an unrecognised provider', () => {
+    // Valid nonce is consumed, but a provider the app doesn't know matches no
+    // branch → nothing is stored.
+    window.location.hash = `#sync_token=tok&sync_provider=mystery&state=${NONCE}`
     render(<App />)
+    expect(mockSetSyncToken).not.toHaveBeenCalled()
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
   })
 
@@ -401,17 +392,18 @@ describe('App — OAuth callback handling', () => {
     expect(mockDbSettingsPut).not.toHaveBeenCalled()
   })
 
-  it('scrubs the access_token from the URL even when the state is unrecognised (#139)', () => {
-    // Old code returned without replaceState for a non-google/onedrive state,
-    // leaving the token in the hash. It must be scrubbed unconditionally.
-    window.location.hash = '#access_token=leakme&state=unknown_provider'
+  it('scrubs the sync_token from the URL before the CSRF check, even on a mismatch (#139)', () => {
+    // The token must be scrubbed unconditionally — before consumeOAuthState — so a
+    // mismatched nonce can't leave it sitting in the hash.
+    window.location.hash = `#sync_token=leakme&sync_provider=google&state=WRONG-${NONCE}`
     render(<App />)
     expect(window.location.hash).toBe('')
+    expect(mockSetSyncToken).not.toHaveBeenCalled()
     expect(mockDbSettingsBulkPut).not.toHaveBeenCalled()
   })
 
   it('pushes a Settings history entry after OAuth so Back returns home, not exit (#141)', async () => {
-    window.location.hash = `#access_token=googletoken&token_type=Bearer&expires_in=3600&state=google:${NONCE}`
+    window.location.hash = `#sync_token=googletoken&sync_provider=google&sync_refresh=gr&sync_expires=3600&state=${NONCE}`
     const lenBefore = history.length
     render(<App />)
     await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())

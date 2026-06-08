@@ -6,7 +6,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-2d5bf5?style=flat" alt="License" /></a>
   <a href="../../actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/PunchIn-App/punchin/ci.yml?branch=main&style=flat&label=CI&color=2d5bf5" alt="CI" /></a>
-  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.26.0-2d5bf5?style=flat" alt="Version 0.26.0" /></a>
+  <a href="docs/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.28.0-2d5bf5?style=flat" alt="Version 0.28.0" /></a>
 </p>
 
 <p align="center">
