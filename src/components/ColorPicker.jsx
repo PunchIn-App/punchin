@@ -17,6 +17,10 @@ function checkColor(hex) {
 
 const VALID_HEX = /^#[0-9A-Fa-f]{6}$/
 
+// The custom-colour trigger's rainbow "wheel" — a conic spectrum that signals
+// "pick any colour" (matches the design-system labor-type picker mockup).
+const RAINBOW = 'conic-gradient(from 90deg,#ef4444,#f59e0b,#10b981,#3b82f6,#8b5cf6,#ef4444)'
+
 // presets: { hex: string, name?: string }[]
 // size:    'md' (w-8 h-8) | 'lg' (w-9 h-9)
 export default function ColorPicker({ presets, value, onChange, size = 'md', label = 'Choose color' }) {
@@ -74,30 +78,38 @@ export default function ColorPicker({ presets, value, onChange, size = 'md', lab
               onClick={() => { pick(hex); setOpen(false) }}
               aria-label={name ? `${name}${active ? ' (selected)' : ''}` : `Color ${hex}${active ? ' (selected)' : ''}`}
               aria-pressed={active}
-              className={`${swatchCls} rounded-full transition-all hover:scale-110 ${active ? 'scale-110' : ''} relative flex items-center justify-center flex-shrink-0`}
-              style={{ backgroundColor: hex }}
+              className={`${swatchCls} rounded-[10px] transition-all hover:scale-110 ${active ? 'scale-110' : ''} relative flex items-center justify-center flex-shrink-0`}
+              style={{ backgroundColor: hex, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)' }}
             >
               {active && <Check className={iconCls} style={{ color: checkColor(hex) }} aria-hidden="true" />}
             </button>
           )
         })}
 
-        {/* Custom color trigger */}
+        {/* Custom color trigger — a rainbow conic "wheel" squircle. Its centre
+            shows the chosen custom colour (with a check) when one is active, else
+            a neutral squircle with a + to add one. */}
         <button
           onClick={() => setOpen(p => !p)}
           aria-label={isCustom ? 'Custom color (selected)' : 'Custom color'}
           aria-pressed={isCustom}
           aria-expanded={open}
-          className={`${swatchCls} rounded-full transition-all hover:scale-110 ${isCustom ? 'scale-110' : ''} relative flex items-center justify-center flex-shrink-0`}
-          style={isCustom
-            ? { backgroundColor: value }
-            : { border: '1.5px dashed currentColor', opacity: 0.5 }
-          }
+          className={`${swatchCls} rounded-[10px] transition-all hover:scale-110 ${isCustom ? 'scale-110' : ''} relative grid place-items-center flex-shrink-0`}
+          style={{ background: RAINBOW }}
         >
-          {isCustom
-            ? <Check className={iconCls} style={{ color: checkColor(value) }} aria-hidden="true" />
-            : <Plus className={iconCls} aria-hidden="true" />
-          }
+          <span
+            className="grid place-items-center rounded-[6px]"
+            style={{
+              width: '60%',
+              height: '60%',
+              backgroundColor: isCustom ? value : 'var(--bg-secondary)',
+            }}
+          >
+            {isCustom
+              ? <Check className={iconCls} style={{ color: checkColor(value) }} aria-hidden="true" />
+              : <Plus className={iconCls} style={{ color: 'var(--text-primary)' }} aria-hidden="true" />
+            }
+          </span>
         </button>
       </div>
 
