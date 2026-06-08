@@ -32,10 +32,10 @@ export default function InstallPromptModal({ mode = 'native', onInstall, onClose
   const stableClose = useCallback(onClose, [onClose])
   const noop = useCallback(() => {}, [])
 
-  const swipeRef = useSwipeDismiss(
-    isStandalone && os === 'ios'     ? stableClose : noop,
-    isStandalone && os === 'ios'     ? hapticTrigger : noop,
-  )
+  // Swipe-down dismiss on any touch platform (not just installed iOS), so the
+  // drag handle responds the same everywhere. hapticTrigger self-noops off-iOS
+  // and desktop fires no touch events.
+  const swipeRef = useSwipeDismiss(stableClose, hapticTrigger)
   useAndroidBackDismiss(
     isStandalone && os === 'android' ? stableClose : noop,
     isStandalone && os === 'android' ? hapticTrigger : noop,

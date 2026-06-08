@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.25.0] — 2026-06-08
+
+### Fixed
+- **Sheets now close when you tap outside them or swipe the handle down.** The Start Timer and Edit Entry sheets ignored a tap on the dimmed backdrop, and the drag handle only dismissed on the installed iOS app — now a backdrop tap closes any sheet, and a swipe-down dismisses on every touch platform (Android and mobile web included), alongside the existing close button and Escape.
+
+---
+
 ## [0.24.0] — 2026-06-08
 
 ### Added

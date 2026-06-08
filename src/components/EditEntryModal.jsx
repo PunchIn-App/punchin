@@ -173,7 +173,10 @@ export default function EditEntryModal({ entry, onClose }) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+      <div
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4"
+        onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      >
         <div
           ref={dialogRef}
           role="dialog"

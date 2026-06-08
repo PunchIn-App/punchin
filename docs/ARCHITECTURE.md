@@ -95,7 +95,7 @@ punchin/
 │   │   ├── usePlatformContext.js   # Standalone mode + OS detection (ios/android/web) + isIOSSafari (true only in iOS Safari, where Add to Home Screen works) + isIPad (treats a touch-capable "Macintosh" UA — iPadOS Safari's default desktop mode — as iOS, and distinguishes iPad from iPhone)
 │   │   ├── useInstallPrompt.js     # PWA install state: canInstall/isInstalled/isIOS/isIOSSafari + promptInstall(); shared by SettingsView and the install nudge
 │   │   ├── useFocusTrap.js         # Shared modal a11y (issue #151): initial focus ([data-autofocus]/first/opts), container-scoped Tab trap (#154), focus restoration on close (#152), Escape→onClose. Consumed by every modal
-│   │   ├── useBottomSheet.jsx      # Shared bottom-sheet plumbing (issue #151): useSwipeDismiss / useAndroidBackDismiss / useSheetStyles for StartTimerModal + InstallPromptModal
+│   │   ├── useBottomSheet.jsx      # Shared bottom-sheet plumbing (issue #151): useSwipeDismiss (swipe-down dismiss on any touch platform) / useAndroidBackDismiss / useSheetStyles for StartTimerModal + InstallPromptModal. Sheet modals also dismiss on a guarded backdrop tap (scrim onClick, e.target===e.currentTarget)
 │   │   ├── useHapticFeedback.jsx  # Platform-routed haptic trigger (vibrate / WebKit switch polyfill)
 │   │   └── useReminders.js        # Reminder scheduler (issue #54): watches settings + live timers, evaluates evaluateReminders on a 30s interval (and on tab focus), fires local notifications while reminders are enabled and permission granted. No backend / Web Push
 │   └── utils/
