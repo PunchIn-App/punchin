@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Info, ExternalLink, ScrollText, ChevronDown, Bug, Lightbulb, Scale, RefreshCw, Heart } from 'lucide-react'
 import { usePlatformContext } from '../../hooks/usePlatformContext'
-import { buildBugReportUrl, buildFeatureRequestUrl } from '../../utils/issueUrl'
+import { useSettings } from '../../hooks/useSettings'
+import { buildBugReportUrl, buildFeatureRequestUrl, buildFeedbackBugUrl, buildFeedbackFeatureUrl } from '../../utils/issueUrl'
 import ChangelogModal from '../../components/ChangelogModal'
 import LicenseModal from '../../components/LicenseModal'
 import { Panel } from './components'
@@ -10,6 +11,7 @@ import { Panel } from './components'
 // with the root-list "update available" badge) and passed in (issue #149).
 export default function AboutPanel({ onBack, updateAvailable, updateStatus, checkForUpdates }) {
   const { isStandalone, os } = usePlatformContext()
+  const { settings } = useSettings()
   const [showChangelog, setShowChangelog] = useState(false)
   const [showLicense, setShowLicense] = useState(false)
 
@@ -55,6 +57,18 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
           <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
         </button>
         <button
+          onClick={() => window.open(buildFeedbackBugUrl(__APP_VERSION__, isStandalone, os, settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
+          className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
+          <div className="flex items-center gap-3 min-w-0">
+            <Bug className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm text-appText font-medium">Report a bug — no GitHub account</p>
+              <p className="text-xs text-appTextMuted mt-0.5">Opens a quick web form with your device info pre-filled</p>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+        </button>
+        <button
           onClick={() => window.open(buildFeatureRequestUrl(__APP_VERSION__), '_blank', 'noopener,noreferrer')}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
           <div className="flex items-center gap-3 min-w-0">
@@ -62,6 +76,18 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
             <div className="min-w-0">
               <p className="text-sm text-appText font-medium">Help improve PunchIn</p>
               <p className="text-xs text-appTextMuted mt-0.5">Suggest a feature — opens a GitHub feature request</p>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+        </button>
+        <button
+          onClick={() => window.open(buildFeedbackFeatureUrl(settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
+          className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
+          <div className="flex items-center gap-3 min-w-0">
+            <Lightbulb className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm text-appText font-medium">Suggest a feature — no GitHub account</p>
+              <p className="text-xs text-appTextMuted mt-0.5">Opens a quick web form — no account needed</p>
             </div>
           </div>
           <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
