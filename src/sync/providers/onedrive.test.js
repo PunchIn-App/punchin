@@ -40,6 +40,10 @@ describe('buildOneDriveOAuthUrl', () => {
     const url = buildOneDriveOAuthUrl('id')
     expect(url).toContain('redirect_uri=')
   })
+
+  it('forces the account chooser with prompt=select_account (no silent reconnect)', () => {
+    expect(new URL(buildOneDriveOAuthUrl('id')).searchParams.get('prompt')).toBe('select_account')
+  })
 })
 
 // ---------------------------------------------------------------------------

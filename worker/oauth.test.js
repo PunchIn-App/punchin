@@ -104,6 +104,87 @@ describe('worker GitHub OAuth callback — edge cases (issue #165)', () => {
   })
 })
 
+describe('worker OAuth revoke route (deauth on disconnect)', () => {
+  const env = { GITHUB_CLIENT_ID: 'id', GITHUB_CLIENT_SECRET: 'secret' }
+  const revoke = (body, method = 'POST') =>
+    worker.fetch({ url: 'https://app.example/oauth/revoke', method, json: async () => body }, env)
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('rejects a non-POST request with 405', async () => {
+    const res = await worker.fetch({ url: 'https://app.example/oauth/revoke', method: 'GET' }, env)
+    expect(res.status).toBe(405)
+  })
+
+  it('returns 400 when provider or token is missing', async () => {
+    expect((await revoke({ provider: 'github' })).status).toBe(400) // no token
+    expect((await revoke({ token: 'tok' })).status).toBe(400) // no provider
+  })
+
+  it('returns 400 on a malformed JSON body', async () => {
+    const res = await worker.fetch(
+      { url: 'https://app.example/oauth/revoke', method: 'POST', json: async () => { throw new Error('bad') } },
+      env,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 for an unsupported provider (e.g. onedrive)', async () => {
+    const res = await revoke({ provider: 'onedrive', token: 'tok' })
+    expect(res.status).toBe(400)
+  })
+
+  it("GitHub: DELETEs only this device's token (not the account-wide grant) with Basic auth + access_token body and returns 204", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 204 })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await revoke({ provider: 'github', token: 'gh-tok' })
+    expect(res.status).toBe(204)
+    const [url, opts] = fetchMock.mock.calls[0]
+    // /token is device-scoped (leaves other devices' tokens alive); /grant would be account-wide.
+    expect(url).toBe('https://api.github.com/applications/id/token')
+    expect(opts.method).toBe('DELETE')
+    expect(opts.headers.Authorization).toMatch(/^Basic /)
+    expect(opts.headers['User-Agent']).toBeTruthy() // api.github.com 403s without a UA
+    expect(opts.body).toContain('gh-tok')
+  })
+
+  it('GitHub: treats 404 (token already invalid) as success (204)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 404 }))
+    expect((await revoke({ provider: 'github', token: 'gh-tok' })).status).toBe(204)
+  })
+
+  it('GitHub: surfaces an unexpected status as 502', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 500 }))
+    expect((await revoke({ provider: 'github', token: 'gh-tok' })).status).toBe(502)
+  })
+
+  it('Google: POSTs the token to the revoke endpoint and returns 204', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await revoke({ provider: 'google', token: 'g-tok' })
+    expect(res.status).toBe(204)
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://oauth2.googleapis.com/revoke')
+    expect(opts.method).toBe('POST')
+    expect(opts.body.toString()).toContain('token=g-tok')
+  })
+
+  it('Google: treats 400 (token already invalid) as success (204)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400 }))
+    expect((await revoke({ provider: 'google', token: 'g-tok' })).status).toBe(204)
+  })
+
+  it('Google: surfaces an unexpected status as 502', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+    expect((await revoke({ provider: 'google', token: 'g-tok' })).status).toBe(502)
+  })
+
+  it('returns 502 when the upstream revoke fetch throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
+    expect((await revoke({ provider: 'github', token: 'gh-tok' })).status).toBe(502)
+  })
+})
+
 describe('accent install icons (issue #228)', () => {
   beforeEach(() => vi.mocked(renderIconPng).mockReset())
 

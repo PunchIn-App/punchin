@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.24.0] — 2026-06-08
+
+### Added
+- **Sync — disconnecting now revokes this device's access at the provider, not just locally.** Disconnecting GitHub or Google cloud sync now tells the provider to revoke this device's token, so a still-signed-in browser can't be handed a fresh token silently on the next connect. It's scoped to this device — your other synced devices keep working — and it removes access only: your synced data is left untouched and is found again the moment you reconnect.
+
+### Changed
+- **Sync — reconnecting now lets you pick the account.** Connecting Google or OneDrive always shows the provider's account chooser instead of pushing straight through to the previously signed-in account, so you can switch accounts (or confirm the right one) when you reconnect.
+
+---
+
 ## [0.23.3] — 2026-06-08
 
 ### Changed

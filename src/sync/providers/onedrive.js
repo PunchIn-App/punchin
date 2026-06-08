@@ -26,6 +26,11 @@ export function buildOneDriveOAuthUrl(clientId, state, codeChallenge) {
     state: state ? `onedrive:${state}` : 'onedrive',
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
+    // Always show the account chooser instead of silently re-using the
+    // already-signed-in Microsoft account on reconnect. OneDrive has no
+    // client-side per-app revoke (its ~1h token just expires), so this prompt is
+    // the lever that keeps a reconnect from "pushing right through".
+    prompt: 'select_account',
   })
   return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params}`
 }

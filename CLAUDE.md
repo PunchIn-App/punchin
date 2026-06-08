@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.23.3
+**Version:** 0.24.0
 
 ---
 
@@ -16,7 +16,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 ```
 punchin/
-├── worker/     # Cloudflare Worker — GitHub OAuth code→token exchange + on-demand accent install-icon render (oauth.js, iconRender.js)
+├── worker/     # Cloudflare Worker — GitHub OAuth code→token exchange + per-device provider token-revoke on disconnect (/oauth/revoke) + on-demand accent install-icon render (oauth.js, iconRender.js)
 ├── app/        # Vite root — index.html app shell + public/ (PWA / home-screen icons)
 ├── config/     # vite.config.js (+ Vitest), manifest.base.js, postcss.config.js, tailwind.config.js
 ├── scripts/    # build/asset tooling — screenshots.mjs, icons.mjs, social-preview.py

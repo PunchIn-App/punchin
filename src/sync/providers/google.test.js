@@ -38,6 +38,10 @@ describe('buildGoogleOAuthUrl', () => {
     const url = buildGoogleOAuthUrl('id')
     expect(url).toContain('redirect_uri=')
   })
+
+  it('forces the account chooser with prompt=select_account (no silent reconnect)', () => {
+    expect(new URL(buildGoogleOAuthUrl('id')).searchParams.get('prompt')).toBe('select_account')
+  })
 })
 
 // ---------------------------------------------------------------------------
