@@ -18,7 +18,9 @@ vi.mock('../components/StartTimerModal', () => ({
 // 4-call queue below stays aligned with TimerView's own queries. TimerRail has
 // its own test.
 vi.mock('../hooks/useSettings', () => ({ useSettings: () => ({ settings: {} }) }))
-vi.mock('../components/TimerRail', () => ({ default: () => null }))
+// Capture the props TimerRail receives so we can assert the recent-jobs list.
+const mockRailProps = { current: null }
+vi.mock('../components/TimerRail', () => ({ default: (props) => { mockRailProps.current = props; return null } }))
 
 const JOBS = [{ id: 1, name: 'Acme Corp' }]
 const LABOR_TYPES = [{ id: 1, name: 'Design', color: '#6366F1' }]
@@ -30,8 +32,46 @@ function setupMocks({ active = [], completed = [], jobs = JOBS, laborTypes = LAB
   useLiveQuery.mockImplementation(() => queue[n++ % 5])
 }
 
+const now = new Date()
+const hoursAgo = h => new Date(now.getTime() - h * 3600000)
+
 beforeEach(() => {
   vi.clearAllMocks()
+  mockRailProps.current = null
+})
+
+describe('TimerView — quick-punch recent jobs', () => {
+  it('feeds the rail the 3 most recently used active jobs (deduped, recency order)', () => {
+    const jobs = [
+      { id: 1, name: 'Alpha', isActive: true },
+      { id: 2, name: 'Bravo', isActive: true },
+      { id: 3, name: 'Charlie', isActive: true },
+      { id: 4, name: 'Delta', isActive: true },
+      { id: 5, name: 'Archived', isActive: false },
+    ]
+    const completed = [
+      { id: 10, jobId: 1, punchIn: hoursAgo(5), punchOut: now },
+      { id: 11, jobId: 2, punchIn: hoursAgo(4), punchOut: now },
+      { id: 12, jobId: 1, punchIn: hoursAgo(3), punchOut: now }, // Alpha again → dedup, newer wins
+      { id: 13, jobId: 3, punchIn: hoursAgo(2), punchOut: now },
+      { id: 14, jobId: 5, punchIn: hoursAgo(1), punchOut: now }, // most recent, but archived → excluded
+    ]
+    setupMocks({ completed, jobs })
+    render(<TimerView />)
+    // By punchIn desc, distinct active jobs: Charlie(2h), Alpha(3h), Bravo(4h).
+    expect(mockRailProps.current.recentJobs.map(j => j.name)).toEqual(['Charlie', 'Alpha', 'Bravo'])
+  })
+
+  it('falls back to active jobs when there are no punches yet', () => {
+    const jobs = [
+      { id: 1, name: 'Alpha', isActive: true },
+      { id: 2, name: 'Bravo', isActive: true },
+      { id: 3, name: 'Archived', isActive: false },
+    ]
+    setupMocks({ active: [], completed: [], jobs })
+    render(<TimerView />)
+    expect(mockRailProps.current.recentJobs.map(j => j.name)).toEqual(['Alpha', 'Bravo'])
+  })
 })
 
 describe('TimerView — empty state', () => {

@@ -29,11 +29,14 @@ it('shows the "This week" section once completed entries load', () => {
   expect(screen.queryByText('No time tracked yet.')).toBeNull()
 })
 
-it('lists only active jobs for quick punch and calls onPunch on click', () => {
+it('renders the given recent jobs as quick-punch buttons and calls onPunch on click', () => {
+  // The rail renders the recent-jobs list it's handed (the 3-most-recent + active
+  // filtering is computed upstream in TimerView); clicking forwards the job.
   useLiveQuery.mockReturnValue([])
   const onPunch = vi.fn()
-  render(<TimerRail jobMap={jobMap} ltMap={ltMap} jobs={jobs} lastEntry={null} weekStartsMonday onPunch={onPunch} />)
-  expect(screen.queryByRole('button', { name: /punch in: archived/i })).toBeNull()
+  render(<TimerRail jobMap={jobMap} ltMap={ltMap} recentJobs={[jobs[0], jobs[1]]} lastEntry={null} weekStartsMonday onPunch={onPunch} />)
+  expect(screen.getByRole('button', { name: /punch in: acme/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /punch in: beta/i })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: /punch in: acme/i }))
   expect(onPunch).toHaveBeenCalledWith(jobs[0])
 })

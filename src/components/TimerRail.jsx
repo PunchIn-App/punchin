@@ -14,7 +14,7 @@ function Overline({ children }) {
   )
 }
 
-export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMonday, timeFormat, onPunch }) {
+export default function TimerRail({ jobMap, ltMap, recentJobs, lastEntry, weekStartsMonday, timeFormat, onPunch }) {
   const completed = useLiveQuery(() => db.entries.filter(e => !!e.punchOut).toArray(), [])
 
   const week = useMemo(() => {
@@ -29,7 +29,7 @@ export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMo
     return { totalMs, top, maxMs }
   }, [completed, weekStartsMonday])
 
-  const activeJobs = (jobs ?? []).filter(j => j.isActive !== false).slice(0, 6)
+  const quickJobs = recentJobs ?? []
 
   return (
     <aside
@@ -59,12 +59,13 @@ export default function TimerRail({ jobMap, ltMap, jobs, lastEntry, weekStartsMo
           )
         })()}
 
-        {/* Quick punch — labor dot + job/labor two-line + filled accent play */}
-        {activeJobs.length > 0 && (
+        {/* Quick punch — the 3 most recently used jobs; labor dot + job/labor
+            two-line + filled accent play. Tapping opens the sheet (you pick the task). */}
+        {quickJobs.length > 0 && (
           <section>
             <Overline>Quick punch</Overline>
             <div className="space-y-1.5">
-              {activeJobs.map(job => {
+              {quickJobs.map(job => {
                 const jlt = ltMap.get(job.laborTypeId)
                 return (
                   <button

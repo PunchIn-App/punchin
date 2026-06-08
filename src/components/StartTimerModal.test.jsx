@@ -199,6 +199,15 @@ describe('StartTimerModal — punch flow (delegates to db.startTimer)', () => {
     // The trigger shows the preselected job (its accessible name carries it).
     expect(screen.getByRole('button', { name: /job a/i })).toBeInTheDocument()
   })
+
+  it('does NOT auto-select a task when opened preselected from quick-punch (you pick it)', () => {
+    // Quick-punch opens the sheet on the job but with no labor type chosen, so the
+    // user consciously picks the task. (Manually picking a job still auto-fills —
+    // covered by the punch-flow tests; this only suppresses the initial preselect.)
+    render(<StartTimerModal onClose={vi.fn()} initialJobId={1} />)
+    expect(screen.getByRole('button', { name: /job a/i })).toBeInTheDocument() // job is set
+    expect(screen.getByRole('radio', { name: /design/i })).toHaveAttribute('aria-checked', 'false') // task is empty
+  })
 })
 
 // --------------------------------------------------------------------------

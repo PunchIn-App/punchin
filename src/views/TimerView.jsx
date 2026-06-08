@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus } from 'lucide-react'
-import { db, startTimer } from '../db'
+import { db } from '../db'
 import TimerCard from '../components/TimerCard'
 import StartTimerModal from '../components/StartTimerModal'
 import TimerRail from '../components/TimerRail'
@@ -58,16 +58,28 @@ export default function TimerView() {
     return { today, week, avg: week / 7 }
   }, [completed, settings.weekStartsMonday])
 
-  // Quick-punch from the rail: one tap when the job has a default labor type,
-  // otherwise open the full modal preselected. Both go through db.startTimer so
-  // the concurrent-timer rule stays single-source.
-  const handleQuickPunch = async (job) => {
-    if (job.laborTypeId) {
-      await startTimer({ jobId: job.id, laborTypeId: job.laborTypeId, allowConcurrentTimers: settings.allowConcurrentTimers })
-    } else {
-      setQuickJobId(job.id)
+  // The rail's quick-punch shortcuts are the 3 most recently used jobs (by last
+  // punch-in, de-duplicated, active only). A fresh account with no punches yet
+  // falls back to a few active jobs so the shortcut isn't empty.
+  const recentJobs = useMemo(() => {
+    const all = [...(active ?? []), ...(completed ?? [])]
+      .filter(e => e.punchIn)
+      .sort((a, b) => new Date(b.punchIn) - new Date(a.punchIn))
+    const seen = new Set()
+    const out = []
+    for (const e of all) {
+      if (seen.has(e.jobId)) continue
+      seen.add(e.jobId)
+      const job = jobMap.get(e.jobId)
+      if (job && job.isActive !== false) out.push(job)
+      if (out.length === 3) break
     }
-  }
+    return out.length > 0 ? out : (jobs ?? []).filter(j => j.isActive !== false).slice(0, 3)
+  }, [active, completed, jobMap, jobs])
+
+  // Quick-punch opens the Start Timer sheet preselected to the job with NO task
+  // chosen, so the user picks the labor type before punching in.
+  const handleQuickPunch = (job) => setQuickJobId(job.id)
 
   const closeModal = () => { setShowModal(false); setQuickJobId(null) }
 
@@ -169,7 +181,7 @@ export default function TimerView() {
       <TimerRail
         jobMap={jobMap}
         ltMap={ltMap}
-        jobs={jobs}
+        recentJobs={recentJobs}
         lastEntry={lastEntry}
         weekStartsMonday={settings.weekStartsMonday !== false}
         timeFormat={settings.timeFormat}

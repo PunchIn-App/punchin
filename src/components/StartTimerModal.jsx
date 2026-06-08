@@ -48,9 +48,13 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
   // Focus trap, Escape, and focus restoration (issues #151/#152/#154)
   useFocusTrap(swipeRef, stableClose)
 
-  // Selecting a job auto-fills its default labor type (the chip lights up).
+  // Selecting a job auto-fills its default labor type (the chip lights up) — but
+  // NOT for a job preselected via initialJobId (quick-punch opens the sheet with
+  // no task so the user picks it). Subsequent manual job changes still auto-fill.
+  const skipInitialLabor = useRef(initialJobId != null)
   useEffect(() => {
     if (!jobId || !jobs) return
+    if (skipInitialLabor.current) { skipInitialLabor.current = false; return }
     const job = jobs.find(j => j.id === Number(jobId))
     if (job?.laborTypeId) setLaborTypeId(String(job.laborTypeId))
   }, [jobId, jobs])
