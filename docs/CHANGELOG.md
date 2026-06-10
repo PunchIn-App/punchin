@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.3] — 2026-06-10
+
+### Fixed
+- **Form labels, names & validation (accessibility).**
+  - Every form field now has a proper accessible name for screen readers — the custom hex-colour input, the per-labor-type hourly-rate fields (each one announces which labor type it's for), the job / client / labor-type name fields, and the archived-item search boxes — where several previously announced as blank or identical.
+  - Saving a job or labor type with an empty name now shows an inline "Enter a … name." error (announced to screen readers and tied to the field) instead of silently doing nothing.
+  - The **Auto / Light / Dark** theme control now tells assistive tech which option is selected.
+  - Billing identity fields (name, business, email, phone, address) carry autofill hints so the browser can complete them.
+
+---
+
 ## [0.29.2] — 2026-06-10
 
 ### Fixed

@@ -14,6 +14,18 @@ it('edits a billing-profile field', () => {
   expect(h.updateSetting).toHaveBeenCalledWith('billingName', 'Jane')
 })
 
+it('sets autocomplete hints on the identity fields (WCAG 1.3.5)', () => {
+  render(<BillingPanel onBack={vi.fn()} />)
+  expect(screen.getByLabelText('Your name')).toHaveAttribute('autocomplete', 'name')
+  expect(screen.getByLabelText('Business')).toHaveAttribute('autocomplete', 'organization')
+  expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'email')
+  expect(screen.getByLabelText('Phone')).toHaveAttribute('autocomplete', 'tel')
+  expect(screen.getByLabelText('Address')).toHaveAttribute('autocomplete', 'street-address')
+  // Fields with no Identify-Input-Purpose mapping must stay un-hinted.
+  expect(screen.getByLabelText('Payment terms')).not.toHaveAttribute('autocomplete')
+  expect(screen.getByLabelText('Notes')).not.toHaveAttribute('autocomplete')
+})
+
 it('changes the default currency', () => {
   render(<BillingPanel onBack={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: /default currency/i }))

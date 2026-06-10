@@ -125,6 +125,7 @@ export default function ColorPicker({ presets, value, onChange, size = 'md', lab
             color={safeColor}
             onChange={pick}
             prefixed
+            aria-label="Hex color code"
             className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-appAccent/50 uppercase"
           />
         </div>

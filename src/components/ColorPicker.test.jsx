@@ -10,12 +10,16 @@ vi.mock('react-colorful', () => ({
       readOnly={false}
     />
   ),
-  HexColorInput: ({ color, onChange }) => (
+  // Mirror react-colorful's real behaviour: it forwards unknown props (e.g.
+  // aria-label) straight onto the underlying <input>, so the spread here lets
+  // the accessible-name assertion actually exercise the component's prop.
+  HexColorInput: ({ color, onChange, prefixed, ...rest }) => (
     <input
       data-testid="hex-color-input"
       value={color}
       onChange={e => onChange(e.target.value)}
       readOnly={false}
+      {...rest}
     />
   ),
 }))
@@ -69,6 +73,15 @@ describe('ColorPicker — custom color button', () => {
     fireEvent.click(screen.getByRole('button', { name: /^custom color$/i }))
     fireEvent.change(screen.getByTestId('hex-color-picker'), { target: { value: '#AABBCC' } })
     expect(onChange).toHaveBeenCalledWith('#AABBCC')
+  })
+
+  it('gives the hex input an accessible name in the open popover', () => {
+    // react-colorful renders a bare <input> with no implicit label; the
+    // component supplies aria-label="Hex color code" so screen-reader users
+    // know what the field is for.
+    render(<ColorPicker presets={PRESETS} value="#6366F1" onChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^custom color$/i }))
+    expect(screen.getByRole('textbox', { name: 'Hex color code' })).toBeInTheDocument()
   })
 
   it('closes picker on Escape key', () => {

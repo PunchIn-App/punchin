@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search, DollarSign } from 'lucide-react'
 import { db } from '../db'
@@ -31,6 +31,9 @@ function JobForm({ job, laborTypes, onDone }) {
   const [laborRates, setLaborRates]   = useState(job?.laborRates || {})
   const [color, setColor]             = useState(job?.color || '')
   const [showRates, setShowRates]     = useState(false)
+  const [error, setError]             = useState('')
+
+  const errorId = useId()
 
   const setRate = (ltId, val) => {
     setLaborRates(prev => {
@@ -45,7 +48,7 @@ function JobForm({ job, laborTypes, onDone }) {
   }
 
   const save = async () => {
-    if (!name.trim()) return
+    if (!name.trim()) { setError('Enter a job name.'); return }
     const data = {
       name: name.trim(),
       clientName: clientName.trim() || null,
@@ -68,9 +71,17 @@ function JobForm({ job, laborTypes, onDone }) {
 
   return (
     <div className="rounded-xl border border-appAccent/30 bg-appCard p-4 space-y-3 shadow-md">
-      <input autoFocus value={name} onChange={e => setName(e.target.value)}
-        placeholder="Job name *" className={inputCls} onKeyDown={e => e.key === 'Enter' && save()} />
+      <div className="space-y-1.5">
+        <input autoFocus value={name}
+          onChange={e => { setName(e.target.value); if (error) setError('') }}
+          aria-label="Job name"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          placeholder="Job name *" className={inputCls} onKeyDown={e => e.key === 'Enter' && save()} />
+        {error && <p id={errorId} role="alert" className="text-red-400 text-sm">{error}</p>}
+      </div>
       <input value={clientName} onChange={e => setClientName(e.target.value)}
+        aria-label="Client name"
         placeholder="Client name (optional)" className={inputCls} />
       <EntitySelect
         label="Default labor type"
@@ -123,6 +134,7 @@ function JobForm({ job, laborTypes, onDone }) {
                       step="0.01"
                       value={laborRates[lt.id] ?? ''}
                       onChange={e => setRate(lt.id, e.target.value)}
+                      aria-label={`Hourly rate for ${lt.name} in dollars per hour`}
                       placeholder="—"
                       className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-2 py-1.5 text-xs focus:outline-none focus:border-appAccent/60 transition-colors"
                     />
@@ -152,9 +164,12 @@ function LaborTypeForm({ lt, onDone }) {
   const [name, setName]   = useState(lt?.name || '')
   const [color, setColor] = useState(lt?.color || DEFAULT_LABOR_COLOR)
   const [glyph, setGlyph] = useState(lt?.glyph || '')
+  const [error, setError] = useState('')
+
+  const errorId = useId()
 
   const save = async () => {
-    if (!name.trim()) return
+    if (!name.trim()) { setError('Enter a labor type name.'); return }
     const data = { name: name.trim(), color, glyph: glyph || null }
     if (lt?.id) {
       await db.laborTypes.update(lt.id, data)
@@ -166,11 +181,18 @@ function LaborTypeForm({ lt, onDone }) {
 
   return (
     <div className="rounded-xl border border-appAccent/30 bg-appCard p-4 space-y-4 shadow-md">
-      <input autoFocus value={name} onChange={e => setName(e.target.value)}
-        placeholder="Labor type name *"
-        onKeyDown={e => e.key === 'Enter' && save()}
-        className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
-                   placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors" />
+      <div className="space-y-1.5">
+        <input autoFocus value={name}
+          onChange={e => { setName(e.target.value); if (error) setError('') }}
+          aria-label="Labor type name"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          placeholder="Labor type name *"
+          onKeyDown={e => e.key === 'Enter' && save()}
+          className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
+                     placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors" />
+        {error && <p id={errorId} role="alert" className="text-red-400 text-sm">{error}</p>}
+      </div>
 
       {/* Glyph — so a type reads by shape, not colour alone */}
       <div className="space-y-1.5">
@@ -346,6 +368,7 @@ export default function JobsView() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-appTextDisabled pointer-events-none" />
                       <input
                         type="text"
+                        aria-label="Search archived jobs"
                         placeholder="Search archived…"
                         value={archiveJobSearch}
                         onChange={e => setArchiveJobSearch(e.target.value)}
@@ -463,6 +486,7 @@ export default function JobsView() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-appTextDisabled pointer-events-none" />
                       <input
                         type="text"
+                        aria-label="Search archived labor types"
                         placeholder="Search archived…"
                         value={archiveLTSearch}
                         onChange={e => setArchiveLTSearch(e.target.value)}

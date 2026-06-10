@@ -324,6 +324,97 @@ describe('JobsView — Labor Types tab: add and edit', () => {
   })
 })
 
+describe('JobsView — accessible names (WCAG 4.1.2)', () => {
+  it('exposes the job-name and client-name inputs by accessible name', () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: /add job/i }))
+    expect(screen.getByRole('textbox', { name: 'Job name' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Client name' })).toBeInTheDocument()
+  })
+
+  it('exposes each hourly-rate input with a distinct, labor-type-specific accessible name', () => {
+    setupMocks(
+      JOBS,
+      [
+        { id: 1, name: 'Design', color: '#6366F1', isArchived: false },
+        { id: 3, name: 'Dev',    color: '#3B82F6', isArchived: false },
+      ],
+    )
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: /add job/i }))
+    // Expand the optional hourly-rates section.
+    fireEvent.click(screen.getByRole('button', { name: /hourly rates/i }))
+    expect(
+      screen.getByLabelText('Hourly rate for Design in dollars per hour')
+    ).toBeInTheDocument()
+    expect(
+      screen.getByLabelText('Hourly rate for Dev in dollars per hour')
+    ).toBeInTheDocument()
+  })
+
+  it('exposes the labor-type-name input by accessible name', () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: /add labor type/i }))
+    expect(screen.getByRole('textbox', { name: 'Labor type name' })).toBeInTheDocument()
+  })
+
+  it('exposes the archived-jobs search input by accessible name', () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    expect(screen.getByRole('textbox', { name: 'Search archived jobs' })).toBeInTheDocument()
+  })
+
+  it('exposes the archived-labor-types search input by accessible name', () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    expect(screen.getByRole('textbox', { name: 'Search archived labor types' })).toBeInTheDocument()
+  })
+})
+
+describe('JobsView — empty-name validation (WCAG 3.3.1)', () => {
+  it('JobForm surfaces an alert and does not create a job when name is empty', async () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: /add job/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^add job$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/enter a job name/i)
+    expect(mockJobsAdd).not.toHaveBeenCalled()
+    // The name field is marked invalid and points at the alert.
+    expect(screen.getByRole('textbox', { name: 'Job name' })).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('JobForm clears the alert once the user edits the name', async () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: /add job/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^add job$/i }))
+    await screen.findByRole('alert')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Job name' }), { target: { value: 'X' } })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('LaborTypeForm surfaces an alert and does not create a type when name is empty', async () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: /add labor type/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^add type$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/enter a labor type name/i)
+    expect(mockLaborTypesAdd).not.toHaveBeenCalled()
+    expect(screen.getByRole('textbox', { name: 'Labor type name' })).toHaveAttribute('aria-invalid', 'true')
+  })
+})
+
 describe('JobsView — Labor Types tab: archive and restore', () => {
   it('calls db.laborTypes.update with isArchived=true when Archive is clicked', async () => {
     setupMocks()
