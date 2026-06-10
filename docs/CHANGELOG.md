@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.1] — 2026-06-10
+
+### Fixed
+- **Keyboard & screen-reader focus handling across dialogs and pickers (accessibility).**
+  - **Delete confirmations no longer hijack the keyboard.** When a confirm dialog opened on top of another dialog (e.g. confirming a time-entry delete while editing it), one Escape used to close *both* and Tab got stuck on the Delete button — now only the top dialog responds to Escape/Tab, and Cancel is reachable again.
+  - **The first-run "Bring your data over?" dialog and the enlarged share-QR now trap focus properly** — focus moves into the dialog on open, Tab stays inside it, Escape and a tap on the backdrop close it, and focus returns to where you were.
+  - **Selecting from a dropdown or picker no longer drops your place.** Choosing a job, labor type, glyph, colour, time, date, or the long-running-reminder duration — or pressing Escape to close one — now returns keyboard focus to the control you opened, instead of jumping to the top of the page. Pressing **Enter** in a time/duration field now confirms and closes its popover.
+
+---
+
 ## [0.29.0] — 2026-06-09
 
 ### Added

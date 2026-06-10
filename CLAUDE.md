@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.29.0
+**Version:** 0.29.1
 
 ---
 
@@ -291,7 +291,7 @@ On mobile, modals are bottom sheets whose style branches by platform. On desktop
 Use `usePlatformContext()` to get `{ isStandalone, os }` and branch accordingly. Follow `StartTimerModal.jsx` as the reference pattern for **form / action** modals; apply the same treatment to any new one.
 
 **Shared modal hooks (issue #151).** Don't re-implement the focus trap or sheet plumbing inline — every modal consumes:
-- `useFocusTrap(dialogRef, onClose, opts?)` (`src/hooks/useFocusTrap.js`) — the full a11y contract in one place: initial focus (`[data-autofocus]` → first focusable, or `opts.initialFocus(el, focusables)` e.g. `(el) => el` for a scrollable reading dialog), a container-scoped Tab trap, focus **restoration** to the triggering element on close, and Escape→`onClose`.
+- `useFocusTrap(dialogRef, onClose, opts?)` (`src/hooks/useFocusTrap.js`) — the full a11y contract in one place: initial focus (`[data-autofocus]` → first focusable, or `opts.initialFocus(el, focusables)` e.g. `(el) => el` for a scrollable reading dialog), a container-scoped Tab trap, focus **restoration** to the triggering element on close, and Escape→`onClose`. The hook keeps a module-level stack of mounted traps so **only the topmost (most-recently-opened) dialog reacts to Escape/Tab** — a `ConfirmModal` opened from inside another modal closes alone, and Tab stays inside it, instead of both traps firing on one key.
 - `useSwipeDismiss` / `useAndroidBackDismiss` / `useSheetStyles` (`src/hooks/useBottomSheet.jsx`) — swipe-down dismiss (any touch platform), Android back-button dismiss, and platform scrim/sheet/handle styles for bottom-sheet modals.
 
 Title ids use `useId()` (never a hardcoded string) so two of the same modal can coexist.

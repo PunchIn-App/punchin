@@ -125,6 +125,26 @@ describe('StartTimerModal — job combobox', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled() // the modal stays open
   })
+
+  it('restores focus to the job trigger after selecting a job (WCAG 2.4.3)', () => {
+    // The chosen option unmounts the menu; focus must return to the trigger
+    // (whose accessible name now reflects the job) rather than dropping to <body>.
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /^job/i })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('option', { name: /job a/i }))
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('restores focus to the job trigger after closing the listbox with Escape (WCAG 2.4.3)', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /^job/i })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+  })
 })
 
 describe('StartTimerModal — validation', () => {

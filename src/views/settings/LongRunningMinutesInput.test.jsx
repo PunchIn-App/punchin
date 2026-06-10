@@ -121,3 +121,26 @@ describe('LongRunningMinutesInput (#111 — 24h wheel, live minutes carry into h
     expect(onChange).not.toHaveBeenCalled()
   })
 })
+
+describe('LongRunningMinutesInput — focus restoration (WCAG 2.4.3)', () => {
+  it('returns focus to the trigger when the popover closes with Escape', () => {
+    render(<LongRunningMinutesInput minutes={60} onChange={vi.fn()} onTurnOff={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /long-running threshold/i })
+    fireEvent.click(trigger) // open the popover
+    screen.getByLabelText(/^hours$/i).focus() // focus moves into the panel
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus() // ...and back to the trigger, not <body>
+  })
+
+  it('confirms and returns focus to the trigger when Enter is pressed in a field', () => {
+    render(<LongRunningMinutesInput minutes={60} onChange={vi.fn()} onTurnOff={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /long-running threshold/i })
+    fireEvent.click(trigger) // open the popover
+    const hours = screen.getByLabelText(/^hours$/i)
+    hours.focus()
+    fireEvent.keyDown(hours, { key: 'Enter' }) // Enter confirms + closes
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+})

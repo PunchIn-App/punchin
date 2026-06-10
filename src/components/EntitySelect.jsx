@@ -64,6 +64,7 @@ export default function EntitySelect({
   const [pos, setPos] = useState(null)   // { left, width, top? , bottom? } in viewport coords
   const wrapRef = useRef(null)
   const menuRef = useRef(null)
+  const triggerRef = useRef(null)        // refocus target on select/Escape (WCAG 2.4.3)
   const uid = useId()
   const labelId = `${uid}-label`
 
@@ -114,6 +115,9 @@ export default function EntitySelect({
       e.stopPropagation()
       e.preventDefault()
       setOpen(false)
+      // Restore focus to the trigger before the menu unmounts so focus doesn't
+      // drop to <body> (WCAG 2.4.3). The trigger node stays mounted.
+      triggerRef.current?.focus()
     }
     document.addEventListener('mousedown', onOutside)
     document.addEventListener('keydown', onEscape, true)
@@ -130,7 +134,10 @@ export default function EntitySelect({
     ? `${selected.label}${selected.sublabel ? ', ' + selected.sublabel : ''}`
     : (display ?? 'none selected')}`
 
-  const pick = (v) => { onChange(v); setOpen(false) }
+  // Selecting an option unmounts the menu, so refocus the (still-mounted) trigger
+  // first or focus falls to <body> (WCAG 2.4.3). :focus-visible means mouse users
+  // won't see a ring, so unconditional refocus on selection is safe.
+  const pick = (v) => { onChange(v); setOpen(false); triggerRef.current?.focus() }
 
   return (
     <div ref={wrapRef} className="relative">
@@ -145,6 +152,7 @@ export default function EntitySelect({
       )}
 
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-haspopup="listbox"

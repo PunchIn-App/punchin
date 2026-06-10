@@ -27,6 +27,7 @@ export default function ColorPicker({ presets, value, onChange, size = 'md', lab
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value)
   const wrapRef = useRef(null)
+  const triggerRef = useRef(null)   // custom-colour trigger — refocus target on Escape (WCAG 2.4.3)
 
   const presetHexes = presets.map(p => p.hex)
   const isCustom = VALID_HEX.test(value) && !presetHexes.includes(value)
@@ -51,6 +52,9 @@ export default function ColorPicker({ presets, value, onChange, size = 'md', lab
       e.stopPropagation()
       e.preventDefault()
       setOpen(false)
+      // Restore focus to the trigger before the popover unmounts so focus doesn't
+      // drop to <body> (WCAG 2.4.3). The trigger node stays mounted.
+      triggerRef.current?.focus()
     }
     document.addEventListener('mousedown', onOutside)
     document.addEventListener('keydown', onEscape, true) // capture
@@ -90,6 +94,7 @@ export default function ColorPicker({ presets, value, onChange, size = 'md', lab
             shows the chosen custom colour (with a check) when one is active, else
             a neutral squircle with a + to add one. */}
         <button
+          ref={triggerRef}
           onClick={() => setOpen(p => !p)}
           aria-label={isCustom ? 'Custom color (selected)' : 'Custom color'}
           aria-pressed={isCustom}

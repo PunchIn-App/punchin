@@ -3,6 +3,13 @@ import { useEffect, useRef } from 'react'
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+// Module-level stack of tokens, one per currently-mounted trap. When a dialog is
+// stacked over another (e.g. a ConfirmModal opened from inside EditEntryModal),
+// only the topmost (most-recently-mounted) trap should react to Escape/Tab —
+// otherwise one Escape closes both, and Tab gets re-captured to the inner
+// dialog from the outer one's listener (issue: stacked-trap focus management).
+const trapStack = []
+
 // Shared modal focus management, replacing the ~20-line trap that was duplicated
 // across every modal (issue #151). It:
 //   - moves focus into the dialog on open — to [data-autofocus] if present, else
@@ -24,6 +31,11 @@ export function useFocusTrap(ref, onClose, opts = {}) {
     const el = ref.current
     if (!el) return
 
+    // Unique identity for THIS trap instance; push onto the stack so the topmost
+    // entry can be identified in handleKey, and spliced off on unmount.
+    const token = {}
+    trapStack.push(token)
+
     // Snapshot the control that had focus so we can hand it back on close (#152).
     const previouslyFocused = document.activeElement
     const focusable = () => Array.from(el.querySelectorAll(FOCUSABLE))
@@ -34,6 +46,9 @@ export function useFocusTrap(ref, onClose, opts = {}) {
     if (target) target.focus()
 
     const handleKey = (e) => {
+      // Only the topmost trap reacts — stacked dialogs share this document
+      // listener, so without this an Escape/Tab fires every mounted trap.
+      if (trapStack[trapStack.length - 1] !== token) return
       if (e.key === 'Escape') { onCloseRef.current?.(); return }
       if (e.key !== 'Tab') return
       const els = focusable()
@@ -52,6 +67,9 @@ export function useFocusTrap(ref, onClose, opts = {}) {
     document.addEventListener('keydown', handleKey)
     return () => {
       document.removeEventListener('keydown', handleKey)
+      // Pop this trap off the stack so the one beneath becomes topmost again.
+      const i = trapStack.indexOf(token)
+      if (i !== -1) trapStack.splice(i, 1)
       if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
         previouslyFocused.focus()
       }

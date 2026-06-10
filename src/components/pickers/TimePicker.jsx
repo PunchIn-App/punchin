@@ -37,9 +37,10 @@ const TRIGGER_DEFAULT =
 
 // A big, always-typeable H/M field that lives directly above its wheel. Typing
 // commits live (so closing the popover keeps what you typed); ↑/↓ step the value.
+// Enter confirms — it closes the popover and hands focus back to the trigger.
 // `type="text"` + inputMode numeric on purpose — `type="number"` reports an ARIA
 // spinbutton role that would collide with the wheel's.
-function Segment({ value, min, max, onCommit, onStep, label }) {
+function Segment({ value, min, max, onCommit, onStep, onConfirm, label }) {
   const [draft, setDraft] = useState(null) // raw text while focused; null = show canonical
 
   return (
@@ -57,7 +58,7 @@ function Segment({ value, min, max, onCommit, onStep, label }) {
       onFocus={(e) => e.target.select()}
       onBlur={() => setDraft(null)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); setDraft(null); e.currentTarget.blur() }
+        if (e.key === 'Enter') { e.preventDefault(); setDraft(null); onConfirm() }
         else if (e.key === 'ArrowUp') { e.preventDefault(); onStep(1) }
         else if (e.key === 'ArrowDown') { e.preventDefault(); onStep(-1) }
       }}
@@ -73,7 +74,11 @@ export default function TimePicker({ value, onChange, label = 'Time', buttonClas
   const { displayH, period } = to12(h)
 
   const PANEL_W = use24 ? 152 : 200
-  const { open, setOpen, wrapRef, menuRef, menuStyle } = useAnchoredPopover({ width: PANEL_W, maxHeight: 200 })
+  const { open, setOpen, wrapRef, menuRef, triggerRef, menuStyle } = useAnchoredPopover({ width: PANEL_W, maxHeight: 200 })
+
+  // Confirm-and-close: drop focus back on the trigger before the panel unmounts
+  // so it never falls to <body> (WCAG 2.4.3). The trigger node stays mounted.
+  const confirm = () => { setOpen(false); triggerRef.current?.focus() }
 
   const emit = (nh, nm) => onChange(`${pad2(nh)}:${pad2(nm)}`)
   const stepHour = (d) => {
@@ -90,6 +95,7 @@ export default function TimePicker({ value, onChange, label = 'Time', buttonClas
   return (
     <div ref={wrapRef} className={`relative ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         onClick={() => setOpen(o => !o)}
@@ -114,9 +120,9 @@ export default function TimePicker({ value, onChange, label = 'Time', buttonClas
             {/* Type or spin — same value, aligned columns: each field sits over its wheel. */}
             <div className="flex flex-col items-center gap-2">
               <div className="flex items-center gap-1.5">
-                <Segment label="Hour" value={use24 ? h : displayH} min={use24 ? 0 : 1} max={use24 ? 23 : 12} onCommit={commitHour} onStep={stepHour} />
+                <Segment label="Hour" value={use24 ? h : displayH} min={use24 ? 0 : 1} max={use24 ? 23 : 12} onCommit={commitHour} onStep={stepHour} onConfirm={confirm} />
                 <span aria-hidden="true" className="w-2 text-center text-lg font-mono text-appTextMuted">:</span>
-                <Segment label="Minute" value={m} min={0} max={59} onCommit={commitMin} onStep={stepMin} />
+                <Segment label="Minute" value={m} min={0} max={59} onCommit={commitMin} onStep={stepMin} onConfirm={confirm} />
               </div>
               <div className="relative flex items-center gap-1.5">
                 {/* Centered selection band across the wheels. */}

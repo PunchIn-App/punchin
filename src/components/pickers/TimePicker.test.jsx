@@ -156,4 +156,29 @@ describe('TimePicker — dismiss', () => {
     fireEvent.mouseDown(document.body)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('confirms (Enter) the typed field, closing the popover', () => {
+    render(<TimePicker value="09:30" onChange={vi.fn()} label="Start" />)
+    openPicker()
+    fireEvent.keyDown(screen.getByRole('textbox', { name: /hour/i }), { key: 'Enter' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('TimePicker — focus restoration (WCAG 2.4.3)', () => {
+  it('returns focus to the trigger when closed via Escape', () => {
+    render(<TimePicker value="09:30" onChange={vi.fn()} label="Start" />)
+    const trigger = screen.getByRole('button', { name: /start/i })
+    openPicker()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(trigger).toHaveFocus()
+  })
+
+  it('returns focus to the trigger when a value is confirmed (Enter)', () => {
+    render(<TimePicker value="09:30" onChange={vi.fn()} label="Start" />)
+    const trigger = screen.getByRole('button', { name: /start/i })
+    openPicker()
+    fireEvent.keyDown(screen.getByRole('textbox', { name: /hour/i }), { key: 'Enter' })
+    expect(trigger).toHaveFocus()
+  })
 })

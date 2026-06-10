@@ -35,7 +35,7 @@ const TRIGGER_DEFAULT =
 export default function DatePicker({ value, onChange, label = 'Date', buttonClassName = '', className = 'inline-block', id }) {
   const selected = parseISO(value)
   const today = new Date()
-  const { open, setOpen, wrapRef, menuRef, menuStyle } = useAnchoredPopover({ width: 280, maxHeight: 348 })
+  const { open, setOpen, wrapRef, menuRef, triggerRef, menuStyle } = useAnchoredPopover({ width: 280, maxHeight: 348 })
 
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(parseISO(value) ?? new Date()))
   const [focusDate, setFocusDate] = useState(() => parseISO(value) ?? new Date())
@@ -59,7 +59,9 @@ export default function DatePicker({ value, onChange, label = 'Date', buttonClas
     }
   }, [focusDate, open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const select = (dt) => { onChange(toISO(dt)); setOpen(false) }
+  // Selecting a day closes the panel; hand focus back to the trigger before the
+  // day button unmounts so it never falls to <body> (WCAG 2.4.3).
+  const select = (dt) => { onChange(toISO(dt)); setOpen(false); triggerRef.current?.focus() }
 
   const moveMonth = (n) => {
     const nv = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + n, 1)
@@ -91,6 +93,7 @@ export default function DatePicker({ value, onChange, label = 'Date', buttonClas
   return (
     <div ref={wrapRef} className={`relative ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         id={id}
         onClick={() => setOpen(o => !o)}

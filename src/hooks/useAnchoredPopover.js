@@ -21,6 +21,7 @@ export function useAnchoredPopover({ width = 240, maxHeight = 280 } = {}) {
   const [pos, setPos] = useState(null) // { left, top?, bottom? } in viewport coords
   const wrapRef = useRef(null)
   const menuRef = useRef(null)
+  const triggerRef = useRef(null) // the button that opens the panel — focus lands back here on close
 
   useLayoutEffect(() => {
     if (!open) { setPos(null); return }
@@ -61,6 +62,7 @@ export function useAnchoredPopover({ width = 240, maxHeight = 280 } = {}) {
       e.stopPropagation() // close the panel before a surrounding modal's Escape fires
       e.preventDefault()
       setOpen(false)
+      triggerRef.current?.focus() // restore focus to the trigger (WCAG 2.4.3) — the menu is about to unmount
     }
     document.addEventListener('mousedown', onOutside)
     document.addEventListener('keydown', onEscape, true)
@@ -74,5 +76,5 @@ export function useAnchoredPopover({ width = 240, maxHeight = 280 } = {}) {
     ? { position: 'fixed', left: pos.left, width, top: pos.top, bottom: pos.bottom }
     : { position: 'fixed', visibility: 'hidden' }
 
-  return { open, setOpen, wrapRef, menuRef, menuStyle }
+  return { open, setOpen, wrapRef, menuRef, triggerRef, menuStyle }
 }
