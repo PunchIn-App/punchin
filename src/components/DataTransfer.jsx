@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import qrcode from 'qrcode-generator'
-import { Share2, Copy, Check, Download, Link as LinkIcon } from 'lucide-react'
+import { Share2, Copy, Check, Download, Link as LinkIcon, X } from 'lucide-react'
 import { exportSnapshot, importSnapshot } from '../sync/syncManager'
 import { encodeSnapshot, decodeSnapshot, buildShareUrl, parseImportCode } from '../utils/transfer'
 
@@ -32,11 +32,21 @@ export default function DataTransfer() {
   const [importText, setImportText] = useState('')
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState(null) // { success } | { error }
+  const [enlarged, setEnlarged] = useState(false) // QR lightbox (issue: code too small to scan inline)
+
+  // Escape closes the enlarged-QR lightbox.
+  useEffect(() => {
+    if (!enlarged) return
+    const onKey = (e) => { if (e.key === 'Escape') setEnlarged(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [enlarged])
 
   const createLink = async () => {
     setGenerating(true)
     setShareError(null)
     setCopied(false)
+    setEnlarged(false)
     try {
       const snap = await exportSnapshot()
       const code = await encodeSnapshot(snap)
@@ -83,6 +93,7 @@ export default function DataTransfer() {
   const qrSrc = shareUrl && shareUrl.length <= QR_SAFE_LIMIT ? makeQrDataUrl(shareUrl) : null
 
   return (
+    <>
     <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
       {/* Share */}
       <div className="px-4 py-4 space-y-3">
@@ -127,8 +138,16 @@ export default function DataTransfer() {
 
             {qrSrc ? (
               <div className="flex flex-col items-center gap-2 py-1">
-                <img src={qrSrc} alt="QR code for the share link" className="w-44 h-44 rounded-lg bg-white p-2" />
-                <p className="text-xs text-appTextMuted">Scan with the other device's camera</p>
+                <button
+                  type="button"
+                  onClick={() => setEnlarged(true)}
+                  aria-label="Enlarge QR code"
+                  aria-haspopup="dialog"
+                  className="rounded-lg focus:outline-none focus:ring-2 focus:ring-appAccent/60"
+                >
+                  <img src={qrSrc} alt="QR code for the share link" className="w-44 h-44 rounded-lg bg-white p-2" />
+                </button>
+                <p className="text-xs text-appTextMuted">Tap the code to enlarge · scan with the other device's camera</p>
               </div>
             ) : (
               <p className="text-xs text-appTextMuted">
@@ -179,5 +198,36 @@ export default function DataTransfer() {
         {importMsg?.error && <p className="text-xs text-red-400">{importMsg.error}</p>}
       </div>
     </div>
+
+    {/* Enlarged QR lightbox — the inline thumbnail is often too small to scan, so
+        tapping it blows the code up centered on a dark scrim (tap/Escape closes). */}
+    {enlarged && qrSrc && (
+      <div
+        className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+        onClick={() => setEnlarged(false)}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Share QR code — scan with the other device"
+      >
+        <button
+          type="button"
+          onClick={() => setEnlarged(false)}
+          aria-label="Close"
+          className="absolute top-4 right-4 p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <X className="w-6 h-6" aria-hidden="true" />
+        </button>
+        <div className="flex flex-col items-center gap-4" onClick={e => e.stopPropagation()}>
+          <img
+            src={qrSrc}
+            alt="QR code for the share link"
+            className="w-full max-w-[340px] aspect-square rounded-2xl bg-white p-4 shadow-xl"
+            style={{ imageRendering: 'pixelated' }}
+          />
+          <p className="text-sm text-white/90 text-center">Scan with the other device's camera</p>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

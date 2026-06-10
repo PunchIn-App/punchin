@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.26.1] — 2026-06-08
+
+### Changed
+- **Share QR codes are now tap-to-enlarge.** The inline share QR was often too small to scan from across a desk — tap it to blow the code up full-screen on a dark backdrop (tap anywhere or press Escape to close).
+
+---
+
 ## [0.26.0] — 2026-06-08
 
 ### Added
