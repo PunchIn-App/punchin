@@ -259,6 +259,26 @@ describe('SettingsView — root list & drill-in', () => {
   })
 })
 
+// The Settings view has no visible page title (the root list is bare CategoryRow
+// buttons; a drilled-in Panel starts the outline at h2), so an always-present
+// visually-hidden <h1>Settings</h1> keeps the heading outline starting at h1 in
+// both states — matching every sibling view's h1 (WCAG 1.3.1).
+describe('SettingsView — page heading (h1)', () => {
+  it('exposes a level-1 "Settings" heading on the root list', () => {
+    render(<SettingsView />)
+    expect(screen.getByRole('heading', { level: 1, name: /^settings$/i })).toBeInTheDocument()
+  })
+
+  it('keeps the level-1 "Settings" heading present after drilling into a panel', () => {
+    render(<SettingsView />)
+    expand('General')
+    // Panel content is showing (so we're in the drilled-in state)…
+    expect(screen.getByRole('switch', { name: /allow concurrent timers/i })).toBeInTheDocument()
+    // …and the h1 still anchors the outline above the Panel's h2.
+    expect(screen.getByRole('heading', { level: 1, name: /^settings$/i })).toBeInTheDocument()
+  })
+})
+
 describe('SettingsView — Toggle', () => {
   it('renders Allow concurrent timers switch with aria-checked=false', () => {
     render(<SettingsView />)

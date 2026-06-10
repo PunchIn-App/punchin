@@ -93,6 +93,13 @@ export default function SettingsView() {
 
   return (
     <div className="h-full scrollable px-4 pt-4 pb-24 lg:max-w-5xl lg:mx-auto lg:w-full">
+      {/* Always-present page heading so the Settings outline starts at h1 in both
+          the root-list and drilled-in states (WCAG 1.3.1), matching every sibling
+          view's visible h1. The root list is only CategoryRow buttons and a Panel
+          starts at h2, so without this the page would have no h1 at all. Kept
+          visually hidden (sr-only) — the root list / panel header carry the visual
+          weight — so it's a no-visual-change addition. */}
+      <h1 className="sr-only">Settings</h1>
       <div className="lg:grid lg:grid-cols-[300px_1fr] lg:gap-6 lg:items-start">
 
         {/* Category rail — the root list on mobile (tap to drill in, issue #60);

@@ -235,7 +235,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
             announced to screen readers (WCAG 4.1.3). It stays in the DOM across
             filter changes; only the total + the sr-only entry count change. */}
         <div role="status" aria-live="polite" className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-          <p className="text-[10px] uppercase tracking-widest text-appTextMuted">Week total</p>
+          <h2 className="text-[10px] uppercase tracking-widest text-appTextMuted">Week total</h2>
           <p className="font-mono font-bold text-appText text-3xl mt-1">{formatDuration(total, decimal)}</p>
           <span className="sr-only">{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} this week</span>
         </div>
@@ -243,7 +243,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
         {/* By job */}
         {Object.keys(jobTotals).length > 0 && (
           <div className="rounded-xl border border-appBorder bg-appCard p-4 shadow-sm">
-            <p className="text-[10px] uppercase tracking-widest text-appTextMuted mb-3">By job</p>
+            <h2 className="text-[10px] uppercase tracking-widest text-appTextMuted mb-3">By job</h2>
             <div className="space-y-3">
               {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
                 const job = getJob(Number(jid))
@@ -527,6 +527,10 @@ ${PRINT_FONT_HEAD}
 
   return (
     <div className="h-full flex flex-col">
+      {/* Per-view page heading (WCAG 1.3.1): the toolbar carries no visible title,
+          so it's visually hidden — matching the visible <h1> the sibling views show. */}
+      <h1 className="sr-only">Timesheet</h1>
+
       {/* Toolbar row 1 — segmented period tabs, centered date nav, Log Manual.
           Stacks on mobile; a single grouped control bar at lg. */}
       <div className="flex-shrink-0 flex flex-col gap-2.5 px-4 py-2.5 border-b border-appBorderLight lg:flex-row lg:items-center">

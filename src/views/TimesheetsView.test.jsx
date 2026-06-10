@@ -483,6 +483,27 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
   })
 })
 
+// ─── Heading structure (WCAG 1.3.1) ───────────────────────────────────────────
+
+describe('TimesheetsView — heading structure (WCAG 1.3.1)', () => {
+  it('renders a per-view <h1> (visually hidden) for the Timesheets view', () => {
+    render(<TimesheetsView />)
+    // The toolbar has no visible title, so the h1 is sr-only — but it must exist
+    // in the DOM so the view has a top-level heading like its sibling views.
+    expect(screen.getByRole('heading', { level: 1, name: 'Timesheet' })).toBeInTheDocument()
+  })
+
+  it('renders the weekly "Week total" and "By job" section titles as headings', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
+    // The styled section titles are headings, not bare <p>s, so they appear in
+    // the screen-reader heading outline.
+    expect(screen.getByRole('heading', { name: 'Week total' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'By job' })).toBeInTheDocument()
+  })
+})
+
 // ─── Live-region status announcements (WCAG 4.1.3) ─────────────────────────────
 
 describe('TimesheetsView — search/filter result is announced (live region)', () => {

@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.6] — 2026-06-10
+
+### Fixed
+- **Page headings & a safer bottom-sheet swipe (accessibility).**
+  - The **Timesheets** and **Settings** screens now expose a top-level heading (and Timesheets' "Week total" / "By job" are now real headings), so screen-reader users can navigate by heading the way they can on every other screen.
+  - Swiping down to dismiss a bottom sheet no longer fires while you're **scrolling the content inside it** — so scrolling a long job list can't accidentally close the sheet and discard what you'd entered.
+
+---
+
 ## [0.29.5] — 2026-06-10
 
 ### Fixed
