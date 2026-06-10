@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.0] — 2026-06-09
+
+### Added
+- **Google Drive & OneDrive now show which account you're connecting** — and ask you to confirm it first, the same way GitHub always has. After you sign in, PunchIn shows a "Connect Google Drive as you@example.com?" dialog before saving anything, and the connected account is shown in the Data & Sync panel. This closes a gap where you could accidentally link the wrong account (e.g. a work or secondary login) with nothing on screen to catch it.
+  - OneDrive uses the Microsoft profile permission PunchIn already requested; Google adds a one-time, non-sensitive `openid email` consent so it can display your address. Neither widens file access — sync still only ever touches PunchIn's own hidden app folder.
+
+---
+
 ## [0.28.0] — 2026-06-08
 
 ### Changed

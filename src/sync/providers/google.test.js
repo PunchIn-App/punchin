@@ -1,4 +1,4 @@
-import { buildGoogleOAuthUrl, pushToDrive, pullFromDrive } from './google'
+import { buildGoogleOAuthUrl, pushToDrive, pullFromDrive, fetchGoogleUser } from './google'
 
 // ---------------------------------------------------------------------------
 // buildGoogleOAuthUrl
@@ -21,6 +21,12 @@ describe('buildGoogleOAuthUrl (Auth Code via worker, issue #243)', () => {
 
   it('requests the drive.appdata scope', () => {
     expect(buildGoogleOAuthUrl('id', BASE)).toContain('drive.appdata')
+  })
+
+  it('also requests openid + email scopes so the connect dialog can name the account', () => {
+    const scope = new URL(buildGoogleOAuthUrl('id', BASE)).searchParams.get('scope')
+    expect(scope).toContain('openid')
+    expect(scope).toContain('email')
   })
 
   it('requests offline access so a refresh token is issued', () => {
@@ -148,5 +154,41 @@ describe('pullFromDrive', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ files: [{ id: 'file-id' }] }) })
       .mockResolvedValueOnce({ ok: false, status: 500 })
     await expect(pullFromDrive('token')).rejects.toThrow('Drive 500')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fetchGoogleUser — account identity for the connect-confirm dialog
+// ---------------------------------------------------------------------------
+
+describe('fetchGoogleUser', () => {
+  let fetchMock
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('GETs the OpenID userinfo endpoint with the bearer token and returns the email', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ email: 'rob@gmail.com', name: 'Rob' }) })
+    const email = await fetchGoogleUser('token123')
+    expect(email).toBe('rob@gmail.com')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://www.googleapis.com/oauth2/v3/userinfo')
+    expect(opts.headers.Authorization).toBe('Bearer token123')
+  })
+
+  it('falls back to the name when no email is present', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ name: 'Rob' }) })
+    expect(await fetchGoogleUser('t')).toBe('Rob')
+  })
+
+  it('returns null on a failed lookup rather than throwing (never blocks connecting)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 403 })
+    expect(await fetchGoogleUser('t')).toBeNull()
   })
 })

@@ -37,6 +37,20 @@ export function buildOneDriveOAuthUrl(clientId, callbackBase, state) {
   return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params}`
 }
 
+// Fetch the signed-in Microsoft account's identity so the connect dialog can
+// show WHICH account is being linked — parity with GitHub, which has always
+// shown its account (issue #243 follow-up). Uses the `User.Read` scope already
+// requested above (no new consent). Returns the best human-readable identifier,
+// or null on any error so a failed lookup never blocks connecting.
+export async function fetchOneDriveUser(token) {
+  const res = await fetch('https://graph.microsoft.com/v1.0/me', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) return null
+  const me = await res.json()
+  return me.userPrincipalName || me.mail || me.displayName || null
+}
+
 export async function pushToOneDrive(token, data) {
   const res = await fetch(
     `https://graph.microsoft.com/v1.0/me/drive/special/approot:/${FILE_NAME}:/content`,

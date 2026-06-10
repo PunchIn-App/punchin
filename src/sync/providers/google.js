@@ -15,13 +15,16 @@ function httpError(label, status) {
 // `access_type=offline` is what makes Google issue the refresh token, and
 // `prompt=consent` is required to RE-issue it on a reconnect (Google omits the
 // refresh token on a silent re-grant otherwise); `select_account` keeps the
-// account chooser so a reconnect can pick a different account.
+// account chooser so a reconnect can pick a different account. `openid email`
+// are added (non-sensitive) so the connect dialog can show WHICH account is
+// being linked — parity with GitHub (see fetchGoogleUser); `drive.appdata`
+// still scopes file access to PunchIn's own hidden app folder only.
 export function buildGoogleOAuthUrl(clientId, callbackBase, state) {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: `${callbackBase}/oauth/google/callback`,
     response_type: 'code',
-    scope: 'https://www.googleapis.com/auth/drive.appdata',
+    scope: 'openid email https://www.googleapis.com/auth/drive.appdata',
     access_type: 'offline',
     prompt: 'consent select_account',
     // CSRF nonce verified on return (issue #125); the worker echoes it back and
@@ -29,6 +32,19 @@ export function buildGoogleOAuthUrl(clientId, callbackBase, state) {
     ...(state ? { state } : {}),
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+}
+
+// Fetch the signed-in Google account's identity (email) so the connect dialog
+// can show WHICH account is being linked — parity with GitHub. Needs the
+// `openid email` scopes added above. Returns the email (or null on any error,
+// so a failed lookup never blocks connecting).
+export async function fetchGoogleUser(token) {
+  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) return null
+  const info = await res.json()
+  return info.email || info.name || null
 }
 
 async function findFileId(token) {
