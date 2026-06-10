@@ -152,27 +152,31 @@ export default function AnalyticsView() {
       {/* Daily chart */}
       <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
         <p className="ds-overline text-appTextMuted mb-4" id="daily-chart-label">Hours per day</p>
-        <figure aria-labelledby="daily-chart-label" role="img"
+        {/* role="img" prunes descendants for AT, so the rich aria-label is the
+            accessible name (no aria-labelledby — it would win and hide it). */}
+        <figure role="img"
           aria-label={`Bar chart: daily hours for the last ${days} days. Total: ${formatDurationHM(total)}.`}>
           <ResponsiveContainer width="100%" height={130}>
             <BarChart data={dailyData} barCategoryGap="30%">
-              <XAxis dataKey="date" tick={{ fill: 'var(--text-darker)', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis hide />
               <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
                 formatter={(v) => [`${v}h`, 'Hours']} />
               <Bar dataKey="hours" fill="rgb(var(--accent-rgb))" radius={[3,3,0,0]} />
             </BarChart>
           </ResponsiveContainer>
-          <table className="sr-only">
-            <caption>Daily hours for the last {days} days</caption>
-            <thead><tr><th scope="col">Day</th><th scope="col">Hours</th></tr></thead>
-            <tbody>
-              {dailyData.map(d => (
-                <tr key={d.date}><td>{d.date}</td><td>{d.hours}h</td></tr>
-              ))}
-            </tbody>
-          </table>
         </figure>
+        {/* sr-only data fallback sits OUTSIDE the role="img" figure — a child of
+            role="img" is presentational and pruned by VoiceOver. */}
+        <table className="sr-only">
+          <caption>Daily hours for the last {days} days</caption>
+          <thead><tr><th scope="col">Day</th><th scope="col">Hours</th></tr></thead>
+          <tbody>
+            {dailyData.map(d => (
+              <tr key={d.date}><td>{d.date}</td><td>{d.hours}h</td></tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Hours by job + Labor type — side by side on desktop */}
@@ -181,7 +185,9 @@ export default function AnalyticsView() {
           {jobData.length > 0 && (
             <div className="flex-1 min-w-0 rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
               <p className="ds-overline text-appTextMuted mb-4" id="job-chart-label">Hours by job</p>
-              <figure aria-labelledby="job-chart-label" role="img"
+              {/* role="img" prunes descendants for AT, so the rich aria-label is
+                  the accessible name (no aria-labelledby — it would win). */}
+              <figure role="img"
                 aria-label={`Bar chart: hours by job. Top job: ${jobData[0]?.name} with ${jobData[0]?.hours}h.`}>
                 <ResponsiveContainer width="100%" height={Math.max(80, jobData.length * 44)}>
                   <BarChart data={jobData} layout="vertical" barCategoryGap="30%" margin={{ right: 8 }}>
@@ -199,16 +205,18 @@ export default function AnalyticsView() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <table className="sr-only">
-                  <caption>Hours by job</caption>
-                  <thead><tr><th scope="col">Job</th><th scope="col">Hours</th></tr></thead>
-                  <tbody>
-                    {jobData.map(d => (
-                      <tr key={d.name}><td>{d.name}</td><td>{d.hours}h</td></tr>
-                    ))}
-                  </tbody>
-                </table>
               </figure>
+              {/* sr-only data fallback sits OUTSIDE the role="img" figure — a child
+                  of role="img" is presentational and pruned by VoiceOver. */}
+              <table className="sr-only">
+                <caption>Hours by job</caption>
+                <thead><tr><th scope="col">Job</th><th scope="col">Hours</th></tr></thead>
+                <tbody>
+                  {jobData.map(d => (
+                    <tr key={d.name}><td>{d.name}</td><td>{d.hours}h</td></tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
@@ -216,9 +224,10 @@ export default function AnalyticsView() {
             <div className="lg:w-72 flex-shrink-0 rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
               <p className="ds-overline text-appTextMuted mb-4" id="lt-chart-label">By labor type</p>
               <div className="flex items-center gap-5">
+                {/* role="img" prunes descendants for AT, so the rich aria-label is
+                    the accessible name (no aria-labelledby — it would win). */}
                 <figure
                   className="relative flex-shrink-0 w-[100px] h-[100px]"
-                  aria-labelledby="lt-chart-label"
                   role="img"
                   aria-label={`Donut chart: hours by labor type. ${ltData.map(d => `${d.name}: ${formatDurationHM(d.value)}`).join(', ')}.`}
                 >
@@ -248,13 +257,25 @@ export default function AnalyticsView() {
                   ))}
                 </div>
               </div>
+              {/* The donut's legend above is aria-hidden, so this sr-only table is
+                  the only data fallback — kept OUTSIDE the role="img" figure, which
+                  prunes its descendants for VoiceOver. Same shape as the bar tables. */}
+              <table className="sr-only">
+                <caption>Hours by labor type</caption>
+                <thead><tr><th scope="col">Labor type</th><th scope="col">Hours</th></tr></thead>
+                <tbody>
+                  {ltData.map(d => (
+                    <tr key={d.name}><td>{d.name}</td><td>{formatDurationHM(d.value)}</td></tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
       )}
 
       {entries.length === 0 && (
-        <div className="flex flex-col items-center py-10 text-appTextDisabled">
+        <div className="flex flex-col items-center py-10 text-appTextMuted">
           <p className="text-sm">No completed entries in this period.</p>
           <p className="text-xs mt-1">Punch in and out to see analytics.</p>
         </div>

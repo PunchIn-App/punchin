@@ -88,21 +88,46 @@ afterEach(() => {
 describe('TimesheetsView — tab switching', () => {
   it('renders daily and weekly tab buttons', () => {
     render(<TimesheetsView />)
-    expect(screen.getByRole('tab', { name: 'daily' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'weekly' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'daily' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'weekly' })).toBeInTheDocument()
   })
 
   it('daily tab is selected by default', () => {
     render(<TimesheetsView />)
-    expect(screen.getByRole('tab', { name: 'daily' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'weekly' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('button', { name: 'daily' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'weekly' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('switches to weekly tab on click', () => {
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
-    expect(screen.getByRole('tab', { name: 'weekly' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'daily' })).toHaveAttribute('aria-selected', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
+    expect(screen.getByRole('button', { name: 'weekly' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'daily' })).toHaveAttribute('aria-pressed', 'false')
+  })
+})
+
+// ─── Period switcher is a toggle-button group, not a tablist (WCAG 4.1.2) ──────
+
+describe('TimesheetsView — period switcher ARIA (WCAG 4.1.2)', () => {
+  it('wraps the daily/weekly buttons in a labelled group, with no tab/tablist roles', () => {
+    render(<TimesheetsView />)
+    // The switcher is a labelled toggle-button group (aria-pressed), not an
+    // incomplete ARIA tablist (which would also need tabpanels + arrow keys).
+    const group = screen.getByRole('group', { name: 'Timesheet view' })
+    expect(group).toBeInTheDocument()
+    expect(group).toContainElement(screen.getByRole('button', { name: 'daily' }))
+    expect(group).toContainElement(screen.getByRole('button', { name: 'weekly' }))
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+  })
+
+  it('marks the active period button aria-pressed="true" and the other "false"', () => {
+    render(<TimesheetsView />)
+    expect(screen.getByRole('button', { name: 'daily' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'weekly' })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
+    expect(screen.getByRole('button', { name: 'daily' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'weekly' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -115,7 +140,7 @@ describe('TimesheetsView — period navigation', () => {
 
   it('shows previous/next week buttons after switching to weekly tab', () => {
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     expect(screen.getByRole('button', { name: /previous week/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next week/i })).toBeInTheDocument()
   })
@@ -350,7 +375,7 @@ describe('TimesheetsView — CSV export', () => {
 
   it('calls URL.createObjectURL when CSV button is clicked (weekly)', async () => {
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /export current view as csv/i }))
     await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled())
   })
@@ -367,7 +392,7 @@ describe('TimesheetsView — print timesheet', () => {
 
   it('hands the print document to openPrintWindow (weekly)', async () => {
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
     await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
   })
@@ -405,14 +430,14 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
   it('renders "Week total" label', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     expect(screen.getByText('Week total')).toBeInTheDocument()
   })
 
   it('shows job name in the job breakdown section', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     // "Acme Corp" appears in dropdown, breakdown, and day-by-day rows
     expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1)
   })
@@ -422,7 +447,7 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
     // populated day discloses its entries on tap rather than rendering them inline.
     setupWithEntries()
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     // Collapsed: the entry's edit button is not in the DOM yet.
     expect(screen.queryByRole('button', { name: /edit entry for acme corp/i })).not.toBeInTheDocument()
     // Expand the only populated day.
@@ -433,7 +458,7 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
   it('renders edit and delete buttons in the day-by-day view (once expanded)', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /delete entry for acme corp/i })).toBeInTheDocument()
@@ -442,7 +467,7 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
   it('clicking the edit button in weekly view opens EditEntryModal', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     fireEvent.click(screen.getByRole('button', { name: /edit entry for acme corp/i }))
     expect(screen.getByTestId('edit-entry-modal')).toBeInTheDocument()
@@ -451,10 +476,79 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
   it('clicking the delete button in weekly view shows ConfirmModal', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /show entries/i }))
     fireEvent.click(screen.getByRole('button', { name: /delete entry for acme corp/i }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})
+
+// ─── Heading structure (WCAG 1.3.1) ───────────────────────────────────────────
+
+describe('TimesheetsView — heading structure (WCAG 1.3.1)', () => {
+  it('renders a per-view <h1> (visually hidden) for the Timesheets view', () => {
+    render(<TimesheetsView />)
+    // The toolbar has no visible title, so the h1 is sr-only — but it must exist
+    // in the DOM so the view has a top-level heading like its sibling views.
+    expect(screen.getByRole('heading', { level: 1, name: 'Timesheet' })).toBeInTheDocument()
+  })
+
+  it('renders the weekly "Week total" and "By job" section titles as headings', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
+    // The styled section titles are headings, not bare <p>s, so they appear in
+    // the screen-reader heading outline.
+    expect(screen.getByRole('heading', { name: 'Week total' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'By job' })).toBeInTheDocument()
+  })
+})
+
+// ─── Live-region status announcements (WCAG 4.1.3) ─────────────────────────────
+
+describe('TimesheetsView — search/filter result is announced (live region)', () => {
+  it('DailySheet summary bar is a polite live region reflecting the entry count', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    // The Total summary bar carries role="status" + aria-live="polite" and an
+    // sr-only entry count, so a search/filter change is announced without focus.
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('Total')
+    expect(status).toHaveTextContent(/1 entry this day/i)
+  })
+
+  it('DailySheet live region updates to the empty result when search excludes all', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.change(screen.getByRole('searchbox', { name: /search time entries/i }), {
+      target: { value: 'xyzzy' },
+    })
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent(/0 entries this day/i)
+  })
+
+  it('WeeklySheet hero total is a polite live region reflecting the entry count', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('Week total')
+    expect(status).toHaveTextContent(/1 entry this week/i)
+  })
+
+  it('WeeklySheet live region updates to the empty result when search excludes all', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: /search time entries/i }), {
+      target: { value: 'xyzzy' },
+    })
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent(/0 entries this week/i)
   })
 })
 
@@ -568,7 +662,7 @@ describe('TimesheetsView — period navigation (functional)', () => {
   it('previous week button navigates back in weekly view without crashing', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /previous week/i }))
     expect(screen.getByRole('button', { name: /previous week/i })).toBeInTheDocument()
   })
@@ -576,7 +670,7 @@ describe('TimesheetsView — period navigation (functional)', () => {
   it('next week button navigates forward in weekly view without crashing', () => {
     setupWithEntries()
     render(<TimesheetsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /next week/i }))
     expect(screen.getByRole('button', { name: /next week/i })).toBeInTheDocument()
   })

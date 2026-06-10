@@ -15,7 +15,7 @@ export default function AppearancePanel({ onBack }) {
           title="Theme"
           subtitle="Auto follows your device setting"
           right={
-            <div className="flex items-center gap-0.5 bg-appBg rounded-lg p-0.5 border border-appBorder">
+            <div role="group" aria-label="Theme" className="flex items-center gap-0.5 bg-appBg rounded-lg p-0.5 border border-appBorder">
               {[
                 { value: 'auto',  label: 'Auto',  Icon: Monitor },
                 { value: 'light', label: 'Light', Icon: Sun     },
@@ -24,6 +24,7 @@ export default function AppearancePanel({ onBack }) {
                 <button
                   key={value}
                   onClick={() => updateSetting('theme', value)}
+                  aria-pressed={(settings.theme || 'auto') === value}
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors
                     ${(settings.theme || 'auto') === value
                       ? 'bg-appAccent text-appOnAccent'

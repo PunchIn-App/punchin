@@ -133,7 +133,7 @@ export default function TimerRail({ jobMap, ltMap, recentJobs, lastEntry, weekSt
               })}
             </div>
           ) : (
-            <p className="text-xs text-appTextDisabled">No time tracked yet.</p>
+            <p className="text-xs text-appTextMuted">No time tracked yet.</p>
           )}
         </section>
       </div>

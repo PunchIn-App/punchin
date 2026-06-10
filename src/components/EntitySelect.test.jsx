@@ -168,4 +168,102 @@ describe('EntitySelect', () => {
     fireEvent.click(screen.getByRole('button', { name: /job/i }))
     expect(screen.getByRole('listbox')).toHaveStyle({ position: 'fixed' })
   })
+
+  // ─── Listbox keyboard model (WAI-ARIA APG, WCAG 4.1.2) ───────────────────
+  describe('listbox keyboard model', () => {
+    it('moves focus into the listbox onto the first option when nothing is selected', () => {
+      render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+      fireEvent.click(screen.getByRole('button', { name: /job/i }))
+      const first = screen.getByRole('option', { name: /acme corp/i })
+      expect(document.activeElement).toBe(first)
+      // roving tabindex: the active option is the only Tab stop
+      expect(first).toHaveAttribute('tabindex', '0')
+      expect(screen.getByRole('option', { name: /skyline studio/i })).toHaveAttribute('tabindex', '-1')
+    })
+
+    it('moves focus onto the currently-selected option on open', () => {
+      render(<EntitySelect label="Job" value="2" onChange={() => {}} options={JOB_OPTS} />)
+      fireEvent.click(screen.getByRole('button', { name: /job/i }))
+      const selectedOpt = screen.getByRole('option', { name: /skyline studio/i })
+      expect(document.activeElement).toBe(selectedOpt)
+      expect(selectedOpt).toHaveAttribute('tabindex', '0')
+      expect(screen.getByRole('option', { name: /acme corp/i })).toHaveAttribute('tabindex', '-1')
+    })
+
+    it('ArrowDown / ArrowUp move the active option (focus + roving tabindex)', () => {
+      render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+      const listbox = (fireEvent.click(screen.getByRole('button', { name: /job/i })), screen.getByRole('listbox'))
+      const first = screen.getByRole('option', { name: /acme corp/i })
+      const second = screen.getByRole('option', { name: /skyline studio/i })
+
+      expect(document.activeElement).toBe(first)
+      fireEvent.keyDown(listbox, { key: 'ArrowDown' })
+      expect(document.activeElement).toBe(second)
+      expect(second).toHaveAttribute('tabindex', '0')
+      expect(first).toHaveAttribute('tabindex', '-1')
+
+      fireEvent.keyDown(listbox, { key: 'ArrowUp' })
+      expect(document.activeElement).toBe(first)
+      expect(first).toHaveAttribute('tabindex', '0')
+      expect(second).toHaveAttribute('tabindex', '-1')
+    })
+
+    it('ArrowUp on the first option does not wrap (stays put)', () => {
+      render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+      const listbox = (fireEvent.click(screen.getByRole('button', { name: /job/i })), screen.getByRole('listbox'))
+      const first = screen.getByRole('option', { name: /acme corp/i })
+      expect(document.activeElement).toBe(first)
+      fireEvent.keyDown(listbox, { key: 'ArrowUp' })
+      expect(document.activeElement).toBe(first)
+    })
+
+    it('Home / End jump to the first / last option (no wrap)', () => {
+      render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+      const listbox = (fireEvent.click(screen.getByRole('button', { name: /job/i })), screen.getByRole('listbox'))
+      const first = screen.getByRole('option', { name: /acme corp/i })
+      const last = screen.getByRole('option', { name: /skyline studio/i })
+
+      fireEvent.keyDown(listbox, { key: 'End' })
+      expect(document.activeElement).toBe(last)
+      expect(last).toHaveAttribute('tabindex', '0')
+
+      fireEvent.keyDown(listbox, { key: 'Home' })
+      expect(document.activeElement).toBe(first)
+      expect(first).toHaveAttribute('tabindex', '0')
+    })
+
+    it('Enter selects the active option, closes the menu, and returns focus to the trigger', () => {
+      const onChange = vi.fn()
+      render(<EntitySelect label="Job" value="" onChange={onChange} options={JOB_OPTS} placeholder="Select a job…" />)
+      const trigger = screen.getByRole('button', { name: /job/i })
+      const listbox = (fireEvent.click(trigger), screen.getByRole('listbox'))
+      fireEvent.keyDown(listbox, { key: 'ArrowDown' })   // -> Skyline Studio
+      fireEvent.keyDown(listbox, { key: 'Enter' })
+      expect(onChange).toHaveBeenCalledWith('2')
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+      expect(document.activeElement).toBe(trigger)        // PR1 focus-return preserved
+    })
+
+    it('Space selects the active option (same as Enter)', () => {
+      const onChange = vi.fn()
+      render(<EntitySelect label="Job" value="" onChange={onChange} options={JOB_OPTS} placeholder="Select a job…" />)
+      const listbox = (fireEvent.click(screen.getByRole('button', { name: /job/i })), screen.getByRole('listbox'))
+      fireEvent.keyDown(listbox, { key: ' ' })
+      expect(onChange).toHaveBeenCalledWith('1')          // first option is active on open
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    })
+
+    it('treats the leading emptyOption as the first option in the roving model', () => {
+      const onChange = vi.fn()
+      render(<EntitySelect label="Job" value="1" onChange={onChange} options={JOB_OPTS} emptyOption={{ label: 'All Jobs' }} />)
+      const listbox = (fireEvent.click(screen.getByRole('button', { name: /job/i })), screen.getByRole('listbox'))
+      // value "1" -> the selected option (Acme Corp) is active on open, not the empty row
+      expect(document.activeElement).toBe(screen.getByRole('option', { name: /acme corp/i }))
+      // Home jumps to the empty row (index 0); Enter selects it with value ''
+      fireEvent.keyDown(listbox, { key: 'Home' })
+      expect(document.activeElement).toBe(screen.getByRole('option', { name: /all jobs/i }))
+      fireEvent.keyDown(listbox, { key: 'Enter' })
+      expect(onChange).toHaveBeenCalledWith('')
+    })
+  })
 })

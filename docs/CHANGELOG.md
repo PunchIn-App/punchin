@@ -5,6 +5,71 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.7] — 2026-06-10
+
+### Fixed
+- **Final accessibility polish.**
+  - **Labor-type glyphs are now legible inside their tinted chips in light mode** — the pastel icon was washing out against the near-white tint; it now darkens just enough to stay readable (≥3:1) while keeping its colour.
+  - **On tablet, the side-rail "on the clock" indicator no longer relies on colour alone** — the amber dot now appears only while a timer is running (its presence, not just its hue, signals the state), and a screen-reader status text states whether you're on or off the clock.
+
+---
+
+## [0.29.6] — 2026-06-10
+
+### Fixed
+- **Page headings & a safer bottom-sheet swipe (accessibility).**
+  - The **Timesheets** and **Settings** screens now expose a top-level heading (and Timesheets' "Week total" / "By job" are now real headings), so screen-reader users can navigate by heading the way they can on every other screen.
+  - Swiping down to dismiss a bottom sheet no longer fires while you're **scrolling the content inside it** — so scrolling a long job list can't accidentally close the sheet and discard what you'd entered.
+
+---
+
+## [0.29.5] — 2026-06-10
+
+### Fixed
+- **Keyboard navigation & screen-reader semantics for menus, pickers, and charts (accessibility).**
+  - The job and labor-type dropdowns, the labor-type chips, the AM/PM control, and the glyph picker now support full arrow-key navigation (↑ ↓ / ← →, Home/End) as a single Tab stop — matching the behaviour their screen-reader roles already advertised, instead of every option being its own Tab stop with arrow keys doing nothing.
+  - The date-picker calendar now exposes proper row / cell / column-header table structure to assistive tech.
+  - The Timesheets (Daily/Weekly) and Jobs (Jobs/Labor Types) switchers now correctly announce which option is active (they were exposed as an incomplete, broken "tab" widget).
+  - **Analytics charts** — the per-day, per-job, and per-labor-type breakdowns are now actually reachable by screen readers (the detailed description was being suppressed and the data tables were hidden inside the chart's image role); the labor-type donut gained a data table it previously lacked entirely.
+
+---
+
+## [0.29.4] — 2026-06-10
+
+### Fixed
+- **Screen readers now hear status changes (accessibility).** Several actions used to change the screen silently; they're now announced via ARIA live regions, without moving your place on the page:
+  - Cloud-sync errors and the "token expired — reconnect" notice after **Sync Now**.
+  - The result of importing shared data (the new-entry count, or an error).
+  - The **Check for updates** result (which otherwise vanished after a few seconds before a screen reader could reach it).
+  - Punching in/out ("N timers running" / "No active timers").
+  - Timesheet search/filter results (the entry count and total as you type or filter).
+  - The "Notifications are blocked" notice when turning on Reminders is denied.
+
+---
+
+## [0.29.3] — 2026-06-10
+
+### Fixed
+- **Form labels, names & validation (accessibility).**
+  - Every form field now has a proper accessible name for screen readers — the custom hex-colour input, the per-labor-type hourly-rate fields (each one announces which labor type it's for), the job / client / labor-type name fields, and the archived-item search boxes — where several previously announced as blank or identical.
+  - Saving a job or labor type with an empty name now shows an inline "Enter a … name." error (announced to screen readers and tied to the field) instead of silently doing nothing.
+  - The **Auto / Light / Dark** theme control now tells assistive tech which option is selected.
+  - Billing identity fields (name, business, email, phone, address) carry autofill hints so the browser can complete them.
+
+---
+
+## [0.29.2] — 2026-06-10
+
+### Fixed
+- **Text legibility & contrast across the app (accessibility).** Faint text that fell below the WCAG AA contrast minimum is now darker and readable — most noticeably in light mode, where some of it was nearly invisible:
+  - Input placeholders; empty-state messages ("No entries this day", "No jobs yet", "No rates set", "No completed entries"); timesheet entry durations and times; the running timer's "started …" time and client name; and chart axis labels.
+  - The keyboard **focus outline** is now full-strength (it was too faint against the dark background), and the invoice/date fields show a proper focus ring.
+  - **Destructive buttons** (delete confirmation, disconnect, factory reset) use a slightly deeper red so their white label stays legible.
+  - The light-mode **"On the clock"** status pill uses a darker amber for its text.
+  - A **custom accent colour** that's too light now automatically switches accent-button text to dark ink so the label stays readable.
+
+---
+
 ## [0.29.1] — 2026-06-10
 
 ### Fixed

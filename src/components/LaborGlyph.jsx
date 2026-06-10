@@ -41,6 +41,10 @@ export function glyphComponent(id) {
 // A tinted colour chip holding the glyph — the design system's `.gl` chip:
 // a ~22% colour fill with a ~42% colour border, the glyph drawn in the full
 // colour. Replaces the bare colour dots in management lists, rate rows, etc.
+// The glyph ink rides on the `--glyph-ink` var + `.lg-glyph-ink` class so the
+// chip stays the full pastel in dark mode but darkens in light mode, where the
+// ~22% tint composites near-white and the bright pastel would fall below 3:1
+// against it (WCAG 1.4.11) — see `.lg-glyph-ink` in index.css.
 export function LaborGlyphChip({ laborType, className = 'w-5 h-5' }) {
   const color = laborType?.color || DEFAULT_LABOR_COLOR
   const Glyph = glyphComponent(laborType?.glyph)
@@ -50,7 +54,7 @@ export function LaborGlyphChip({ laborType, className = 'w-5 h-5' }) {
       style={{ backgroundColor: withAlpha(color, '38'), border: `1px solid ${withAlpha(color, '6B')}` }}
       aria-hidden="true"
     >
-      <Glyph className="w-1/2 h-1/2" style={{ color }} strokeWidth={2} />
+      <Glyph className="lg-glyph-ink w-1/2 h-1/2" style={{ '--glyph-ink': color }} strokeWidth={2} />
     </span>
   )
 }
@@ -75,7 +79,7 @@ export function LaborTag({ laborType, className = '' }) {
         style={{ backgroundColor: withAlpha(color, '38'), border: `1px solid ${withAlpha(color, '6B')}` }}
         aria-hidden="true"
       >
-        <Glyph className="w-3 h-3" style={{ color }} strokeWidth={2} />
+        <Glyph className="lg-glyph-ink w-3 h-3" style={{ '--glyph-ink': color }} strokeWidth={2} />
       </span>
       {laborType.name}
     </span>

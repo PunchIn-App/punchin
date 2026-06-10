@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { is24Hour, formatTime } from '../../utils/time'
@@ -64,6 +64,55 @@ function Segment({ value, min, max, onCommit, onStep, onConfirm, label }) {
       }}
       className="w-11 h-10 rounded-lg bg-appInput border border-appBorder text-appText text-center text-lg font-mono font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-appAccent/60"
     />
+  )
+}
+
+// The AM/PM control is a real WAI-ARIA radio group, so it carries the full
+// keyboard model (issue: ARIA widget semantics). Roving tabindex: only the
+// selected radio is in the Tab order; arrows move *and* select (radiogroup
+// semantics — focus follows selection), Home/End jump to the ends, both wrap.
+const PERIODS = ['AM', 'PM']
+function PeriodRadioGroup({ period, onSelect }) {
+  const refs = useRef([])
+  const selected = PERIODS.indexOf(period)
+  // Exactly one radio is tabbable: the checked one, or the first if none match.
+  const tabbable = selected === -1 ? 0 : selected
+
+  const move = (i) => {
+    const next = wrap(i, PERIODS.length)
+    onSelect(PERIODS[next])      // moving the selection *is* selecting it
+    refs.current[next]?.focus()
+  }
+
+  const onKeyDown = (e) => {
+    // Support both axes: the group is laid out horizontally, but honour the
+    // vertical pair too so it works however the eye reads it.
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); move(selected + 1) }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); move(selected - 1) }
+    else if (e.key === 'Home') { e.preventDefault(); move(0) }
+    else if (e.key === 'End') { e.preventDefault(); move(PERIODS.length - 1) }
+  }
+
+  return (
+    <div className="flex flex-col justify-center gap-1" role="radiogroup" aria-label="AM or PM">
+      {PERIODS.map((p, i) => (
+        <button
+          key={p}
+          ref={(el) => { refs.current[i] = el }}
+          type="button"
+          role="radio"
+          aria-checked={period === p}
+          tabIndex={i === tabbable ? 0 : -1}
+          onClick={() => onSelect(p)}
+          onKeyDown={onKeyDown}
+          className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+            period === p ? 'bg-appAccent text-appOnAccent' : 'text-appTextMuted hover:bg-appInput'
+          }`}
+        >
+          {p}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -154,22 +203,7 @@ export default function TimePicker({ value, onChange, label = 'Time', buttonClas
             </div>
 
             {!use24 && (
-              <div className="flex flex-col justify-center gap-1" role="radiogroup" aria-label="AM or PM">
-                {['AM', 'PM'].map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    role="radio"
-                    aria-checked={period === p}
-                    onClick={() => setPeriod(p)}
-                    className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
-                      period === p ? 'bg-appAccent text-appOnAccent' : 'text-appTextMuted hover:bg-appInput'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
+              <PeriodRadioGroup period={period} onSelect={setPeriod} />
             )}
           </div>
         </div>

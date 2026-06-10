@@ -78,14 +78,19 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
 
   return (
     <div className="space-y-3">
-      {/* Summary bar */}
-      <div className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
+      {/* Summary bar — a persistent polite live region so typing in the search
+          box or changing a filter (which silently updates the list, Total, and
+          empty state) is announced to screen readers (WCAG 4.1.3). It stays in
+          the DOM across filter changes; only the Total + the sr-only entry count
+          change, which announces more reliably than a node that mounts/unmounts. */}
+      <div role="status" aria-live="polite" className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
         <span className="text-sm text-appTextMuted">Total</span>
         <span className="font-mono font-semibold text-appText text-lg">{formatDuration(sumDurationsInRange(filteredEntries.map(e => roundEntry(e, rm)), start, end), decimal)}</span>
+        <span className="sr-only">{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} this day</span>
       </div>
 
       {filteredEntries.length === 0 ? (
-        <div className="flex flex-col items-center py-14 text-appTextDisabled">
+        <div className="flex flex-col items-center py-14 text-appTextMuted">
           <Calendar className="w-10 h-10 mb-3 opacity-40" />
           <p className="text-sm">No entries this day</p>
         </div>
@@ -111,7 +116,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
                   <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || '—'}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {lt && <LaborTag laborType={lt} />}
-                    <span className="font-mono text-xs text-appTextDarker whitespace-nowrap">
+                    <span className="font-mono text-xs text-appTextMuted whitespace-nowrap">
                       {formatTime(entry.punchIn, settings.timeFormat)} → {entry.punchOut ? formatTime(entry.punchOut, settings.timeFormat) : 'running'}
                     </span>
                   </div>
@@ -225,16 +230,20 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
     <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-4 lg:items-start">
       {/* Summary — on top on mobile, a sticky right rail on desktop */}
       <div className="space-y-3 mb-3 lg:mb-0 lg:order-2 lg:sticky lg:top-4">
-        {/* Hero week total */}
-        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-          <p className="text-[10px] uppercase tracking-widest text-appTextMuted">Week total</p>
+        {/* Hero week total — a persistent polite live region so a search/filter
+            change (which silently re-totals the week and re-buckets the days) is
+            announced to screen readers (WCAG 4.1.3). It stays in the DOM across
+            filter changes; only the total + the sr-only entry count change. */}
+        <div role="status" aria-live="polite" className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+          <h2 className="text-[10px] uppercase tracking-widest text-appTextMuted">Week total</h2>
           <p className="font-mono font-bold text-appText text-3xl mt-1">{formatDuration(total, decimal)}</p>
+          <span className="sr-only">{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} this week</span>
         </div>
 
         {/* By job */}
         {Object.keys(jobTotals).length > 0 && (
           <div className="rounded-xl border border-appBorder bg-appCard p-4 shadow-sm">
-            <p className="text-[10px] uppercase tracking-widest text-appTextMuted mb-3">By job</p>
+            <h2 className="text-[10px] uppercase tracking-widest text-appTextMuted mb-3">By job</h2>
             <div className="space-y-3">
               {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
                 const job = getJob(Number(jid))
@@ -294,7 +303,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                   {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
                   <span className={`text-sm font-medium truncate ${isToday ? 'text-appAccent' : 'text-appTextMuted'}`}>{dayLabel}</span>
                 </span>
-                <span className="font-mono text-sm text-appTextDisabled">—</span>
+                <span className="font-mono text-sm text-appTextMuted">—</span>
               </div>
             )}
             {hasEntries && isOpen && (
@@ -309,7 +318,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="font-mono text-appTextDarker">{formatDuration(getEntryDurationInRange(roundEntry(e, rm), ds, de), decimal)}</span>
+                        <span className="font-mono text-appTextMuted">{formatDuration(getEntryDurationInRange(roundEntry(e, rm), ds, de), decimal)}</span>
                         <div className="flex items-center gap-1">
                           <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
@@ -518,14 +527,21 @@ ${PRINT_FONT_HEAD}
 
   return (
     <div className="h-full flex flex-col">
+      {/* Per-view page heading (WCAG 1.3.1): the toolbar carries no visible title,
+          so it's visually hidden — matching the visible <h1> the sibling views show. */}
+      <h1 className="sr-only">Timesheet</h1>
+
       {/* Toolbar row 1 — segmented period tabs, centered date nav, Log Manual.
           Stacks on mobile; a single grouped control bar at lg. */}
       <div className="flex-shrink-0 flex flex-col gap-2.5 px-4 py-2.5 border-b border-appBorderLight lg:flex-row lg:items-center">
-        <div role="tablist" className="flex lg:inline-flex flex-shrink-0 bg-appInput border border-appBorder rounded-xl p-1">
+        {/* A two-way period switch — modelled as a labelled group of toggle
+            buttons (aria-pressed) rather than a full ARIA tablist, which would
+            also require tabpanels, aria-controls, roving tabindex and arrow keys. */}
+        <div role="group" aria-label="Timesheet view" className="flex lg:inline-flex flex-shrink-0 bg-appInput border border-appBorder rounded-xl p-1">
           {['daily','weekly'].map(t => (
             <button key={t} onClick={() => setTab(t)}
-              role="tab"
-              aria-selected={tab === t}
+              type="button"
+              aria-pressed={tab === t}
               className={`flex-1 lg:flex-initial px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors
                 ${tab === t ? 'bg-appCard text-appText shadow-sm' : 'text-appTextMuted hover:text-appText'}`}>
               {t}
@@ -576,7 +592,7 @@ ${PRINT_FONT_HEAD}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search logs..."
             aria-label="Search time entries"
-            className="w-full bg-appCard border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors placeholder-appTextDisabled"
+            className="w-full bg-appCard border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors placeholder-appTextPlaceholder"
           />
         </div>
 

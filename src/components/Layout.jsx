@@ -137,13 +137,23 @@ export default function Layout({ activeView, onNavigate, children }) {
                 : <p className="text-[13px] font-medium text-appTextMuted">Off the clock</p>}
             </div>
           </div>
-          {/* md icon-rail: just the status dot */}
+          {/* md icon-rail: presence conveys state without relying on hue (WCAG
+              1.4.1) — the amber dot renders ONLY when on the clock; its absence
+              means off. An sr-only string voices the same state in text, since
+              the lg-only status card above is hidden at md. */}
           <div className="lg:hidden flex justify-center py-2">
-            <span
-              aria-hidden="true"
-              className={`w-2.5 h-2.5 rounded-full ${activeCount ? 'animate-pulse' : ''}`}
-              style={{ backgroundColor: activeCount ? 'var(--amber)' : 'var(--text-disabled)' }}
-            />
+            {activeCount > 0 && (
+              <span
+                aria-hidden="true"
+                className="w-2.5 h-2.5 rounded-full animate-pulse"
+                style={{ backgroundColor: 'var(--amber)' }}
+              />
+            )}
+            <span className="sr-only">
+              {activeCount
+                ? `On the clock — ${activeCount} running`
+                : 'Off the clock'}
+            </span>
           </div>
         </div>
       </aside>
@@ -163,7 +173,7 @@ export default function Layout({ activeView, onNavigate, children }) {
         {activeCount > 0 && (
           <span
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--amber) 14%, transparent)', color: 'var(--amber)' }}
+            style={{ backgroundColor: 'color-mix(in srgb, var(--amber) 14%, transparent)', color: 'var(--amber-text)' }}
           >
             <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--amber)' }} />
             On the clock

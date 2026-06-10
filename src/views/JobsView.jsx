@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search, DollarSign } from 'lucide-react'
 import { db } from '../db'
@@ -31,6 +31,9 @@ function JobForm({ job, laborTypes, onDone }) {
   const [laborRates, setLaborRates]   = useState(job?.laborRates || {})
   const [color, setColor]             = useState(job?.color || '')
   const [showRates, setShowRates]     = useState(false)
+  const [error, setError]             = useState('')
+
+  const errorId = useId()
 
   const setRate = (ltId, val) => {
     setLaborRates(prev => {
@@ -45,7 +48,7 @@ function JobForm({ job, laborTypes, onDone }) {
   }
 
   const save = async () => {
-    if (!name.trim()) return
+    if (!name.trim()) { setError('Enter a job name.'); return }
     const data = {
       name: name.trim(),
       clientName: clientName.trim() || null,
@@ -62,15 +65,23 @@ function JobForm({ job, laborTypes, onDone }) {
   }
 
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
-                    placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors`
+                    placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors`
 
   const activeLTs = laborTypes?.filter(lt => !lt.isArchived) ?? []
 
   return (
     <div className="rounded-xl border border-appAccent/30 bg-appCard p-4 space-y-3 shadow-md">
-      <input autoFocus value={name} onChange={e => setName(e.target.value)}
-        placeholder="Job name *" className={inputCls} onKeyDown={e => e.key === 'Enter' && save()} />
+      <div className="space-y-1.5">
+        <input autoFocus value={name}
+          onChange={e => { setName(e.target.value); if (error) setError('') }}
+          aria-label="Job name"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          placeholder="Job name *" className={inputCls} onKeyDown={e => e.key === 'Enter' && save()} />
+        {error && <p id={errorId} role="alert" className="text-red-400 text-sm">{error}</p>}
+      </div>
       <input value={clientName} onChange={e => setClientName(e.target.value)}
+        aria-label="Client name"
         placeholder="Client name (optional)" className={inputCls} />
       <EntitySelect
         label="Default labor type"
@@ -123,6 +134,7 @@ function JobForm({ job, laborTypes, onDone }) {
                       step="0.01"
                       value={laborRates[lt.id] ?? ''}
                       onChange={e => setRate(lt.id, e.target.value)}
+                      aria-label={`Hourly rate for ${lt.name} in dollars per hour`}
                       placeholder="—"
                       className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-2 py-1.5 text-xs focus:outline-none focus:border-appAccent/60 transition-colors"
                     />
@@ -152,9 +164,12 @@ function LaborTypeForm({ lt, onDone }) {
   const [name, setName]   = useState(lt?.name || '')
   const [color, setColor] = useState(lt?.color || DEFAULT_LABOR_COLOR)
   const [glyph, setGlyph] = useState(lt?.glyph || '')
+  const [error, setError] = useState('')
+
+  const errorId = useId()
 
   const save = async () => {
-    if (!name.trim()) return
+    if (!name.trim()) { setError('Enter a labor type name.'); return }
     const data = { name: name.trim(), color, glyph: glyph || null }
     if (lt?.id) {
       await db.laborTypes.update(lt.id, data)
@@ -166,11 +181,18 @@ function LaborTypeForm({ lt, onDone }) {
 
   return (
     <div className="rounded-xl border border-appAccent/30 bg-appCard p-4 space-y-4 shadow-md">
-      <input autoFocus value={name} onChange={e => setName(e.target.value)}
-        placeholder="Labor type name *"
-        onKeyDown={e => e.key === 'Enter' && save()}
-        className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
-                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors" />
+      <div className="space-y-1.5">
+        <input autoFocus value={name}
+          onChange={e => { setName(e.target.value); if (error) setError('') }}
+          aria-label="Labor type name"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          placeholder="Labor type name *"
+          onKeyDown={e => e.key === 'Enter' && save()}
+          className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
+                     placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors" />
+        {error && <p id={errorId} role="alert" className="text-red-400 text-sm">{error}</p>}
+      </div>
 
       {/* Glyph — so a type reads by shape, not colour alone */}
       <div className="space-y-1.5">
@@ -251,9 +273,12 @@ export default function JobsView() {
                 : `${activeLtCount} labor type${activeLtCount === 1 ? '' : 's'}`}
             </p>
           </div>
-          <div role="tablist" className="inline-flex flex-shrink-0 bg-appCard border border-appBorder rounded-xl p-1">
+          {/* A two-way section switch — modelled as a labelled group of toggle
+              buttons (aria-pressed) rather than a full ARIA tablist, which would
+              also require tabpanels, aria-controls, roving tabindex and arrow keys. */}
+          <div role="group" aria-label="Manage" className="inline-flex flex-shrink-0 bg-appCard border border-appBorder rounded-xl p-1">
             {['jobs','labor'].map(t => (
-              <button key={t} onClick={() => setTab(t)} role="tab" aria-selected={tab === t}
+              <button key={t} type="button" onClick={() => setTab(t)} aria-pressed={tab === t}
                 className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors
                   ${tab === t ? 'bg-appInput text-appText' : 'text-appTextMuted hover:text-appText'}`}>
                 {t === 'labor' ? 'Labor Types' : 'Jobs'}
@@ -278,7 +303,7 @@ export default function JobsView() {
             )}
 
             {jobs?.filter(j => j.isActive !== false).length === 0 && !addingJob && (
-              <div className="flex flex-col items-center py-14 text-appTextDisabled">
+              <div className="flex flex-col items-center py-14 text-appTextMuted">
                 <Briefcase className="w-10 h-10 mb-3 opacity-40" />
                 <p className="text-sm">No jobs yet. Add one above.</p>
               </div>
@@ -313,12 +338,12 @@ export default function JobsView() {
                       </div>
                       {/* meta row: labor tag (left) + rates indicator (right) */}
                       <div className="flex items-center justify-between gap-2 mt-2.5">
-                        {lt ? <LaborTag laborType={lt} /> : <span className="text-[10px] text-appTextDisabled uppercase tracking-wider">No labor type</span>}
+                        {lt ? <LaborTag laborType={lt} /> : <span className="text-[10px] text-appTextMuted uppercase tracking-wider">No labor type</span>}
                         <span className="flex items-center gap-1 text-xs flex-shrink-0">
                           <DollarSign className="w-3.5 h-3.5 text-appTextMuted" aria-hidden="true" />
                           {rateCount > 0
                             ? <span className="text-appTextMuted">{rateCount} rate{rateCount === 1 ? '' : 's'} set</span>
-                            : <span className="text-appTextDisabled">No rates set</span>}
+                            : <span className="text-appTextMuted">No rates set</span>}
                         </span>
                       </div>
                     </div>
@@ -346,11 +371,12 @@ export default function JobsView() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-appTextDisabled pointer-events-none" />
                       <input
                         type="text"
+                        aria-label="Search archived jobs"
                         placeholder="Search archived…"
                         value={archiveJobSearch}
                         onChange={e => setArchiveJobSearch(e.target.value)}
                         className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-sm
-                                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors"
+                                   placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors"
                       />
                     </div>
                   )}
@@ -410,7 +436,7 @@ export default function JobsView() {
             )}
 
             {laborTypes?.filter(lt => !lt.isArchived).length === 0 && !addingLT && (
-              <div className="flex flex-col items-center py-14 text-appTextDisabled">
+              <div className="flex flex-col items-center py-14 text-appTextMuted">
                 <Tag className="w-10 h-10 mb-3 opacity-40" />
                 <p className="text-sm">No labor types yet.</p>
               </div>
@@ -463,11 +489,12 @@ export default function JobsView() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-appTextDisabled pointer-events-none" />
                       <input
                         type="text"
+                        aria-label="Search archived labor types"
                         placeholder="Search archived…"
                         value={archiveLTSearch}
                         onChange={e => setArchiveLTSearch(e.target.value)}
                         className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-sm
-                                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors"
+                                   placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors"
                       />
                     </div>
                   )}

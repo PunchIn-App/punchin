@@ -14,6 +14,7 @@ import { useAnchoredPopover } from '../../hooks/useAnchoredPopover'
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const WEEKDAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const pad2 = (n) => String(n).padStart(2, '0')
 const toISO = (dt) => `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`
@@ -86,6 +87,7 @@ export default function DatePicker({ value, onChange, label = 'Date', buttonClas
 
   const gridStart = addDays(viewMonth, -viewMonth.getDay()) // Sunday on/before the 1st
   const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
+  const weeks = Array.from({ length: 6 }, (_, w) => cells.slice(w * 7, w * 7 + 7)) // 6 role="row"s of 7
   const triggerText = selected
     ? `${MONTHS_SHORT[selected.getMonth()]} ${selected.getDate()}, ${selected.getFullYear()}`
     : 'Select date'
@@ -127,42 +129,48 @@ export default function DatePicker({ value, onChange, label = 'Date', buttonClas
             </button>
           </div>
 
-          {/* Weekday header */}
-          <div className="grid grid-cols-7 mb-1">
-            {WEEKDAYS.map((w, i) => (
-              <div key={i} className="text-center text-[11px] font-semibold text-appTextMuted py-1" aria-hidden="true">{w}</div>
-            ))}
-          </div>
-
-          {/* Day grid */}
+          {/* Day grid — a role="grid" of role="row"s: a columnheader row of
+              weekday names, then 6 rows of role="gridcell"s wrapping the day
+              buttons (WCAG 1.3.1 / aria-required-children). The focusable
+              <button>s keep the roving tabindex + arrow-key navigation. */}
           <div role="grid" aria-label={`Choose ${label.toLowerCase()}`} className="grid grid-cols-7 gap-0.5" onKeyDown={onGridKeyDown}>
-            {cells.map((dt) => {
-              const inMonth = dt.getMonth() === viewMonth.getMonth()
-              const isSel = selected && sameYMD(dt, selected)
-              const isToday = sameYMD(dt, today)
-              const isFocus = sameYMD(dt, focusDate)
-              return (
-                <button
-                  key={toISO(dt)}
-                  ref={(el) => { if (el) dayRefs.current.set(toISO(dt), el); else dayRefs.current.delete(toISO(dt)) }}
-                  type="button"
-                  tabIndex={isFocus ? 0 : -1}
-                  aria-label={`${MONTHS[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`}
-                  aria-pressed={isSel || undefined}
-                  aria-current={isToday ? 'date' : undefined}
-                  onClick={() => select(dt)}
-                  className={[
-                    'h-9 rounded-lg text-sm font-mono tabular-nums transition-colors focus:outline-none focus:ring-2 focus:ring-appAccent/60',
-                    isSel
-                      ? 'bg-appAccent text-appOnAccent font-bold'
-                      : inMonth ? 'text-appText hover:bg-appInput' : 'text-appTextDisabled hover:bg-appInput',
-                    !isSel && isToday ? 'ring-1 ring-inset ring-appAccent/50' : '',
-                  ].join(' ')}
-                >
-                  {dt.getDate()}
-                </button>
-              )
-            })}
+            <div role="row" className="contents">
+              {WEEKDAYS.map((w, i) => (
+                <div key={i} role="columnheader" aria-label={WEEKDAYS_FULL[i]} className="text-center text-[11px] font-semibold text-appTextMuted py-1 mb-1">{w}</div>
+              ))}
+            </div>
+            {weeks.map((week, w) => (
+              <div key={w} role="row" className="contents">
+                {week.map((dt) => {
+                  const inMonth = dt.getMonth() === viewMonth.getMonth()
+                  const isSel = selected && sameYMD(dt, selected)
+                  const isToday = sameYMD(dt, today)
+                  const isFocus = sameYMD(dt, focusDate)
+                  return (
+                    <div key={toISO(dt)} role="gridcell" className="contents">
+                      <button
+                        ref={(el) => { if (el) dayRefs.current.set(toISO(dt), el); else dayRefs.current.delete(toISO(dt)) }}
+                        type="button"
+                        tabIndex={isFocus ? 0 : -1}
+                        aria-label={`${MONTHS[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`}
+                        aria-pressed={isSel || undefined}
+                        aria-current={isToday ? 'date' : undefined}
+                        onClick={() => select(dt)}
+                        className={[
+                          'h-9 rounded-lg text-sm font-mono tabular-nums transition-colors focus:outline-none focus:ring-2 focus:ring-appAccent/60',
+                          isSel
+                            ? 'bg-appAccent text-appOnAccent font-bold'
+                            : inMonth ? 'text-appText hover:bg-appInput' : 'text-appTextDisabled hover:bg-appInput',
+                          !isSel && isToday ? 'ring-1 ring-inset ring-appAccent/50' : '',
+                        ].join(' ')}
+                      >
+                        {dt.getDate()}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
           </div>
         </div>
       )}

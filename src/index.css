@@ -28,12 +28,16 @@
   --text-muted: #8A93A6;
   --text-darker: #4B5563;
   --text-disabled: #374151;
+  /* Placeholder ink — muted-level so input placeholders meet AA (≥4.5:1);
+     --text-disabled stays reserved for genuinely disabled controls (1.4.3-exempt). */
+  --text-placeholder: #8A93A6;
   --shadow-color: rgba(0, 0, 0, 0.5);
 
   /* Semantic / status colours (dark). */
   --green:  #34D399;
   --violet: #8B8CF8;
   --amber:  #F5A524;
+  --amber-text: #F5A524; /* amber as TEXT on an amber tint — dark passes; see .light for the legible variant */
   --red:    #FB6B6B;
 }
 
@@ -49,15 +53,19 @@
   --border-light: #E5E7EB;
   --text-primary: #111827;
   --text-secondary: #374151;
-  --text-muted: #6B7280;
+  /* #6B7280 measured 4.43:1 on the page bg (fails AA for small text); #5B6472
+     reaches ≥4.9:1 on every light surface while keeping the muted hierarchy. */
+  --text-muted: #5B6472;
   --text-darker: #9CA3AF;
   --text-disabled: #D1D5DB;
+  --text-placeholder: #5B6472;
   --shadow-color: rgba(0, 0, 0, 0.05);
 
   /* Semantic / status colours (light). */
   --green:  #0EA66B;
   --violet: #6366F1;
   --amber:  #D9870A;
+  --amber-text: #92400E; /* amber-800 — legible amber TEXT on the 14%-amber pill tint (#D9870A was 2.47:1) */
   --red:    #E5484D;
 }
 
@@ -129,7 +137,10 @@
   }
 
   :focus-visible {
-    outline: 2px solid rgb(var(--accent-rgb) / 0.75);
+    /* Full opacity: at 0.75 alpha the default dark accent composited to ~2.5:1
+       vs the page bg, below the 3:1 minimum for a focus indicator (WCAG 1.4.11).
+       The 2px offset gap already separates it from the control. */
+    outline: 2px solid rgb(var(--accent-rgb));
     outline-offset: 2px;
   }
 
@@ -185,6 +196,20 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: var(--track-over);
+  }
+
+  /* Labor-type glyph ink (LaborGlyph.jsx). The glyph rides on a ~22%-tint chip
+     (withAlpha(color, '38')); the labor colour is passed in via `--glyph-ink`.
+     Dark mode keeps the full pastel (already 4.4–6.4:1 against the dark tint).
+     In light mode the tint composites near-white, so the full pastel falls to
+     ~1.48–2.27:1 against it (WCAG 1.4.11). Darkening the ink toward the ink
+     near-black (#0F1117) lifts every design-system pastel ≥3:1: at 60% the
+     worst case (yellow #E6C84B) reaches 3.58:1. */
+  .lg-glyph-ink {
+    color: var(--glyph-ink);
+  }
+  .light .lg-glyph-ink {
+    color: color-mix(in srgb, var(--glyph-ink) 60%, #0F1117);
   }
 
   /* Scroll-snap "wheel" column for the reminder duration picker (issue #111).

@@ -19,6 +19,7 @@ export default {
         appTextMuted:    'var(--text-muted)',
         appTextDarker:   'var(--text-darker)',
         appTextDisabled: 'var(--text-disabled)',
+        appTextPlaceholder: 'var(--text-placeholder)',
         appAccent:       'rgb(var(--accent-rgb) / <alpha-value>)',
         appOnAccent:     'var(--on-accent)',
       },

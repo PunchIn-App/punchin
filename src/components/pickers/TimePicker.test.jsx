@@ -94,6 +94,116 @@ describe('TimePicker — 12h AM/PM', () => {
   })
 })
 
+describe('TimePicker — AM/PM radiogroup keyboard model (WAI-ARIA APG)', () => {
+  beforeEach(() => { mockTimeFormat = '12h' })
+
+  const am = () => screen.getByRole('radio', { name: 'AM' })
+  const pm = () => screen.getByRole('radio', { name: 'PM' })
+
+  it('roving tabindex: only the checked radio is tabbable', () => {
+    render(<TimePicker value="09:00" onChange={vi.fn()} label="Start" />) // 9 AM → AM checked
+    openPicker()
+    expect(am()).toHaveAttribute('tabindex', '0')
+    expect(pm()).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('ArrowRight moves selection from AM to PM, updating checked + focus + tabindex', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:00" onChange={onChange} label="Start" />) // 9 AM
+    openPicker()
+    am().focus()
+    fireEvent.keyDown(am(), { key: 'ArrowRight' })
+    expect(onChange).toHaveBeenCalledWith('21:00') // moving selects PM (9 PM)
+  })
+
+  it('ArrowRight from AM moves focus, checked state, and roving tabindex to PM', () => {
+    const onChange = vi.fn()
+    // Re-render the component with the post-select value so the radio reflects PM.
+    const { rerender } = render(<TimePicker value="09:00" onChange={onChange} label="Start" />)
+    openPicker()
+    am().focus()
+    fireEvent.keyDown(am(), { key: 'ArrowRight' })
+    rerender(<TimePicker value="21:00" onChange={onChange} label="Start" />)
+    expect(pm()).toHaveAttribute('aria-checked', 'true')
+    expect(am()).toHaveAttribute('aria-checked', 'false')
+    expect(pm()).toHaveAttribute('tabindex', '0')
+    expect(am()).toHaveAttribute('tabindex', '-1')
+    expect(pm()).toHaveFocus()
+  })
+
+  it('ArrowLeft moves selection from PM to AM', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="21:00" onChange={onChange} label="Start" />) // 9 PM
+    openPicker()
+    pm().focus()
+    fireEvent.keyDown(pm(), { key: 'ArrowLeft' })
+    expect(onChange).toHaveBeenCalledWith('09:00') // moving selects AM (9 AM)
+  })
+
+  it('ArrowDown also moves selection (vertical pair supported)', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:00" onChange={onChange} label="Start" />) // 9 AM
+    openPicker()
+    am().focus()
+    fireEvent.keyDown(am(), { key: 'ArrowDown' })
+    expect(onChange).toHaveBeenCalledWith('21:00') // → PM
+  })
+
+  it('ArrowUp also moves selection (vertical pair supported)', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="21:00" onChange={onChange} label="Start" />) // 9 PM
+    openPicker()
+    pm().focus()
+    fireEvent.keyDown(pm(), { key: 'ArrowUp' })
+    expect(onChange).toHaveBeenCalledWith('09:00') // → AM
+  })
+
+  it('wraps: ArrowRight from PM (last) wraps to AM', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="21:00" onChange={onChange} label="Start" />) // 9 PM (PM, last)
+    openPicker()
+    pm().focus()
+    fireEvent.keyDown(pm(), { key: 'ArrowRight' })
+    expect(onChange).toHaveBeenCalledWith('09:00') // wraps back to AM
+  })
+
+  it('wraps: ArrowLeft from AM (first) wraps to PM', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:00" onChange={onChange} label="Start" />) // 9 AM (AM, first)
+    openPicker()
+    am().focus()
+    fireEvent.keyDown(am(), { key: 'ArrowLeft' })
+    expect(onChange).toHaveBeenCalledWith('21:00') // wraps forward to PM
+  })
+
+  it('Home jumps to the first radio (AM)', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="21:00" onChange={onChange} label="Start" />) // 9 PM
+    openPicker()
+    pm().focus()
+    fireEvent.keyDown(pm(), { key: 'Home' })
+    expect(onChange).toHaveBeenCalledWith('09:00') // → AM (first)
+  })
+
+  it('End jumps to the last radio (PM)', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:00" onChange={onChange} label="Start" />) // 9 AM
+    openPicker()
+    am().focus()
+    fireEvent.keyDown(am(), { key: 'End' })
+    expect(onChange).toHaveBeenCalledWith('21:00') // → PM (last)
+  })
+
+  it('Space/Enter still select the focused radio (native button behaviour preserved)', () => {
+    const onChange = vi.fn()
+    render(<TimePicker value="09:00" onChange={onChange} label="Start" />) // 9 AM
+    openPicker()
+    // A native <button> turns Space/Enter into a click; emulate that activation.
+    fireEvent.click(pm())
+    expect(onChange).toHaveBeenCalledWith('21:00')
+  })
+})
+
 describe('TimePicker — typeable fields', () => {
   const hourField = () => screen.getByRole('textbox', { name: /hour/i })
   const minuteField = () => screen.getByRole('textbox', { name: /minute/i })

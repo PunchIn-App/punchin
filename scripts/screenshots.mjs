@@ -207,13 +207,15 @@ async function captureDevice(browser, device, theme) {
   await goTab('Jobs')
   await shot('jobs.png')
 
-  await page.getByRole('tab', { name: 'Labor Types' }).click()
+  // Jobs/Labor-Types and Timesheets daily/weekly switchers are role="group" +
+  // aria-pressed toggle buttons (not an ARIA tablist) — see LicenseModal’s note.
+  await page.getByRole('button', { name: 'Labor Types' }).click()
   await page.waitForTimeout(300)
   await shot('labor-types.png')
 
   await goTab('Timesheets')
   await shot('timesheets-daily.png')
-  await page.getByRole('tab', { name: /weekly/i }).click()
+  await page.getByRole('button', { name: /weekly/i }).click()
   await page.waitForTimeout(300)
   await shot('timesheets-weekly.png')
 

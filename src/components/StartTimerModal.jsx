@@ -16,6 +16,8 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
   const [error, setError]             = useState('')
   const [submitting, setSubmitting]   = useState(false)
   const [jobMenuOpen, setJobMenuOpen] = useState(false)
+  // Listbox roving tabindex: which option is the active (tabbable, focused) one.
+  const [activeJobIndex, setActiveJobIndex] = useState(-1)
 
   const uid = useId()
   const titleId   = `${uid}-title`
@@ -66,6 +68,8 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
   // ColorPicker / GlyphPicker popovers, issue #155).
   const jobWrapRef = useRef(null)
   const jobTriggerRef = useRef(null)   // refocus target on job select/Escape (WCAG 2.4.3)
+  const jobOptionRefs = useRef([])      // one <button role="option"> per job, for roving focus
+  const laborRadioRefs = useRef([])     // one <button role="radio"> per labor type, for roving focus
   useEffect(() => {
     if (!jobMenuOpen) return
     const onOutside = (e) => {
@@ -87,6 +91,83 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
       document.removeEventListener('keydown', onEscape, true)
     }
   }, [jobMenuOpen])
+
+  // Listbox keyboard model (WAI-ARIA APG): on open, move focus INTO the listbox,
+  // landing on the selected option (else the first). Roving tabindex + focus then
+  // follow activeJobIndex (set by the arrow/Home/End handler below).
+  useEffect(() => {
+    if (!jobMenuOpen || !jobs?.length) return
+    const selIdx = jobs.findIndex(j => j.id === Number(jobId))
+    setActiveJobIndex(selIdx >= 0 ? selIdx : 0)
+  }, [jobMenuOpen, jobs, jobId])
+
+  // Drive focus onto the active option whenever it changes while the menu is open.
+  useEffect(() => {
+    if (!jobMenuOpen || activeJobIndex < 0) return
+    jobOptionRefs.current[activeJobIndex]?.focus()
+  }, [jobMenuOpen, activeJobIndex])
+
+  // Arrow / Home / End navigation inside the job listbox (no wrap at the ends).
+  // Enter/Space fall through to the option's native onClick (select + close).
+  const onJobListKeyDown = (e) => {
+    const count = jobs?.length ?? 0
+    if (!count) return
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setActiveJobIndex(i => Math.min((i < 0 ? -1 : i) + 1, count - 1))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setActiveJobIndex(i => Math.max((i < 0 ? count : i) - 1, 0))
+        break
+      case 'Home':
+        e.preventDefault()
+        setActiveJobIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setActiveJobIndex(count - 1)
+        break
+      default:
+        break
+    }
+  }
+
+  // Radiogroup keyboard model (WAI-ARIA APG): arrow keys move the selection (in a
+  // radio group, moving focus selects), wrapping at the ends; Home/End jump to the
+  // first/last. The chips are laid out horizontally, so Right/Left are primary, but
+  // Up/Down are accepted too. Space/Enter still select via the native button click.
+  const onLaborRadioKeyDown = (e) => {
+    const count = laborTypes?.length ?? 0
+    if (!count) return
+    const cur = laborTypes.findIndex(lt => lt.id === Number(laborTypeId))
+    let next = cur
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        e.preventDefault()
+        next = cur < 0 ? 0 : (cur + 1) % count          // wrap forward
+        break
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        e.preventDefault()
+        next = cur < 0 ? count - 1 : (cur - 1 + count) % count  // wrap back
+        break
+      case 'Home':
+        e.preventDefault()
+        next = 0
+        break
+      case 'End':
+        e.preventDefault()
+        next = count - 1
+        break
+      default:
+        return
+    }
+    setLaborTypeId(String(laborTypes[next].id))
+    laborRadioRefs.current[next]?.focus()
+  }
 
   const handleStart = async () => {
     setError('')
@@ -122,7 +203,7 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
   // Mono uppercase overline — the design system's field-label treatment (.pcm-lbl).
   const overlineCls = 'block mb-2 ds-overline text-appTextMuted'
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-xl px-4 py-3 text-[14.5px]
-                    placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors`
+                    placeholder-appTextPlaceholder focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors`
 
   return (
     // Tap the backdrop (the scrim itself, not a bubbled click from the sheet) to
@@ -199,16 +280,20 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
                 <div
                   role="listbox"
                   aria-label="Job"
+                  onKeyDown={onJobListKeyDown}
                   className="absolute left-0 right-0 top-full mt-1.5 z-20 bg-appCard border border-appBorder rounded-xl shadow-[var(--shadow-pop)] p-1.5 max-h-60 overflow-y-auto"
                 >
-                  {jobs?.length ? jobs.map(j => {
+                  {jobs?.length ? jobs.map((j, i) => {
                     const sel = j.id === Number(jobId)
                     return (
                       <button
                         key={j.id}
+                        ref={el => { jobOptionRefs.current[i] = el }}
                         type="button"
                         role="option"
                         aria-selected={sel}
+                        // Roving tabindex: only the active option is tab-reachable.
+                        tabIndex={i === activeJobIndex ? 0 : -1}
                         // Selecting a job unmounts the menu — refocus the (still-mounted)
                         // trigger first or focus falls to <body> (WCAG 2.4.3).
                         onClick={() => { setJobId(String(j.id)); setJobMenuOpen(false); jobTriggerRef.current?.focus() }}
@@ -234,17 +319,29 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
             {laborTypes === undefined ? null : laborTypes.length === 0 ? (
               <p className="text-xs text-appTextMuted">No labor types yet — add one in Jobs.</p>
             ) : (
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-labelledby={`${uid}-lt`}>
-                {laborTypes.map(lt => {
+              <div
+                className="flex flex-wrap gap-2"
+                role="radiogroup"
+                aria-labelledby={`${uid}-lt`}
+                onKeyDown={onLaborRadioKeyDown}
+              >
+                {(() => {
+                  // Roving tabindex: exactly one radio is tabbable — the checked one,
+                  // or the first when none is checked yet.
+                  const checkedIdx = laborTypes.findIndex(lt => lt.id === Number(laborTypeId))
+                  const tabbableIdx = checkedIdx >= 0 ? checkedIdx : 0
+                  return laborTypes.map((lt, i) => {
                   const sel = lt.id === Number(laborTypeId)
                   const color = lt.color || DEFAULT_LABOR_COLOR
                   const Glyph = glyphComponent(lt.glyph)
                   return (
                     <button
                       key={lt.id}
+                      ref={el => { laborRadioRefs.current[i] = el }}
                       type="button"
                       role="radio"
                       aria-checked={sel}
+                      tabIndex={i === tabbableIdx ? 0 : -1}
                       onClick={() => setLaborTypeId(String(lt.id))}
                       className={`inline-flex items-center gap-2 px-3 py-2 rounded-[10px] border text-[13.5px] font-semibold transition-colors
                         ${sel ? 'border-transparent' : 'border-appBorder text-appTextMuted hover:text-appText hover:border-appBorderLight'}`}
@@ -254,7 +351,8 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
                       {lt.name}
                     </button>
                   )
-                })}
+                  })
+                })()}
               </div>
             )}
           </div>

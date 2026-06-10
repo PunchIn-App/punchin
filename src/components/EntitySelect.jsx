@@ -62,11 +62,22 @@ export default function EntitySelect({
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState(null)   // { left, width, top? , bottom? } in viewport coords
+  const [active, setActive] = useState(0) // roving-tabindex active option index (WCAG 4.1.2)
   const wrapRef = useRef(null)
   const menuRef = useRef(null)
   const triggerRef = useRef(null)        // refocus target on select/Escape (WCAG 2.4.3)
+  const optionRefs = useRef([])          // option DOM nodes, in render order, for roving focus
   const uid = useId()
   const labelId = `${uid}-label`
+
+  // The options as one flat, ordered list — the optional emptyOption is the
+  // first row, exactly as rendered — so the listbox keyboard model (roving
+  // tabindex, Arrow/Home/End, Enter/Space) treats every row uniformly. `v` is
+  // the value passed to pick(): '' for the empty row, String(o.value) otherwise.
+  const rows = [
+    ...(emptyOption ? [{ v: '', selected: value === '' || value == null }] : []),
+    ...options.map(o => ({ v: String(o.value), selected: String(o.value) === String(value) })),
+  ]
 
   // Position the floating menu off the trigger: match the trigger width (min 200
   // for narrow compact chips), flip above when there's no room below, and clamp
@@ -127,6 +138,47 @@ export default function EntitySelect({
     }
   }, [open])
 
+  // Listbox keyboard model (WAI-ARIA APG): on open, move focus INTO the listbox
+  // to the currently-selected option (else the first), and seed the roving
+  // active index there. useLayoutEffect runs after the menu mounts but before
+  // paint so focus lands without a flash. Re-seeds the index every open.
+  useLayoutEffect(() => {
+    if (!open) { setActive(0); return }
+    const sel = rows.findIndex(r => r.selected)
+    const start = sel >= 0 ? sel : 0
+    setActive(start)
+    optionRefs.current[start]?.focus()
+    // rows is derived from value/options/emptyOption; `open` is the trigger we
+    // care about — recomputing on every render would refocus mid-interaction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Move the roving active option: focus it and flip its tabindex to 0 (the
+  // rest go to -1 in render). No wrap at the ends — Home/End reach the extremes.
+  const moveActive = (i) => {
+    const clamped = Math.max(0, Math.min(rows.length - 1, i))
+    setActive(clamped)
+    optionRefs.current[clamped]?.focus()
+  }
+
+  // Arrow/Home/End/Enter/Space on the listbox. Enter/Space select the active
+  // option via pick() (which closes + returns focus to the trigger, PR1). Other
+  // keys (Escape, Tab) fall through to the existing handlers / native behaviour.
+  const onListKeyDown = (e) => {
+    switch (e.key) {
+      case 'ArrowDown': e.preventDefault(); moveActive(active + 1); break
+      case 'ArrowUp':   e.preventDefault(); moveActive(active - 1); break
+      case 'Home':      e.preventDefault(); moveActive(0); break
+      case 'End':       e.preventDefault(); moveActive(rows.length - 1); break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        rows[active] && pick(rows[active].v)
+        break
+      default: break
+    }
+  }
+
   const selected = options.find(o => String(o.value) === String(value)) || null
   const isEmpty = value === '' || value == null
   const display = selected ? selected.label : (emptyOption && isEmpty ? emptyOption.label : null)
@@ -138,6 +190,10 @@ export default function EntitySelect({
   // first or focus falls to <body> (WCAG 2.4.3). :focus-visible means mouse users
   // won't see a ring, so unconditional refocus on selection is safe.
   const pick = (v) => { onChange(v); setOpen(false); triggerRef.current?.focus() }
+
+  // Reset the roving-tabindex ref list each render so removed options don't
+  // leave stale nodes; the option `ref` callbacks below refill it in order.
+  optionRefs.current = []
 
   return (
     <div ref={wrapRef} className="relative">
@@ -182,6 +238,7 @@ export default function EntitySelect({
           ref={menuRef}
           role="listbox"
           aria-label={label}
+          onKeyDown={onListKeyDown}
           style={pos
             ? { position: 'fixed', left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom }
             : { position: 'fixed', visibility: 'hidden' }}
@@ -189,9 +246,11 @@ export default function EntitySelect({
         >
           {emptyOption && (
             <button
+              ref={(el) => { optionRefs.current[0] = el }}
               type="button"
               role="option"
               aria-selected={isEmpty}
+              tabIndex={active === 0 ? 0 : -1}
               onClick={() => pick('')}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-appInput transition-colors"
             >
@@ -200,14 +259,17 @@ export default function EntitySelect({
               {isEmpty && <Check className="w-4 h-4 ml-auto flex-shrink-0 text-appAccent" aria-hidden="true" />}
             </button>
           )}
-          {options.map(o => {
+          {options.map((o, i) => {
             const sel = String(o.value) === String(value)
+            const rowIdx = (emptyOption ? 1 : 0) + i  // flat index into `rows`
             return (
               <button
                 key={o.value}
+                ref={(el) => { optionRefs.current[rowIdx] = el }}
                 type="button"
                 role="option"
                 aria-selected={sel}
+                tabIndex={active === rowIdx ? 0 : -1}
                 onClick={() => pick(String(o.value))}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-appInput transition-colors"
               >

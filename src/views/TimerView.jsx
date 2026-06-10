@@ -92,7 +92,7 @@ export default function TimerView() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="font-display font-extrabold text-appText text-2xl leading-none">On the clock</h1>
-            <p className="text-appTextMuted text-sm mt-1">
+            <p className="text-appTextMuted text-sm mt-1" aria-live="polite">
               <span className="hidden lg:inline">{formatDate(new Date())} · </span>
               {active === undefined
                 ? ' ' /* still loading — don't flash "No active timers" (issue #135) */

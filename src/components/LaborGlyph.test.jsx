@@ -57,3 +57,23 @@ it('LaborGlyphChip renders a glyph even when glyph/color are unset (fallbacks)',
   const { container } = render(<LaborGlyphChip laborType={{}} />)
   expect(container.querySelector('svg')).toBeTruthy()
 })
+
+it('LaborTag glyph wires up theme-aware ink so it darkens in light mode (WCAG 1.4.11)', () => {
+  // The glyph carries `.lg-glyph-ink` + the labor colour on `--glyph-ink`, so
+  // index.css can darken it in light mode (where the ~22% tint composites
+  // near-white and the full pastel would fall below 3:1) while dark mode keeps
+  // the full colour. No raw `color` is set inline — the var drives it.
+  const { container } = render(<LaborTag laborType={{ name: 'Design', color: '#5FD08A', glyph: 'brush' }} />)
+  const glyph = container.querySelector('svg')
+  expect(glyph).toHaveClass('lg-glyph-ink')
+  expect(glyph.style.getPropertyValue('--glyph-ink')).toBe('#5FD08A')
+  expect(glyph.style.color).toBe('') // colour comes from the var, not a hardcoded inline value
+})
+
+it('LaborGlyphChip glyph wires up theme-aware ink so it darkens in light mode (WCAG 1.4.11)', () => {
+  const { container } = render(<LaborGlyphChip laborType={{ color: '#E6C84B', glyph: 'code' }} />)
+  const glyph = container.querySelector('svg')
+  expect(glyph).toHaveClass('lg-glyph-ink')
+  expect(glyph.style.getPropertyValue('--glyph-ink')).toBe('#E6C84B')
+  expect(glyph.style.color).toBe('')
+})

@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.29.1
+**Version:** 0.29.7
 
 ---
 
@@ -364,7 +364,7 @@ Screenshots live in `docs/screenshots/{phone,tablet,desktop}-{dark,light}/` and 
 2. **New setting?** Add the key + default to the single `DEFAULT_SETTINGS` object in `db.js` (both `populate` and `factoryReset` consume it via `defaultSettingsRows()`, so there's one source of truth — no separate edit to `SettingsView.jsx` needed) and document it in the Settings Keys table in `docs/SETTINGS.md`. Because `useSettings` merges over `DEFAULT_SETTINGS`, consumers can read `settings.yourKey` directly without a fallback. Destructive data actions belong in the collapsible **Danger Zone** section, not in the main Data section.
 3. **New view?** Add to `App.jsx` tab switch and `Layout.jsx` nav bar (keep it to 5 nav items max for mobile)
 4. **Editing time?** Always go through `utils/time.js` helpers; never use raw `Date` arithmetic inline
-5. **Charts?** Follow `AnalyticsView.jsx` — use Recharts, reference CSS variables for colors (`var(--text-secondary)` etc.). Wrap each chart in `<figure role="img" aria-label="…">` with a `<table className="sr-only">` fallback.
+5. **Charts?** Follow `AnalyticsView.jsx` — use Recharts, reference CSS variables for colors (`var(--text-secondary)` etc.). Wrap each chart in `<figure role="img" aria-label="…">` whose `aria-label` carries the full data summary, and render a `<table className="sr-only">` data fallback as a **sibling right after the `</figure>`** — *not* inside it. `role="img"` makes all descendants presentational, so a table nested in the figure is pruned from the accessibility tree (esp. VoiceOver). Do **not** also set `aria-labelledby` on the figure: it wins accessible-name computation over `aria-label`, hiding the rich summary — name the figure with `aria-label` only.
 6. **Theming?** New accent-colored elements must use `appAccent` / `text-appAccent` — never hardcode `amber-*` classes. New non-accent colors should use existing CSS variable conventions or Tailwind red/neutral palettes.
 7. **New modal?** Apply the platform-native bottom-sheet pattern from `StartTimerModal.jsx` — use `usePlatformContext()` to branch scrim/sheet/handle styles and wire up `useSwipeDismiss` (iOS) and `useAndroidBackDismiss` (Android). Do not add a new modal that only uses the old `items-end sm:items-center` toggle. Every modal must also have `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, a focus trap, and an Escape key handler (see existing modals for the inline pattern).
 8. **Haptic feedback?** Use `useHapticFeedback(os)` — never call `navigator.vibrate()` directly in a component, and never attempt iOS haptics via any method other than the WebKit switch polyfill. Gate it on both standalone mode and the `hapticFeedback` setting by passing `'web'` when off: `useHapticFeedback(isStandalone && settings.hapticFeedback !== false ? os : 'web')`. Call `trigger()` **synchronously inside the gesture handler** (not after an `await`) or iOS Taptic silently no-ops, and render the returned `hapticEl` somewhere in the component.

@@ -49,3 +49,13 @@ describe('RemindersPanel — local-only delivery messaging (#112)', () => {
     expect(screen.queryByText(/no server/i)).not.toBeInTheDocument()
   })
 })
+
+describe('RemindersPanel — blocked-permission live region (WCAG 4.1.3)', () => {
+  it('announces the blocked message via a polite status region when permission is denied', () => {
+    mockSettings = {}
+    renderPanel('denied')
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent(/notifications are blocked/i)
+  })
+})

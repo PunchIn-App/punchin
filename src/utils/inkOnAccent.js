@@ -3,9 +3,11 @@
 // light/pastel accents (where white would wash out). Pure JS / no DOM, so it's
 // importable from the browser, the Cloudflare Worker, and the Node build scripts.
 //
-// Rule: keep white while it has at least the WCAG 3:1 graphic-contrast ratio
-// against the accent; below that, use the dark ink. This matches the design
-// reference tiles (#2D5BF5 / #7C5CFF → white; #FFD66B / #9FE5C5 / pastels → ink).
+// Rule: keep white while it has at least `minRatio` contrast against the accent;
+// below that, use the dark ink. minRatio defaults to the WCAG 3:1 graphic-contrast
+// ratio (the brand mark is a graphic) — callers styling normal-size TEXT on the
+// accent pass 4.5 instead. This matches the design reference tiles
+// (#2D5BF5 / #7C5CFF → white; #FFD66B / #9FE5C5 / pastels → ink).
 
 export const DARK_INK = '#0F1117' // the app's on-accent dark ink (same as button text)
 const WHITE_INK = '#FFFFFF'
@@ -31,7 +33,8 @@ function contrast(l1, l2) {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-// White by default; dark ink once white drops below 3:1 graphic contrast.
-export function readableInk(hex) {
-  return contrast(1, luminance(hex)) >= 3 ? WHITE_INK : DARK_INK
+// White by default; dark ink once white drops below `minRatio` contrast (3:1 for
+// the brand graphic, 4.5:1 for normal-size text on the accent).
+export function readableInk(hex, minRatio = 3) {
+  return contrast(1, luminance(hex)) >= minRatio ? WHITE_INK : DARK_INK
 }

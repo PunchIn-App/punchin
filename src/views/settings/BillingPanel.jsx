@@ -11,8 +11,8 @@ import { Panel, SettingsRow, Toggle, FIELD_INPUT_CLS as inputCls, FIELD_LABEL_CL
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'INR', 'BRL', 'MXN', 'SEK', 'NZD', 'ZAR', 'SGD']
 const CURRENCY_OPTIONS = CURRENCIES.map(c => ({ value: c, label: c }))
 
-function Field({ id, label, value, onChange, type = 'text', placeholder, multiline }) {
-  const props = { id, value: value ?? '', onChange: e => onChange(e.target.value), placeholder, className: inputCls }
+function Field({ id, label, value, onChange, type = 'text', placeholder, multiline, autoComplete }) {
+  const props = { id, value: value ?? '', onChange: e => onChange(e.target.value), placeholder, autoComplete, className: inputCls }
   return (
     <div className="space-y-1">
       <label htmlFor={id} className={labelCls}>{label}</label>
@@ -62,11 +62,11 @@ export default function BillingPanel({ onBack }) {
           <input ref={logoInputRef} type="file" accept="image/*" className="sr-only" aria-label="Upload business logo" onChange={onLogoFile} />
         </div>
 
-        <Field id="billing-name"     label="Your name"     value={settings.billingName}         onChange={set('billingName')}         placeholder="Jane Doe" />
-        <Field id="billing-business" label="Business"      value={settings.billingBusiness}     onChange={set('billingBusiness')}     placeholder="Optional" />
-        <Field id="billing-email"    label="Email"   type="email" value={settings.billingEmail} onChange={set('billingEmail')}        placeholder="you@example.com" />
-        <Field id="billing-phone"    label="Phone"   type="tel"   value={settings.billingPhone} onChange={set('billingPhone')} />
-        <Field id="billing-address"  label="Address"      value={settings.billingAddress}      onChange={set('billingAddress')}      multiline />
+        <Field id="billing-name"     label="Your name"     value={settings.billingName}         onChange={set('billingName')}         placeholder="Jane Doe" autoComplete="name" />
+        <Field id="billing-business" label="Business"      value={settings.billingBusiness}     onChange={set('billingBusiness')}     placeholder="Optional" autoComplete="organization" />
+        <Field id="billing-email"    label="Email"   type="email" value={settings.billingEmail} onChange={set('billingEmail')}        placeholder="you@example.com" autoComplete="email" />
+        <Field id="billing-phone"    label="Phone"   type="tel"   value={settings.billingPhone} onChange={set('billingPhone')} autoComplete="tel" />
+        <Field id="billing-address"  label="Address"      value={settings.billingAddress}      onChange={set('billingAddress')}      multiline autoComplete="street-address" />
         <Field id="billing-terms"    label="Payment terms" value={settings.billingPaymentTerms} onChange={set('billingPaymentTerms')} placeholder="e.g. Net 30" />
         <Field id="billing-notes"    label="Notes"        value={settings.billingNotes}        onChange={set('billingNotes')}        multiline placeholder="Payment instructions, etc." />
       </div>
