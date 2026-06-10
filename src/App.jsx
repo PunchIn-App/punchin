@@ -15,6 +15,7 @@ const AnalyticsView = lazy(() => import('./views/AnalyticsView'))
 import { useSettings } from './hooks/useSettings'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { useReminders } from './hooks/useReminders'
+import { useAutoSync } from './hooks/useAutoSync'
 import { updateFavicon } from './utils/favicon'
 import { applyInstallIcon } from './utils/installIcon'
 import { DEFAULT_ACCENT, DEFAULT_ACCENT_LIGHT } from './accentPresets'
@@ -128,6 +129,10 @@ export default function App() {
   // Drive local reminder notifications (issue #54). No-op unless the user has
   // enabled reminders and granted notification permission.
   useReminders()
+
+  // Background auto-sync (opt-in, default ON once connected). No-op unless a
+  // provider is connected, auto-sync is on, and the token is live.
+  useAutoSync()
 
   // Track the live view for the navigate callback without re-creating it.
   const activeViewRef = useRef(activeView)
@@ -289,6 +294,7 @@ export default function App() {
       { key: 'syncFileId', value: null },
       { key: 'syncError', value: null },
       { key: 'syncUsername', value: pendingGitHubAuth.username },
+      { key: 'autoSync', value: true }, // default background sync ON at connect
     ])
     setPendingGitHubAuth(null)
   }, [pendingGitHubAuth])
@@ -327,6 +333,7 @@ export default function App() {
               { key: 'syncTokenExpiry', value: Date.now() + (data.expires_in ?? 3600) * 1000 },
               { key: 'syncFileId', value: null },
               { key: 'syncError', value: null },
+              { key: 'autoSync', value: true }, // default background sync ON at connect
             ]))
           })
           .catch(() => { if (!cancelled) db.settings.put({ key: 'syncError', value: describeSyncError('auth_failed') }) })
@@ -395,6 +402,7 @@ export default function App() {
             { key: 'syncTokenExpiry', value: Date.now() + expiresIn },
             { key: 'syncFileId', value: null },
             { key: 'syncError', value: null },
+            { key: 'autoSync', value: true }, // default background sync ON at connect
           ]))
         } else {
           db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })

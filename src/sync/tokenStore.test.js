@@ -1,10 +1,11 @@
 import 'fake-indexeddb/auto'
 import { db } from '../db'
-import { setSyncToken, getSyncToken, clearSyncToken } from './tokenStore'
+import { setSyncToken, getSyncToken, getFreshAccessToken, clearSyncToken } from './tokenStore'
 
 beforeEach(async () => {
   await db.secrets.clear()
   await db.settings.delete('syncToken')
+  await db.settings.delete('syncTokenExpiry')
 })
 afterAll(async () => { await db.close(); await db.delete() })
 
@@ -41,5 +42,28 @@ describe('tokenStore — encrypted at-rest sync token (issue #126)', () => {
     expect(await getSyncToken()).toBe('legacy-plaintext') // migrated transparently
     expect(await db.settings.get('syncToken')).toBeUndefined() // plaintext removed
     expect(await getSyncToken()).toBe('legacy-plaintext') // now served from the encrypted store
+  })
+})
+
+describe('tokenStore — getFreshAccessToken chokepoint', () => {
+  it('returns null when there is no token (not connected)', async () => {
+    expect(await getFreshAccessToken()).toBeNull()
+  })
+
+  it('returns the token when there is no expiry (e.g. GitHub, never expires)', async () => {
+    await setSyncToken('gh-token')
+    expect(await getFreshAccessToken()).toBe('gh-token')
+  })
+
+  it('returns the token when the expiry is comfortably in the future', async () => {
+    await setSyncToken('fresh')
+    await db.settings.put({ key: 'syncTokenExpiry', value: Date.now() + 3_600_000 })
+    expect(await getFreshAccessToken()).toBe('fresh')
+  })
+
+  it('throws TOKEN_EXPIRED once past (within the safety margin of) expiry', async () => {
+    await setSyncToken('stale')
+    await db.settings.put({ key: 'syncTokenExpiry', value: Date.now() + 5_000 }) // inside the 30s margin
+    await expect(getFreshAccessToken()).rejects.toThrow('TOKEN_EXPIRED')
   })
 })

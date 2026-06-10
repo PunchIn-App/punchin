@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.27.0] — 2026-06-08
+
+### Added
+- **Auto-sync.** Once you connect a cloud account, PunchIn now keeps it in sync automatically — on open, when you make changes, when you return to the tab, and on a light background timer — so you no longer have to tap **Sync Now**. It's a per-device toggle in **Settings › Data & Sync** that defaults **on** when you connect, and you can switch it off any time. On GitHub it's fully seamless; on Google Drive / OneDrive it syncs until the ~1-hour sign-in expires, then shows the existing "Reconnect" prompt (longer-lived sessions are coming next). Background syncs never interrupt you with transient network errors — only an expired sign-in surfaces.
+
+---
+
 ## [0.26.1] — 2026-06-08
 
 ### Changed
