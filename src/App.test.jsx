@@ -324,6 +324,34 @@ describe('App — OAuth callback handling', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
+  it('moves focus into the dialog (the Connect button) on open via the shared focus trap', async () => {
+    // The shared useFocusTrap focuses [data-autofocus] on open. Asserting the
+    // Connect button receives focus proves the dialog consumes the hook rather
+    // than an ad-hoc inline trap.
+    window.location.hash = `#sync_token=ghtoken123&sync_provider=github&state=${NONCE}`
+    render(<App />)
+    await screen.findByRole('dialog')
+    // Flush effects so the trap's mount-time focus has run.
+    await act(async () => {})
+    expect(screen.getByRole('button', { name: 'Connect' })).toHaveFocus()
+  })
+
+  it('pulls wandered focus back into the dialog on Tab (shared trap behaviour)', async () => {
+    // The shared trap recovers focus if it has escaped the dialog (#154) — the
+    // inline trap it replaces only cycled between buttons and never recovered.
+    window.location.hash = `#sync_token=ghtoken123&sync_provider=github&state=${NONCE}`
+    render(<App />)
+    const dialog = await screen.findByRole('dialog')
+    await act(async () => {})
+    // Move focus to a real focusable node outside the dialog (the mocked Layout's
+    // nav button), then Tab — the trap should pull focus back into the dialog.
+    const outside = screen.getByText('go-jobs')
+    outside.focus()
+    expect(dialog.contains(document.activeElement)).toBe(false)
+    await act(async () => { fireEvent.keyDown(document, { key: 'Tab' }) })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+  })
+
   it('confirms the Google account, then stores the access + refresh token (issue #243, account parity)', async () => {
     window.location.hash = `#sync_token=googletoken&sync_provider=google&sync_refresh=grefresh&sync_expires=3600&state=${NONCE}`
     render(<App />)

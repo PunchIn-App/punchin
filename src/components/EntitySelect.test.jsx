@@ -106,6 +106,26 @@ describe('EntitySelect', () => {
     expect(screen.getByRole('button', { name: /all jobs/i })).toBeInTheDocument()
   })
 
+  it('restores focus to the trigger after selecting an option (WCAG 2.4.3)', () => {
+    // The chosen option unmounts the menu; focus must return to the trigger
+    // rather than dropping to <body>.
+    render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+    const trigger = screen.getByRole('button', { name: /job/i })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('option', { name: /skyline studio/i }))
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('restores focus to the trigger after closing the menu with Escape (WCAG 2.4.3)', () => {
+    render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+    const trigger = screen.getByRole('button', { name: /job/i })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('closes on Escape without bubbling (so a surrounding modal stays open)', () => {
     const onModalEscape = vi.fn()
     render(

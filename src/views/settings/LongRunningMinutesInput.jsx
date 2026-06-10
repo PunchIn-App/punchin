@@ -41,9 +41,10 @@ const TRIGGER_DEFAULT =
   'bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-appAccent/50'
 
 // A big, always-typeable H/M field that lives above its wheel (mirrors the
-// TimePicker's). `type="text"` + inputMode numeric on purpose — `type="number"`
+// TimePicker's). Enter confirms — it closes the popover and hands focus back to
+// the trigger. `type="text"` + inputMode numeric on purpose — `type="number"`
 // reports an ARIA spinbutton role that would collide with the wheel's.
-function Segment({ value, min, max, pad, onCommit, onStep, label }) {
+function Segment({ value, min, max, pad, onCommit, onStep, onConfirm, label }) {
   const [draft, setDraft] = useState(null)
   return (
     <input
@@ -60,7 +61,7 @@ function Segment({ value, min, max, pad, onCommit, onStep, label }) {
       onFocus={(e) => e.target.select()}
       onBlur={() => setDraft(null)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); setDraft(null); e.currentTarget.blur() }
+        if (e.key === 'Enter') { e.preventDefault(); setDraft(null); onConfirm() }
         else if (e.key === 'ArrowUp') { e.preventDefault(); onStep(1) }
         else if (e.key === 'ArrowDown') { e.preventDefault(); onStep(-1) }
       }}
@@ -82,7 +83,11 @@ export default function LongRunningMinutesInput({ minutes, onChange, onTurnOff, 
   const m = total % 60
   const liveH = Math.floor(norm(total + liveMin) / 60)
 
-  const { open, setOpen, wrapRef, menuRef, menuStyle } = useAnchoredPopover({ width: 168, maxHeight: 200 })
+  const { open, setOpen, wrapRef, menuRef, triggerRef, menuStyle } = useAnchoredPopover({ width: 168, maxHeight: 200 })
+
+  // Confirm-and-close: drop focus back on the trigger before the panel unmounts
+  // so it never falls to <body> (WCAG 2.4.3). The trigger node stays mounted.
+  const confirm = () => { setOpen(false); triggerRef.current?.focus() }
 
   const commit = (newTotal) => {
     const t = norm(newTotal)
@@ -95,6 +100,7 @@ export default function LongRunningMinutesInput({ minutes, onChange, onTurnOff, 
   return (
     <div ref={wrapRef} className="relative inline-block">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-haspopup="dialog"
@@ -117,9 +123,9 @@ export default function LongRunningMinutesInput({ minutes, onChange, onTurnOff, 
           <div className="flex flex-col items-center gap-2">
             {/* Type it… */}
             <div className="flex items-center gap-1.5">
-              <Segment label="Hours" value={liveH} min={0} max={23} pad={false} onCommit={commitHour} onStep={(d) => commit(total + d * 60)} />
+              <Segment label="Hours" value={liveH} min={0} max={23} pad={false} onCommit={commitHour} onStep={(d) => commit(total + d * 60)} onConfirm={confirm} />
               <span aria-hidden="true" className="w-3 text-center text-sm font-mono text-appTextMuted">h</span>
-              <Segment label="Minutes" value={m} min={0} max={55} pad onCommit={commitMin} onStep={(d) => commit(total + d * 5)} />
+              <Segment label="Minutes" value={m} min={0} max={55} pad onCommit={commitMin} onStep={(d) => commit(total + d * 5)} onConfirm={confirm} />
               <span aria-hidden="true" className="w-3 text-center text-sm font-mono text-appTextMuted">m</span>
             </div>
             {/* …or spin it. */}

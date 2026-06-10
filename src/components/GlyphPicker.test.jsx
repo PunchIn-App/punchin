@@ -55,4 +55,25 @@ describe('GlyphPicker', () => {
     fireEvent.change(screen.getByLabelText(/search glyphs/i), { target: { value: 'zzzznope' } })
     expect(screen.getByText(/no matching glyphs/i)).toBeInTheDocument()
   })
+
+  it('restores focus to the "More glyphs" trigger after choosing from the dropdown (WCAG 2.4.3)', () => {
+    // Selecting a glyph unmounts the popover; focus must return to the trigger
+    // rather than dropping to <body>.
+    render(<GlyphPicker value="" onChange={() => {}} />)
+    const trigger = screen.getByRole('button', { name: /more glyphs/i })
+    fireEvent.click(trigger)
+    fireEvent.change(screen.getByLabelText(/search glyphs/i), { target: { value: 'plane' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'plane' }))
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('restores focus to the "More glyphs" trigger after closing with Escape (WCAG 2.4.3)', () => {
+    render(<GlyphPicker value="" onChange={() => {}} />)
+    const trigger = screen.getByRole('button', { name: /more glyphs/i })
+    fireEvent.click(trigger)
+    expect(screen.getByLabelText(/search glyphs/i)).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByLabelText(/search glyphs/i)).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+  })
 })

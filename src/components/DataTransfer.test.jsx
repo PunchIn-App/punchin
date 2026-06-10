@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import DataTransfer from './DataTransfer'
 
 const mockExport = vi.fn()
@@ -65,6 +65,28 @@ describe('DataTransfer — share', () => {
     fireEvent.click(screen.getByRole('button', { name: /enlarge qr code/i }))
     fireEvent.click(screen.getByRole('dialog', { name: /share qr code/i })) // the scrim itself
     expect(screen.queryByRole('dialog', { name: /share qr code/i })).not.toBeInTheDocument()
+  })
+
+  it('traps focus in the lightbox (Close gets initial focus) and restores it on close', async () => {
+    render(<DataTransfer />)
+    fireEvent.click(screen.getByRole('button', { name: /create share link/i }))
+    await screen.findByLabelText('Share link')
+
+    // Focus the trigger as a real tap would, so the trap can hand focus back to it.
+    const trigger = screen.getByRole('button', { name: /enlarge qr code/i })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    // useFocusTrap moves initial focus to the [data-autofocus] Close button —
+    // the old inline lightbox never moved focus, so this fails without the fix.
+    const dialog = screen.getByRole('dialog', { name: /share qr code/i })
+    const close = within(dialog).getByRole('button', { name: /close/i })
+    expect(close).toHaveFocus()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: /share qr code/i })).not.toBeInTheDocument()
+    // Focus is restored to the element that opened the dialog (WCAG 2.4.3).
+    expect(trigger).toHaveFocus()
   })
 })
 

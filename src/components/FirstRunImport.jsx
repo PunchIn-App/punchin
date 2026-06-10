@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Download, Cloud, X } from 'lucide-react'
 import { importSnapshot } from '../sync/syncManager'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 // Shown once on a fresh / empty install: an installed PWA gets a SEPARATE data
 // store from the browser that installed it, so jobs, entries, and settings don't
@@ -9,8 +10,14 @@ import { importSnapshot } from '../sync/syncManager'
 // (the caller localStorage-gates it so this never nags twice).
 export default function FirstRunImport({ onDismiss, onConnectSync }) {
   const fileRef = useRef(null)
+  const dialogRef = useRef(null)
+  const titleId = useId() // useId, not a hardcoded id, so two of these can coexist (issue #156)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  // Trap + restore focus and close on Escape via the shared hook; initial focus
+  // lands on the non-destructive "Import a backup file" button (data-autofocus).
+  useFocusTrap(dialogRef, onDismiss)
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]
@@ -35,14 +42,16 @@ export default function FirstRunImport({ onDismiss, onConnectSync }) {
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="firstrun-title"
+      aria-labelledby={titleId}
+      onClick={e => { if (e.target === e.currentTarget) onDismiss() }}
       className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
     >
       <div className="w-full sm:max-w-sm bg-appCard border border-appBorder rounded-2xl shadow-xl p-5">
         <div className="flex items-start justify-between gap-3">
-          <h2 id="firstrun-title" className="font-display font-bold text-appText text-lg">Bring your data over?</h2>
+          <h2 id={titleId} className="font-display font-bold text-appText text-lg">Bring your data over?</h2>
           <button
             onClick={onDismiss}
             aria-label="Dismiss"
@@ -59,6 +68,7 @@ export default function FirstRunImport({ onDismiss, onConnectSync }) {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={busy}
+            data-autofocus
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-appAccent text-appOnAccent font-semibold shadow-[var(--shadow-accent)] disabled:opacity-60 transition-all"
           >
             <Download className="w-4 h-4" aria-hidden="true" /> {busy ? 'Importing…' : 'Import a backup file'}

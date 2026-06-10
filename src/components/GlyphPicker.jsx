@@ -31,6 +31,7 @@ export default function GlyphPicker({ value, onChange }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const wrapRef = useRef(null)
+  const triggerRef = useRef(null)   // "More glyphs" — refocus target on select/Escape (WCAG 2.4.3)
 
   useEffect(() => {
     if (!open) return
@@ -44,6 +45,9 @@ export default function GlyphPicker({ value, onChange }) {
       e.stopPropagation()
       e.preventDefault()
       setOpen(false)
+      // Restore focus to the trigger before the popover unmounts so focus doesn't
+      // drop to <body> (WCAG 2.4.3). The trigger node stays mounted.
+      triggerRef.current?.focus()
     }
     document.addEventListener('mousedown', onOutside)
     document.addEventListener('keydown', onEscape, true)
@@ -58,7 +62,10 @@ export default function GlyphPicker({ value, onChange }) {
   const q = query.trim().toLowerCase()
   const results = q ? LABOR_GLYPH_IDS.filter(id => id.includes(q)) : LABOR_GLYPH_IDS
 
-  const choose = id => { onChange(id); setOpen(false); setQuery('') }
+  // Picking a glyph unmounts the popover, so refocus the (still-mounted) trigger
+  // first or focus falls to <body> (WCAG 2.4.3). :focus-visible means mouse users
+  // won't see a ring, so unconditional refocus on selection is safe.
+  const choose = id => { onChange(id); setOpen(false); setQuery(''); triggerRef.current?.focus() }
 
   return (
     <div ref={wrapRef} className="relative">
@@ -67,6 +74,7 @@ export default function GlyphPicker({ value, onChange }) {
           <GlyphButton key={id} id={id} selected={value === id} onChange={onChange} />
         ))}
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setOpen(o => !o)}
           aria-expanded={open}

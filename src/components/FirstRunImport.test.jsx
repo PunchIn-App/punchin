@@ -52,3 +52,26 @@ it('rejects a non-PunchIn file without importing or dismissing', async () => {
   expect(mockImportSnapshot).not.toHaveBeenCalled()
   expect(onDismiss).not.toHaveBeenCalled()
 })
+
+it('moves initial focus to the non-destructive "Import a backup file" button', () => {
+  render(<FirstRunImport onDismiss={vi.fn()} onConnectSync={vi.fn()} />)
+  expect(screen.getByRole('button', { name: /import a backup file/i })).toHaveFocus()
+})
+
+it('Escape dismisses the dialog', () => {
+  const onDismiss = vi.fn()
+  render(<FirstRunImport onDismiss={onDismiss} onConnectSync={vi.fn()} />)
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(onDismiss).toHaveBeenCalled()
+})
+
+it('a backdrop tap dismisses, an in-sheet click does not', () => {
+  const onDismiss = vi.fn()
+  render(<FirstRunImport onDismiss={onDismiss} onConnectSync={vi.fn()} />)
+  const dialog = screen.getByRole('dialog', { name: /bring your data over/i })
+  fireEvent.click(dialog) // tap on the scrim itself
+  expect(onDismiss).toHaveBeenCalledTimes(1)
+  // a bubbled click from inside the sheet must NOT close it
+  fireEvent.click(screen.getByText(/bring your data over\?/i))
+  expect(onDismiss).toHaveBeenCalledTimes(1)
+})

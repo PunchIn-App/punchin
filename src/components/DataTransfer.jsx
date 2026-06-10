@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import qrcode from 'qrcode-generator'
 import { Share2, Copy, Check, Download, Link as LinkIcon, X } from 'lucide-react'
 import { exportSnapshot, importSnapshot } from '../sync/syncManager'
 import { encodeSnapshot, decodeSnapshot, buildShareUrl, parseImportCode } from '../utils/transfer'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 
 // Above this URL length a QR code is unlikely to scan reliably, and some apps
 // truncate very long links — warn and lean on copy/paste instead.
@@ -33,14 +34,6 @@ export default function DataTransfer() {
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState(null) // { success } | { error }
   const [enlarged, setEnlarged] = useState(false) // QR lightbox (issue: code too small to scan inline)
-
-  // Escape closes the enlarged-QR lightbox.
-  useEffect(() => {
-    if (!enlarged) return
-    const onKey = (e) => { if (e.key === 'Escape') setEnlarged(false) }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [enlarged])
 
   const createLink = async () => {
     setGenerating(true)
@@ -199,35 +192,46 @@ export default function DataTransfer() {
       </div>
     </div>
 
-    {/* Enlarged QR lightbox — the inline thumbnail is often too small to scan, so
-        tapping it blows the code up centered on a dark scrim (tap/Escape closes). */}
-    {enlarged && qrSrc && (
-      <div
-        className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
-        onClick={() => setEnlarged(false)}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Share QR code — scan with the other device"
-      >
-        <button
-          type="button"
-          onClick={() => setEnlarged(false)}
-          aria-label="Close"
-          className="absolute top-4 right-4 p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          <X className="w-6 h-6" aria-hidden="true" />
-        </button>
-        <div className="flex flex-col items-center gap-4" onClick={e => e.stopPropagation()}>
-          <img
-            src={qrSrc}
-            alt="QR code for the share link"
-            className="w-full max-w-[340px] aspect-square rounded-2xl bg-white p-4 shadow-xl"
-            style={{ imageRendering: 'pixelated' }}
-          />
-          <p className="text-sm text-white/90 text-center">Scan with the other device's camera</p>
-        </div>
-      </div>
-    )}
+    {enlarged && qrSrc && <QrLightbox src={qrSrc} onClose={() => setEnlarged(false)} />}
     </>
+  )
+}
+
+// Enlarged QR lightbox — the inline thumbnail is often too small to scan, so
+// tapping it blows the code up centered on a dark scrim. The focus trap (initial
+// focus → restore → Escape) must mount/unmount with the dialog, so it lives in
+// this child rather than a conditional hook in the parent (issues #151/#152/#154).
+function QrLightbox({ src, onClose }) {
+  const dialogRef = useRef(null)
+  useFocusTrap(dialogRef, onClose) // traps Tab + Escape; restores focus to the "Enlarge QR code" trigger on close
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+      onClick={e => e.target === e.currentTarget && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Share QR code — scan with the other device"
+      ref={dialogRef}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        data-autofocus
+        className="absolute top-4 right-4 p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+      >
+        <X className="w-6 h-6" aria-hidden="true" />
+      </button>
+      <div className="flex flex-col items-center gap-4" onClick={e => e.stopPropagation()}>
+        <img
+          src={src}
+          alt="QR code for the share link"
+          className="w-full max-w-[340px] aspect-square rounded-2xl bg-white p-4 shadow-xl"
+          style={{ imageRendering: 'pixelated' }}
+        />
+        <p className="text-sm text-white/90 text-center">Scan with the other device's camera</p>
+      </div>
+    </div>
   )
 }

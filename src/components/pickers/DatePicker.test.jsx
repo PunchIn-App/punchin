@@ -59,3 +59,21 @@ describe('DatePicker — calendar', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
+
+describe('DatePicker — focus restoration (WCAG 2.4.3)', () => {
+  it('returns focus to the trigger when closed via Escape', () => {
+    render(<DatePicker value="2026-06-08" onChange={vi.fn()} label="Start Date" />)
+    const trigger = screen.getByRole('button', { name: /start date/i })
+    open()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(trigger).toHaveFocus()
+  })
+
+  it('returns focus to the trigger when a day is selected', () => {
+    render(<DatePicker value="2026-06-08" onChange={vi.fn()} label="Start Date" />)
+    const trigger = screen.getByRole('button', { name: /start date/i })
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'June 15, 2026' }))
+    expect(trigger).toHaveFocus()
+  })
+})

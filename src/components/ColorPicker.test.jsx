@@ -79,6 +79,18 @@ describe('ColorPicker — custom color button', () => {
     expect(screen.queryByTestId('hex-color-picker')).not.toBeInTheDocument()
   })
 
+  it('restores focus to the custom-color trigger after closing with Escape (WCAG 2.4.3)', () => {
+    // Closing the popover unmounts its contents; focus must return to the trigger
+    // rather than dropping to <body>.
+    render(<ColorPicker presets={PRESETS} value="#6366F1" onChange={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /^custom color$/i })
+    fireEvent.click(trigger)
+    expect(screen.getByTestId('hex-color-picker')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByTestId('hex-color-picker')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('Escape closes only the popover, sparing a parent dialog\'s Escape handler (#155)', () => {
     // Simulate a surrounding modal whose Escape handler is on document (bubble),
     // registered before the popover opens.

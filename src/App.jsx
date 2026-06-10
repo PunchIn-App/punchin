@@ -12,6 +12,7 @@ import SettingsView   from './views/SettingsView'
 // library lands in its own chunk fetched on demand, keeping the initial bundle
 // small for an offline-first PWA (issue #167).
 const AnalyticsView = lazy(() => import('./views/AnalyticsView'))
+import { useFocusTrap } from './hooks/useFocusTrap'
 import { useSettings } from './hooks/useSettings'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { useReminders } from './hooks/useReminders'
@@ -95,20 +96,11 @@ function AccountConfirm({ provider, username, onConfirm, onDismiss }) {
   const cfg = PROVIDER_CONNECT[provider] ?? PROVIDER_CONNECT.github
   const display = username ? `${cfg.prefix}${username}` : null
 
-  useEffect(() => {
-    dialogRef.current?.querySelector('[data-autofocus]')?.focus()
-    const onKey = (e) => {
-      if (e.key === 'Escape') { onDismiss(); return }
-      if (e.key !== 'Tab') return
-      const focusable = Array.from(dialogRef.current?.querySelectorAll('button') ?? [])
-      if (!focusable.length) return
-      const first = focusable[0], last = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onDismiss])
+  // Shared modal focus management (issue #151): focus the [data-autofocus]
+  // Connect button on open, trap Tab within the dialog (all focusable nodes, not
+  // just buttons), pull focus back if it wanders out, restore focus to the opener
+  // on close, and close on Escape — the full a11y contract the inline trap missed.
+  useFocusTrap(dialogRef, onDismiss)
 
   return (
     <div

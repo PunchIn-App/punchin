@@ -65,6 +65,7 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
   // doesn't fall through to the modal's Escape→onClose (same contract as the
   // ColorPicker / GlyphPicker popovers, issue #155).
   const jobWrapRef = useRef(null)
+  const jobTriggerRef = useRef(null)   // refocus target on job select/Escape (WCAG 2.4.3)
   useEffect(() => {
     if (!jobMenuOpen) return
     const onOutside = (e) => {
@@ -75,6 +76,9 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
       e.stopPropagation()
       e.preventDefault()
       setJobMenuOpen(false)
+      // Restore focus to the job trigger before the menu unmounts so focus doesn't
+      // drop to <body> (WCAG 2.4.3). The trigger node stays mounted.
+      jobTriggerRef.current?.focus()
     }
     document.addEventListener('mousedown', onOutside)
     document.addEventListener('keydown', onEscape, true)
@@ -161,6 +165,7 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
             <span className={overlineCls} aria-hidden="true">Job</span>
             <div ref={jobWrapRef} className="relative">
               <button
+                ref={jobTriggerRef}
                 type="button"
                 onClick={() => setJobMenuOpen(o => !o)}
                 aria-haspopup="listbox"
@@ -204,7 +209,9 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
                         type="button"
                         role="option"
                         aria-selected={sel}
-                        onClick={() => { setJobId(String(j.id)); setJobMenuOpen(false) }}
+                        // Selecting a job unmounts the menu — refocus the (still-mounted)
+                        // trigger first or focus falls to <body> (WCAG 2.4.3).
+                        onClick={() => { setJobId(String(j.id)); setJobMenuOpen(false); jobTriggerRef.current?.focus() }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-appInput transition-colors"
                       >
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: jobDotColor(j) }} aria-hidden="true" />
