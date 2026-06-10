@@ -77,10 +77,10 @@ describe('EditEntryModal — manual add mode', () => {
     expect(screen.getByRole('button', { name: /add time entry/i })).toBeInTheDocument()
   })
 
-  it('renders both start and end date inputs', () => {
+  it('renders both start and end date pickers', () => {
     render(<EditEntryModal onClose={vi.fn()} />)
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    expect(dateInputs).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /start date/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /end date/i })).toBeInTheDocument()
   })
 })
 
@@ -110,10 +110,9 @@ describe('EditEntryModal — edit mode (completed entry)', () => {
     expect(screen.getByPlaceholderText('What did you work on?')).toHaveValue('Design review')
   })
 
-  it('pre-fills start date with "2025-06-01"', () => {
+  it('pre-fills the start date picker with Jun 1, 2025', () => {
     render(<EditEntryModal entry={COMPLETED_ENTRY} onClose={vi.fn()} />)
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    expect(dateInputs[0]).toHaveValue('2025-06-01')
+    expect(screen.getByRole('button', { name: /start date: jun 1, 2025/i })).toBeInTheDocument()
   })
 })
 
@@ -128,16 +127,16 @@ describe('EditEntryModal — active timer mode', () => {
     expect(screen.getByText('Edit Active Timer')).toBeInTheDocument()
   })
 
-  it('renders only 1 date input (no end date)', () => {
+  it('renders only a start date picker (no end date) for an active timer', () => {
     render(<EditEntryModal entry={ACTIVE_ENTRY} onClose={vi.fn()} />)
-    const dateInputs = document.querySelectorAll('input[type="date"]')
-    expect(dateInputs).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /start date/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /end date/i })).not.toBeInTheDocument()
   })
 
-  it('renders only 1 time input (no end time)', () => {
+  it('renders only a start time picker (no end time) for an active timer', () => {
     render(<EditEntryModal entry={ACTIVE_ENTRY} onClose={vi.fn()} />)
-    const timeInputs = document.querySelectorAll('input[type="time"]')
-    expect(timeInputs).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /start time/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /end time/i })).not.toBeInTheDocument()
   })
 })
 
@@ -199,30 +198,35 @@ describe('EditEntryModal — validation', () => {
     )
   })
 
-  it('shows "End must be after start." when end time is before start time', async () => {
-    render(<EditEntryModal onClose={vi.fn()} />)
-    pickJob()
-    pickLabor()
-
-    const timeInputs = document.querySelectorAll('input[type="time"]')
-    fireEvent.change(timeInputs[0], { target: { value: '22:00' } })
-    fireEvent.change(timeInputs[1], { target: { value: '08:00' } })
-
-    fireEvent.click(screen.getByRole('button', { name: /add time entry/i }))
+  it('shows "End must be after start." when end is before start', async () => {
+    // Edit a known 09:00–10:00 entry (deterministic, unlike add-mode's now-based
+    // defaults), then step the End hour wheel back to 08:00 — before the start.
+    render(<EditEntryModal entry={COMPLETED_ENTRY} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /end time/i })) // open the picker
+    const endHours = screen.getByRole('spinbutton', { name: /hours \(end time\)/i })
+    fireEvent.keyDown(endHours, { key: 'ArrowUp' }) // 10 → 09
+    fireEvent.keyDown(endHours, { key: 'ArrowUp' }) // 09 → 08
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
     await waitFor(() =>
       expect(screen.getByText('End must be after start.')).toBeInTheDocument()
     )
   })
 
-  it('rejects a future start on an active timer (#153)', async () => {
-    render(<EditEntryModal entry={ACTIVE_ENTRY} onClose={vi.fn()} />)
-    // Active timer has one date input (start); push it far into the future
-    fireEvent.change(document.querySelector('input[type="date"]'), { target: { value: '2999-01-01' } })
-    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
-    await waitFor(() =>
+  it('rejects a future start on an active timer (#153)', () => {
+    // Pin "now" to the entry's start so the next calendar day is unambiguously
+    // the future, then drive the start-date picker forward a day.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2025-06-01T09:00:00'))
+    try {
+      render(<EditEntryModal entry={ACTIVE_ENTRY} onClose={vi.fn()} />)
+      fireEvent.click(screen.getByRole('button', { name: /start date/i })) // open the calendar
+      fireEvent.click(screen.getByRole('button', { name: 'June 2, 2025' })) // tomorrow
+      fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
       expect(screen.getByText(/start can.t be in the future/i)).toBeInTheDocument()
-    )
-    expect(mockEntriesUpdate).not.toHaveBeenCalled()
+      expect(mockEntriesUpdate).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -233,14 +237,15 @@ describe('EditEntryModal — save', () => {
   })
 
   it('calls db.entries.add with {jobId:1,laborTypeId:1} on successful add', async () => {
+    // Pin "now" so the add-mode default times (start = now, end = now + 1h) are a
+    // deterministic, valid 09:00–10:00 and the test can't go flaky near midnight.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2025-06-01T09:00:00'))
     const onClose = vi.fn()
     render(<EditEntryModal onClose={onClose} />)
+    vi.useRealTimers()
     pickJob()
     pickLabor()
-    // Set explicit times so the test is not flaky near midnight
-    const timeInputs = document.querySelectorAll('input[type="time"]')
-    fireEvent.change(timeInputs[0], { target: { value: '09:00' } })
-    fireEvent.change(timeInputs[1], { target: { value: '10:00' } })
     fireEvent.click(screen.getByRole('button', { name: /add time entry/i }))
     await waitFor(() => expect(mockEntriesAdd).toHaveBeenCalledWith(
       expect.objectContaining({ jobId: 1, laborTypeId: 1 })

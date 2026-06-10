@@ -5,6 +5,8 @@ import { db, deleteEntry } from '../db'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import ConfirmModal from './ConfirmModal'
 import EntitySelect from './EntitySelect'
+import TimePicker from './pickers/TimePicker'
+import DatePicker from './pickers/DatePicker'
 
 // Helper helpers for date/time controls — exported for unit testing
 export function formatDateToYYYYMMDD(date) {
@@ -233,24 +235,26 @@ export default function EditEntryModal({ entry, onClose }) {
             {/* Start Date */}
             <div className="space-y-1.5">
               <label htmlFor={startDate_} className={labelCls}>Start Date</label>
-              <input
+              <DatePicker
                 id={startDate_}
-                type="date"
                 value={dateStr}
-                onChange={e => setDateStr(e.target.value)}
-                className={inputCls}
+                onChange={setDateStr}
+                label="Start Date"
+                className="block"
+                buttonClassName={inputCls}
               />
             </div>
 
             {/* Start Time */}
             <div className="space-y-1.5">
               <label htmlFor={startTime_} className={labelCls}>Start Time</label>
-              <input
+              <TimePicker
                 id={startTime_}
-                type="time"
                 value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                className={inputCls}
+                onChange={setStartTime}
+                label="Start Time"
+                className="block"
+                buttonClassName={inputCls}
               />
             </div>
 
@@ -258,12 +262,13 @@ export default function EditEntryModal({ entry, onClose }) {
             {!isActiveTimer && (
               <div className="space-y-1.5">
                 <label htmlFor={endDate_} className={labelCls}>End Date</label>
-                <input
+                <DatePicker
                   id={endDate_}
-                  type="date"
                   value={endDateStr}
-                  onChange={e => setEndDateStr(e.target.value)}
-                  className={inputCls}
+                  onChange={setEndDateStr}
+                  label="End Date"
+                  className="block"
+                  buttonClassName={inputCls}
                 />
               </div>
             )}
@@ -272,12 +277,13 @@ export default function EditEntryModal({ entry, onClose }) {
             {!isActiveTimer && (
               <div className="space-y-1.5">
                 <label htmlFor={endTime_} className={labelCls}>End Time</label>
-                <input
+                <TimePicker
                   id={endTime_}
-                  type="time"
                   value={endTime}
-                  onChange={e => setEndTime(e.target.value)}
-                  className={inputCls}
+                  onChange={setEndTime}
+                  label="End Time"
+                  className="block"
+                  buttonClassName={inputCls}
                 />
               </div>
             )}

@@ -100,6 +100,7 @@ describe('SettingsView — Reminders section (#54)', () => {
     mockSettings = { remindersEnabled: true, remindLongRunning: true, remindLongRunningMinutes: 60 }
     render(<SettingsView />)
     expandReminders()
+    fireEvent.click(screen.getByRole('button', { name: /long-running threshold/i })) // open the duration popover
     // 60 min = 1h 0m; ArrowDown on the minutes wheel steps +5 → 1h 05 = 65.
     fireEvent.keyDown(screen.getByLabelText(/minutes before a long-running timer reminder/i), { key: 'ArrowDown' })
     expect(mockUpdateSetting).toHaveBeenCalledWith('remindLongRunningMinutes', 65)
