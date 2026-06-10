@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.2] — 2026-06-10
+
+### Fixed
+- **Text legibility & contrast across the app (accessibility).** Faint text that fell below the WCAG AA contrast minimum is now darker and readable — most noticeably in light mode, where some of it was nearly invisible:
+  - Input placeholders; empty-state messages ("No entries this day", "No jobs yet", "No rates set", "No completed entries"); timesheet entry durations and times; the running timer's "started …" time and client name; and chart axis labels.
+  - The keyboard **focus outline** is now full-strength (it was too faint against the dark background), and the invoice/date fields show a proper focus ring.
+  - **Destructive buttons** (delete confirmation, disconnect, factory reset) use a slightly deeper red so their white label stays legible.
+  - The light-mode **"On the clock"** status pill uses a darker amber for its text.
+  - A **custom accent colour** that's too light now automatically switches accent-button text to dark ink so the label stays readable.
+
+---
+
 ## [0.29.1] — 2026-06-10
 
 ### Fixed

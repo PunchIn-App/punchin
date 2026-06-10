@@ -62,7 +62,7 @@ function JobForm({ job, laborTypes, onDone }) {
   }
 
   const inputCls = `w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
-                    placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors`
+                    placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors`
 
   const activeLTs = laborTypes?.filter(lt => !lt.isArchived) ?? []
 
@@ -170,7 +170,7 @@ function LaborTypeForm({ lt, onDone }) {
         placeholder="Labor type name *"
         onKeyDown={e => e.key === 'Enter' && save()}
         className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-2 text-sm
-                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors" />
+                   placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors" />
 
       {/* Glyph — so a type reads by shape, not colour alone */}
       <div className="space-y-1.5">
@@ -278,7 +278,7 @@ export default function JobsView() {
             )}
 
             {jobs?.filter(j => j.isActive !== false).length === 0 && !addingJob && (
-              <div className="flex flex-col items-center py-14 text-appTextDisabled">
+              <div className="flex flex-col items-center py-14 text-appTextMuted">
                 <Briefcase className="w-10 h-10 mb-3 opacity-40" />
                 <p className="text-sm">No jobs yet. Add one above.</p>
               </div>
@@ -313,12 +313,12 @@ export default function JobsView() {
                       </div>
                       {/* meta row: labor tag (left) + rates indicator (right) */}
                       <div className="flex items-center justify-between gap-2 mt-2.5">
-                        {lt ? <LaborTag laborType={lt} /> : <span className="text-[10px] text-appTextDisabled uppercase tracking-wider">No labor type</span>}
+                        {lt ? <LaborTag laborType={lt} /> : <span className="text-[10px] text-appTextMuted uppercase tracking-wider">No labor type</span>}
                         <span className="flex items-center gap-1 text-xs flex-shrink-0">
                           <DollarSign className="w-3.5 h-3.5 text-appTextMuted" aria-hidden="true" />
                           {rateCount > 0
                             ? <span className="text-appTextMuted">{rateCount} rate{rateCount === 1 ? '' : 's'} set</span>
-                            : <span className="text-appTextDisabled">No rates set</span>}
+                            : <span className="text-appTextMuted">No rates set</span>}
                         </span>
                       </div>
                     </div>
@@ -350,7 +350,7 @@ export default function JobsView() {
                         value={archiveJobSearch}
                         onChange={e => setArchiveJobSearch(e.target.value)}
                         className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-sm
-                                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors"
+                                   placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors"
                       />
                     </div>
                   )}
@@ -410,7 +410,7 @@ export default function JobsView() {
             )}
 
             {laborTypes?.filter(lt => !lt.isArchived).length === 0 && !addingLT && (
-              <div className="flex flex-col items-center py-14 text-appTextDisabled">
+              <div className="flex flex-col items-center py-14 text-appTextMuted">
                 <Tag className="w-10 h-10 mb-3 opacity-40" />
                 <p className="text-sm">No labor types yet.</p>
               </div>
@@ -467,7 +467,7 @@ export default function JobsView() {
                         value={archiveLTSearch}
                         onChange={e => setArchiveLTSearch(e.target.value)}
                         className="w-full bg-appBg border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-sm
-                                   placeholder-appTextDisabled focus:outline-none focus:border-appAccent/60 transition-colors"
+                                   placeholder-appTextPlaceholder focus:outline-none focus:border-appAccent/60 transition-colors"
                       />
                     </div>
                   )}

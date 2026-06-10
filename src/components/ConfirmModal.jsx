@@ -34,7 +34,7 @@ export default function ConfirmModal({
         <div className="flex gap-2">
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
+            className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
           >
             {confirmLabel}
           </button>

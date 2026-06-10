@@ -280,7 +280,10 @@ export default function App() {
     rootStyle.setProperty('--accent-rgb', hexToRgb(effectiveAccent))
     // Legible foreground for text/glyphs ON the accent (white, or dark ink on a
     // light/pastel accent) — used via the appOnAccent token on accent buttons.
-    rootStyle.setProperty('--on-accent', readableInk(effectiveAccent))
+    // 4.5:1 threshold because --on-accent styles normal-size button TEXT, not just
+    // the graphic mark; a custom accent whose white contrast falls in [3, 4.5) now
+    // flips to dark ink instead of failing AA (the brand renderers keep the 3:1 default).
+    rootStyle.setProperty('--on-accent', readableInk(effectiveAccent, 4.5))
   }, [accentColor, resolvedTheme])
 
   // The favicon / install icon follow the stored accent (theme-independent — the

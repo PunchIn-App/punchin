@@ -163,7 +163,7 @@ export default function Layout({ activeView, onNavigate, children }) {
         {activeCount > 0 && (
           <span
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--amber) 14%, transparent)', color: 'var(--amber)' }}
+            style={{ backgroundColor: 'color-mix(in srgb, var(--amber) 14%, transparent)', color: 'var(--amber-text)' }}
           >
             <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--amber)' }} />
             On the clock

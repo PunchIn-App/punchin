@@ -85,7 +85,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
       </div>
 
       {filteredEntries.length === 0 ? (
-        <div className="flex flex-col items-center py-14 text-appTextDisabled">
+        <div className="flex flex-col items-center py-14 text-appTextMuted">
           <Calendar className="w-10 h-10 mb-3 opacity-40" />
           <p className="text-sm">No entries this day</p>
         </div>
@@ -111,7 +111,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
                   <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || '—'}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {lt && <LaborTag laborType={lt} />}
-                    <span className="font-mono text-xs text-appTextDarker whitespace-nowrap">
+                    <span className="font-mono text-xs text-appTextMuted whitespace-nowrap">
                       {formatTime(entry.punchIn, settings.timeFormat)} → {entry.punchOut ? formatTime(entry.punchOut, settings.timeFormat) : 'running'}
                     </span>
                   </div>
@@ -294,7 +294,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                   {isToday && <span className="w-1.5 h-1.5 rounded-full bg-appAccent flex-shrink-0" />}
                   <span className={`text-sm font-medium truncate ${isToday ? 'text-appAccent' : 'text-appTextMuted'}`}>{dayLabel}</span>
                 </span>
-                <span className="font-mono text-sm text-appTextDisabled">—</span>
+                <span className="font-mono text-sm text-appTextMuted">—</span>
               </div>
             )}
             {hasEntries && isOpen && (
@@ -309,7 +309,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="font-mono text-appTextDarker">{formatDuration(getEntryDurationInRange(roundEntry(e, rm), ds, de), decimal)}</span>
+                        <span className="font-mono text-appTextMuted">{formatDuration(getEntryDurationInRange(roundEntry(e, rm), ds, de), decimal)}</span>
                         <div className="flex items-center gap-1">
                           <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
@@ -576,7 +576,7 @@ ${PRINT_FONT_HEAD}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search logs..."
             aria-label="Search time entries"
-            className="w-full bg-appCard border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors placeholder-appTextDisabled"
+            className="w-full bg-appCard border border-appBorder text-appText rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-appAccent/50 transition-colors placeholder-appTextPlaceholder"
           />
         </div>
 

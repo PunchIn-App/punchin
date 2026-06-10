@@ -330,7 +330,7 @@ export default function DataSyncPanel({ onBack }) {
             <div className="flex gap-2">
               <button
                 onClick={() => setResetStage('final')}
-                className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors">
+                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors">
                 Continue
               </button>
               <button
@@ -354,7 +354,7 @@ export default function DataSyncPanel({ onBack }) {
             <div className="flex gap-2">
               <button
                 onClick={factoryReset}
-                className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-colors">
+                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors">
                 Yes, wipe everything
               </button>
               <button

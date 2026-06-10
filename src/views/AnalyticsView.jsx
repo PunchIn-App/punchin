@@ -156,7 +156,7 @@ export default function AnalyticsView() {
           aria-label={`Bar chart: daily hours for the last ${days} days. Total: ${formatDurationHM(total)}.`}>
           <ResponsiveContainer width="100%" height={130}>
             <BarChart data={dailyData} barCategoryGap="30%">
-              <XAxis dataKey="date" tick={{ fill: 'var(--text-darker)', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis hide />
               <Tooltip contentStyle={TOOLTIP} cursor={{ fill: 'var(--bg-tertiary)' }}
                 formatter={(v) => [`${v}h`, 'Hours']} />
@@ -254,7 +254,7 @@ export default function AnalyticsView() {
       )}
 
       {entries.length === 0 && (
-        <div className="flex flex-col items-center py-10 text-appTextDisabled">
+        <div className="flex flex-col items-center py-10 text-appTextMuted">
           <p className="text-sm">No completed entries in this period.</p>
           <p className="text-xs mt-1">Punch in and out to see analytics.</p>
         </div>

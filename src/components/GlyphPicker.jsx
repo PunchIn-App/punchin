@@ -95,7 +95,7 @@ export default function GlyphPicker({ value, onChange }) {
             placeholder="Search glyphs…"
             aria-label="Search glyphs"
             className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-1.5 text-sm
-                       placeholder-appTextDisabled focus:outline-none focus:ring-2 focus:ring-appAccent/50"
+                       placeholder-appTextPlaceholder focus:outline-none focus:ring-2 focus:ring-appAccent/50"
           />
           <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto">
             {results.map(id => (
