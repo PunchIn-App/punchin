@@ -48,6 +48,26 @@ vi.mock('../hooks/useSettings', () => ({
 const JOBS  = [{ id: 1, name: 'Job A', clientName: 'Acme Inc', color: '#22C55E', isActive: true, laborTypeId: 1 }]
 const TYPES = [{ id: 1, name: 'Design', color: '#6366F1', glyph: 'brush', isArchived: false }]
 
+// A richer fixture set for the keyboard-model tests: three jobs (no default labor
+// type so opening the picker doesn't auto-fill a chip) and three labor chips.
+const JOBS3  = [
+  { id: 1, name: 'Alpha', clientName: 'Acme', isActive: true, laborTypeId: null },
+  { id: 2, name: 'Bravo', clientName: 'Globex', isActive: true, laborTypeId: null },
+  { id: 3, name: 'Charlie', clientName: 'Initech', isActive: true, laborTypeId: null },
+]
+const TYPES3 = [
+  { id: 11, name: 'Design',  color: '#6366F1', glyph: 'brush',  isArchived: false },
+  { id: 12, name: 'Dev',     color: '#22C55E', glyph: 'code',   isArchived: false },
+  { id: 13, name: 'Support', color: '#F59E0B', glyph: 'phone',  isArchived: false },
+]
+
+// useLiveQuery is called twice per render (jobs, then laborTypes); alternate by
+// call index so it stays stable across re-renders — same idiom as useAlternatingMock.
+function useAlternatingMockWith(jobs, types) {
+  let n = 0
+  useLiveQuery.mockImplementation(() => (++n % 2 === 1 ? jobs : types))
+}
+
 // useLiveQuery is called twice per render (jobs, then laborTypes).
 // This implementation stays stable across re-renders by alternating on call index.
 function useAlternatingMock() {
@@ -345,5 +365,202 @@ describe('StartTimerModal — error handling', () => {
       expect(screen.getByRole('alert')).toBeInTheDocument()
     )
     expect(screen.getByRole('alert')).toHaveTextContent('DB error')
+  })
+})
+
+// --------------------------------------------------------------------------
+// Listbox keyboard model (WAI-ARIA APG) — job picker
+// --------------------------------------------------------------------------
+
+describe('StartTimerModal — job listbox keyboard model', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useAlternatingMockWith(JOBS3, TYPES3)
+  })
+
+  it('moves focus into the listbox onto the first option when opened (none selected)', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    const opts = screen.getAllByRole('option')
+    // Focus lands on the first option, which is the sole tab-reachable one.
+    expect(document.activeElement).toBe(opts[0])
+    expect(opts[0]).toHaveAttribute('tabindex', '0')
+    expect(opts[1]).toHaveAttribute('tabindex', '-1')
+    expect(opts[2]).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('ArrowDown moves the active option down (focus + roving tabindex)', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const listbox = (() => {
+      fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+      return screen.getByRole('listbox')
+    })()
+    const opts = screen.getAllByRole('option')
+
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(opts[1])
+    expect(opts[1]).toHaveAttribute('tabindex', '0')
+    expect(opts[0]).toHaveAttribute('tabindex', '-1')
+
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(opts[2])
+    expect(opts[2]).toHaveAttribute('tabindex', '0')
+  })
+
+  it('ArrowUp moves the active option up; ArrowDown at the end does not wrap', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    const listbox = screen.getByRole('listbox')
+    const opts = screen.getAllByRole('option')
+
+    // Jump to the last option, then ArrowDown again — stays put (no wrap).
+    fireEvent.keyDown(listbox, { key: 'End' })
+    expect(document.activeElement).toBe(opts[2])
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(opts[2])
+
+    fireEvent.keyDown(listbox, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(opts[1])
+  })
+
+  it('Home and End jump to the first and last option (no wrap)', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    const listbox = screen.getByRole('listbox')
+    const opts = screen.getAllByRole('option')
+
+    fireEvent.keyDown(listbox, { key: 'End' })
+    expect(document.activeElement).toBe(opts[2])
+    // ArrowUp at the top after Home should stay on the first (no wrap).
+    fireEvent.keyDown(listbox, { key: 'Home' })
+    expect(document.activeElement).toBe(opts[0])
+    fireEvent.keyDown(listbox, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(opts[0])
+  })
+
+  it('opens onto the currently-selected option when one is already chosen', () => {
+    render(<StartTimerModal onClose={vi.fn()} initialJobId={2} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    const opts = screen.getAllByRole('option')
+    // Bravo (id 2) is index 1 — focus + the tabbable option land there.
+    expect(document.activeElement).toBe(opts[1])
+    expect(opts[1]).toHaveAttribute('tabindex', '0')
+    expect(opts[1]).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('arrowing then Enter selects the active option and returns focus to the trigger (PR1)', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /^job/i })
+    fireEvent.click(trigger)
+    const listbox = screen.getByRole('listbox')
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' }) // active = Bravo (index 1)
+
+    const bravo = screen.getByRole('option', { name: /bravo/i })
+    // Enter on a native <button> fires its click — select + close, refocus trigger.
+    fireEvent.keyDown(bravo, { key: 'Enter' })
+    fireEvent.click(bravo)
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+    expect(screen.getByRole('button', { name: /bravo/i })).toBeInTheDocument()
+  })
+})
+
+// --------------------------------------------------------------------------
+// Radiogroup keyboard model (WAI-ARIA APG) — labor-type chips
+// --------------------------------------------------------------------------
+
+describe('StartTimerModal — labor radiogroup keyboard model', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useAlternatingMockWith(JOBS3, TYPES3)
+  })
+
+  it('makes only the first radio tabbable when none is checked (roving tabindex)', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const radios = screen.getAllByRole('radio')
+    expect(radios[0]).toHaveAttribute('tabindex', '0')
+    expect(radios[1]).toHaveAttribute('tabindex', '-1')
+    expect(radios[2]).toHaveAttribute('tabindex', '-1')
+    radios.forEach(r => expect(r).toHaveAttribute('aria-checked', 'false'))
+  })
+
+  it('ArrowRight selects + focuses the next radio and moves the roving tabindex', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const group = screen.getByRole('radiogroup')
+    const radios = screen.getAllByRole('radio')
+
+    fireEvent.keyDown(group, { key: 'ArrowRight' }) // none → first selected
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true')
+    expect(document.activeElement).toBe(radios[0])
+    expect(radios[0]).toHaveAttribute('tabindex', '0')
+
+    fireEvent.keyDown(group, { key: 'ArrowRight' }) // first → second
+    expect(radios[1]).toHaveAttribute('aria-checked', 'true')
+    expect(radios[0]).toHaveAttribute('aria-checked', 'false')
+    expect(document.activeElement).toBe(radios[1])
+    expect(radios[1]).toHaveAttribute('tabindex', '0')
+    expect(radios[0]).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('ArrowLeft moves selection backwards and wraps at the start', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const group = screen.getByRole('radiogroup')
+    const radios = screen.getAllByRole('radio')
+
+    // Select the first, then ArrowLeft wraps to the last.
+    fireEvent.click(radios[0])
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true')
+    fireEvent.keyDown(group, { key: 'ArrowLeft' })
+    expect(radios[2]).toHaveAttribute('aria-checked', 'true')
+    expect(document.activeElement).toBe(radios[2])
+  })
+
+  it('ArrowRight wraps from the last radio back to the first', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const group = screen.getByRole('radiogroup')
+    const radios = screen.getAllByRole('radio')
+
+    fireEvent.click(radios[2]) // last
+    fireEvent.keyDown(group, { key: 'ArrowRight' })
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true')
+    expect(document.activeElement).toBe(radios[0])
+  })
+
+  it('ArrowDown/ArrowUp also move selection (both axis pairs accepted)', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const group = screen.getByRole('radiogroup')
+    const radios = screen.getAllByRole('radio')
+
+    fireEvent.keyDown(group, { key: 'ArrowDown' }) // none → first
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true')
+    fireEvent.keyDown(group, { key: 'ArrowDown' }) // first → second
+    expect(radios[1]).toHaveAttribute('aria-checked', 'true')
+    fireEvent.keyDown(group, { key: 'ArrowUp' })   // second → first
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true')
+    expect(document.activeElement).toBe(radios[0])
+  })
+
+  it('Home and End jump to the first and last radio (select + focus)', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const group = screen.getByRole('radiogroup')
+    const radios = screen.getAllByRole('radio')
+
+    fireEvent.keyDown(group, { key: 'End' })
+    expect(radios[2]).toHaveAttribute('aria-checked', 'true')
+    expect(document.activeElement).toBe(radios[2])
+
+    fireEvent.keyDown(group, { key: 'Home' })
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true')
+    expect(document.activeElement).toBe(radios[0])
+  })
+
+  it('the checked radio is the only tabbable one after a selection', () => {
+    render(<StartTimerModal onClose={vi.fn()} />)
+    const radios = screen.getAllByRole('radio')
+    fireEvent.click(radios[1]) // check the middle chip
+    expect(radios[1]).toHaveAttribute('tabindex', '0')
+    expect(radios[0]).toHaveAttribute('tabindex', '-1')
+    expect(radios[2]).toHaveAttribute('tabindex', '-1')
   })
 })

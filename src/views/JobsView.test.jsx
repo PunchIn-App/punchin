@@ -49,14 +49,14 @@ describe('JobsView — Jobs tab', () => {
   it('renders Jobs and Labor Types tab buttons', () => {
     setupMocks()
     render(<JobsView />)
-    expect(screen.getByRole('tab', { name: 'Jobs' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Labor Types' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Jobs' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Labor Types' })).toBeInTheDocument()
   })
 
   it('Jobs tab is selected by default', () => {
     setupMocks()
     render(<JobsView />)
-    expect(screen.getByRole('tab', { name: 'Jobs' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Jobs' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('renders active job names', () => {
@@ -109,28 +109,28 @@ describe('JobsView — Labor Types tab', () => {
   it('switches to the Labor Types tab', () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
-    expect(screen.getByRole('tab', { name: 'Labor Types' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
+    expect(screen.getByRole('button', { name: 'Labor Types' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('renders active labor type names', () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     expect(screen.getByText('Design')).toBeInTheDocument()
   })
 
   it('shows "Add Labor Type" button', () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     expect(screen.getByRole('button', { name: /add labor type/i })).toBeInTheDocument()
   })
 
   it('shows archived labor type section toggle with count', () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     expect(screen.getByText(/archived \(1\)/i)).toBeInTheDocument()
   })
 })
@@ -281,7 +281,7 @@ describe('JobsView — Labor Types tab: add and edit', () => {
   it('shows LaborTypeForm when "Add Labor Type" is clicked', () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByRole('button', { name: /add labor type/i }))
     expect(screen.getByPlaceholderText('Labor type name *')).toBeInTheDocument()
   })
@@ -289,7 +289,7 @@ describe('JobsView — Labor Types tab: add and edit', () => {
   it('calls db.laborTypes.add when a new labor type is saved', async () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByRole('button', { name: /add labor type/i }))
     fireEvent.change(screen.getByPlaceholderText('Labor type name *'), { target: { value: 'Marketing' } })
     fireEvent.click(screen.getByRole('button', { name: /^add type$/i }))
@@ -303,7 +303,7 @@ describe('JobsView — Labor Types tab: add and edit', () => {
   it('shows LaborTypeForm when Edit button is clicked', () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByRole('button', { name: /edit design/i }))
     expect(screen.getByPlaceholderText('Labor type name *')).toBeInTheDocument()
   })
@@ -311,7 +311,7 @@ describe('JobsView — Labor Types tab: add and edit', () => {
   it('calls db.laborTypes.update when a labor type is edited and saved', async () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByRole('button', { name: /edit design/i }))
     const input = screen.getByPlaceholderText('Labor type name *')
     fireEvent.change(input, { target: { value: 'Design v2' } })
@@ -356,7 +356,7 @@ describe('JobsView — accessible names (WCAG 4.1.2)', () => {
   it('exposes the labor-type-name input by accessible name', () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByRole('button', { name: /add labor type/i }))
     expect(screen.getByRole('textbox', { name: 'Labor type name' })).toBeInTheDocument()
   })
@@ -371,7 +371,7 @@ describe('JobsView — accessible names (WCAG 4.1.2)', () => {
   it('exposes the archived-labor-types search input by accessible name', () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByText(/archived \(1\)/i))
     expect(screen.getByRole('textbox', { name: 'Search archived labor types' })).toBeInTheDocument()
   })
@@ -404,7 +404,7 @@ describe('JobsView — empty-name validation (WCAG 3.3.1)', () => {
   it('LaborTypeForm surfaces an alert and does not create a type when name is empty', async () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByRole('button', { name: /add labor type/i }))
     fireEvent.click(screen.getByRole('button', { name: /^add type$/i }))
 
@@ -419,7 +419,7 @@ describe('JobsView — Labor Types tab: archive and restore', () => {
   it('calls db.laborTypes.update with isArchived=true when Archive is clicked', async () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByRole('button', { name: /archive design/i }))
     await waitFor(() =>
       expect(mockLaborTypesUpdate).toHaveBeenCalledWith(1, { isArchived: true })
@@ -429,11 +429,38 @@ describe('JobsView — Labor Types tab: archive and restore', () => {
   it('calls db.laborTypes.update with isArchived=false when Restore is clicked', async () => {
     setupMocks()
     render(<JobsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     fireEvent.click(screen.getByText(/archived \(1\)/i))
     fireEvent.click(screen.getByRole('button', { name: /restore dev/i }))
     await waitFor(() =>
       expect(mockLaborTypesUpdate).toHaveBeenCalledWith(2, { isArchived: false })
     )
+  })
+})
+
+// ─── Section switcher is a toggle-button group, not a tablist (WCAG 4.1.2) ─────
+
+describe('JobsView — section switcher ARIA (WCAG 4.1.2)', () => {
+  it('wraps the Jobs/Labor Types buttons in a labelled group, with no tab/tablist roles', () => {
+    setupMocks()
+    render(<JobsView />)
+    // The switcher is a labelled toggle-button group (aria-pressed), not an
+    // incomplete ARIA tablist (which would also need tabpanels + arrow keys).
+    const group = screen.getByRole('group', { name: 'Manage' })
+    expect(group).toBeInTheDocument()
+    expect(group).toContainElement(screen.getByRole('button', { name: 'Jobs' }))
+    expect(group).toContainElement(screen.getByRole('button', { name: 'Labor Types' }))
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+  })
+
+  it('marks the active section button aria-pressed="true" and the other "false"', () => {
+    setupMocks()
+    render(<JobsView />)
+    expect(screen.getByRole('button', { name: 'Jobs' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Labor Types' })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
+    expect(screen.getByRole('button', { name: 'Jobs' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Labor Types' })).toHaveAttribute('aria-pressed', 'true')
   })
 })

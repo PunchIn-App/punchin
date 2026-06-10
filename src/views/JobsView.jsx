@@ -273,9 +273,12 @@ export default function JobsView() {
                 : `${activeLtCount} labor type${activeLtCount === 1 ? '' : 's'}`}
             </p>
           </div>
-          <div role="tablist" className="inline-flex flex-shrink-0 bg-appCard border border-appBorder rounded-xl p-1">
+          {/* A two-way section switch — modelled as a labelled group of toggle
+              buttons (aria-pressed) rather than a full ARIA tablist, which would
+              also require tabpanels, aria-controls, roving tabindex and arrow keys. */}
+          <div role="group" aria-label="Manage" className="inline-flex flex-shrink-0 bg-appCard border border-appBorder rounded-xl p-1">
             {['jobs','labor'].map(t => (
-              <button key={t} onClick={() => setTab(t)} role="tab" aria-selected={tab === t}
+              <button key={t} type="button" onClick={() => setTab(t)} aria-pressed={tab === t}
                 className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors
                   ${tab === t ? 'bg-appInput text-appText' : 'text-appTextMuted hover:text-appText'}`}>
                 {t === 'labor' ? 'Labor Types' : 'Jobs'}

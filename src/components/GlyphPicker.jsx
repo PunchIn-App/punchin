@@ -8,7 +8,7 @@ import { LABOR_GLYPH_IDS, glyphComponent } from './LaborGlyph'
 // ColorPicker's popover/Escape/outside-click contract.
 const QUICK_IDS = LABOR_GLYPH_IDS.slice(0, 7)
 
-function GlyphButton({ id, selected, onChange }) {
+function GlyphButton({ id, selected, onChange, tabIndex = 0, onKeyDown }) {
   const Glyph = glyphComponent(id)
   return (
     <button
@@ -16,7 +16,13 @@ function GlyphButton({ id, selected, onChange }) {
       role="radio"
       aria-checked={selected}
       aria-label={id}
+      // Roving tabindex: only the checked radio (or the first when none is) sits
+      // in the tab order; the rest are reachable with the arrow keys per the
+      // WAI-ARIA radio-group model.
+      tabIndex={tabIndex}
       onClick={() => onChange(id)}
+      onKeyDown={onKeyDown}
+      data-glyph-radio
       className={`w-10 h-10 flex-shrink-0 grid place-items-center rounded-lg border transition-colors
         ${selected
           ? 'border-appAccent bg-appAccent/10 text-appAccent'
@@ -25,6 +31,14 @@ function GlyphButton({ id, selected, onChange }) {
       <Glyph className="w-[18px] h-[18px]" aria-hidden="true" />
     </button>
   )
+}
+
+// WAI-ARIA radio-group keyboard model, shared by the quick row and the search
+// results. Returns the index of the tabbable radio (roving tabindex) for a set
+// of ids: the checked one, or the first when none is checked.
+function rovingIndex(ids, value) {
+  const i = ids.indexOf(value)
+  return i >= 0 ? i : 0
 }
 
 export default function GlyphPicker({ value, onChange }) {
@@ -67,11 +81,50 @@ export default function GlyphPicker({ value, onChange }) {
   // won't see a ring, so unconditional refocus on selection is safe.
   const choose = id => { onChange(id); setOpen(false); setQuery(''); triggerRef.current?.focus() }
 
+  // Build the radio-group arrow-key handler for a given set of ids and select
+  // callback. The glyphs wrap in a flex row, so we support BOTH axis pairs
+  // (ArrowRight/Left and ArrowDown/Up); Home/End jump to the ends; selection
+  // wraps around. Moving the focus also selects (radiogroup semantics), and the
+  // moved-to radio is focused by querying the rendered buttons in the group.
+  const groupKeyDown = (ids, select) => e => {
+    const last = ids.length - 1
+    if (last < 0) return
+    const cur = rovingIndex(ids, value)
+    let next
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown': next = cur >= last ? 0 : cur + 1; break
+      case 'ArrowLeft':
+      case 'ArrowUp':   next = cur <= 0 ? last : cur - 1; break
+      case 'Home': next = 0; break
+      case 'End':  next = last; break
+      default: return
+    }
+    e.preventDefault()
+    select(ids[next])
+    // Focus the moved-to radio. The group's buttons render in `ids` order, so
+    // the nth [data-glyph-radio] is the target (same DOM-query idiom as the
+    // outside-click guard above).
+    const radios = e.currentTarget.querySelectorAll('[data-glyph-radio]')
+    radios[next]?.focus()
+  }
+
   return (
     <div ref={wrapRef} className="relative">
-      <div className="flex items-center gap-1.5 flex-wrap" role="radiogroup" aria-label="Glyph">
+      <div
+        className="flex items-center gap-1.5 flex-wrap"
+        role="radiogroup"
+        aria-label="Glyph"
+        onKeyDown={groupKeyDown(quick, onChange)}
+      >
         {quick.map(id => (
-          <GlyphButton key={id} id={id} selected={value === id} onChange={onChange} />
+          <GlyphButton
+            key={id}
+            id={id}
+            selected={value === id}
+            onChange={onChange}
+            tabIndex={rovingIndex(quick, value) === quick.indexOf(id) ? 0 : -1}
+          />
         ))}
         <button
           ref={triggerRef}
@@ -97,9 +150,26 @@ export default function GlyphPicker({ value, onChange }) {
             className="w-full bg-appBg border border-appBorder text-appText rounded-lg px-3 py-1.5 text-sm
                        placeholder-appTextPlaceholder focus:outline-none focus:ring-2 focus:ring-appAccent/50"
           />
-          <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto">
+          {/* The results are role="radio" buttons, so they need a role="radiogroup"
+              ancestor (a bare radio outside a group is an ARIA structure error).
+              Same wrapping flex row → same dual-axis arrow-key model as the quick row. */}
+          <div
+            className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto"
+            role="radiogroup"
+            aria-label="All glyphs"
+            // Arrow navigation selects but keeps the popover open (it just moves
+            // the roving focus); a click / Enter / Space on a result commits via
+            // `choose`, which closes and returns focus to the trigger.
+            onKeyDown={groupKeyDown(results, onChange)}
+          >
             {results.map(id => (
-              <GlyphButton key={id} id={id} selected={value === id} onChange={choose} />
+              <GlyphButton
+                key={id}
+                id={id}
+                selected={value === id}
+                onChange={choose}
+                tabIndex={rovingIndex(results, value) === results.indexOf(id) ? 0 : -1}
+              />
             ))}
             {results.length === 0 && (
               <p className="w-full text-xs text-appTextMuted py-2 text-center">No matching glyphs</p>

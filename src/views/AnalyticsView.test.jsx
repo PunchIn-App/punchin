@@ -207,12 +207,13 @@ describe('AnalyticsView — with entries', () => {
 
   it('renders labor type name "Design" in the legend', () => {
     render(<AnalyticsView />)
-    expect(screen.getByText('Design')).toBeInTheDocument()
+    // Appears in the (aria-hidden) legend AND the sr-only labor-type table.
+    expect(screen.getAllByText('Design').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders labor type name "Dev" in the legend', () => {
     render(<AnalyticsView />)
-    expect(screen.getByText('Dev')).toBeInTheDocument()
+    expect(screen.getAllByText('Dev').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders the "By labor type" section label', () => {
@@ -244,5 +245,55 @@ describe('AnalyticsView — billable earnings', () => {
     })
     render(<AnalyticsView />)
     expect(screen.queryByText('Billable earnings')).toBeNull()
+  })
+})
+
+// --------------------------------------------------------------------------
+// Chart ARIA semantics for AT (WCAG 1.1.1)
+// --------------------------------------------------------------------------
+describe('AnalyticsView — chart ARIA semantics (#1.1.1)', () => {
+  beforeEach(() => {
+    setupMocksByDeps({ entries: ENTRIES_MULTI, jobs: JOBS_MULTI, laborTypes: LABOR_TYPES_MULTI })
+  })
+
+  it('no role="img" figure carries aria-labelledby (the rich aria-label is the accessible name)', () => {
+    const { container } = render(<AnalyticsView />)
+    const figures = container.querySelectorAll('[role="img"]')
+    // Daily + job bars + labor-type donut.
+    expect(figures.length).toBe(3)
+    figures.forEach(fig => {
+      expect(fig).not.toHaveAttribute('aria-labelledby')
+      // The rich aria-label is preserved.
+      expect(fig.getAttribute('aria-label')).toBeTruthy()
+    })
+  })
+
+  it('keeps the rich (not the short-heading) aria-label on each chart figure', () => {
+    const { container } = render(<AnalyticsView />)
+    const labels = Array.from(container.querySelectorAll('[role="img"]')).map(f => f.getAttribute('aria-label'))
+    expect(labels.some(l => /daily hours for the last/i.test(l))).toBe(true)
+    expect(labels.some(l => /hours by job\. top job:/i.test(l))).toBe(true)
+    expect(labels.some(l => /donut chart: hours by labor type/i.test(l))).toBe(true)
+  })
+
+  it('no sr-only data table is a descendant of a role="img" element (VoiceOver prunes them)', () => {
+    const { container } = render(<AnalyticsView />)
+    const tables = container.querySelectorAll('table.sr-only')
+    // Daily + job + labor-type fallbacks.
+    expect(tables.length).toBe(3)
+    tables.forEach(t => {
+      expect(t.closest('[role="img"]')).toBeNull()
+    })
+  })
+
+  it('gives the donut chart its own sr-only data table (its legend is aria-hidden)', () => {
+    render(<AnalyticsView />)
+    const caption = screen.getByText('Hours by labor type')
+    expect(caption.tagName.toLowerCase()).toBe('caption')
+    const table = within(caption.closest('table'))
+    // Per-labor-type rows: name + duration, matching the bar tables' shape.
+    expect(table.getByText('Design')).toBeInTheDocument()
+    expect(table.getByText('Dev')).toBeInTheDocument()
+    expect(caption.closest('table').closest('[role="img"]')).toBeNull()
   })
 })

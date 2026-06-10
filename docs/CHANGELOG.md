@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.5] — 2026-06-10
+
+### Fixed
+- **Keyboard navigation & screen-reader semantics for menus, pickers, and charts (accessibility).**
+  - The job and labor-type dropdowns, the labor-type chips, the AM/PM control, and the glyph picker now support full arrow-key navigation (↑ ↓ / ← →, Home/End) as a single Tab stop — matching the behaviour their screen-reader roles already advertised, instead of every option being its own Tab stop with arrow keys doing nothing.
+  - The date-picker calendar now exposes proper row / cell / column-header table structure to assistive tech.
+  - The Timesheets (Daily/Weekly) and Jobs (Jobs/Labor Types) switchers now correctly announce which option is active (they were exposed as an incomplete, broken "tab" widget).
+  - **Analytics charts** — the per-day, per-job, and per-labor-type breakdowns are now actually reachable by screen readers (the detailed description was being suppressed and the data tables were hidden inside the chart's image role); the labor-type donut gained a data table it previously lacked entirely.
+
+---
+
 ## [0.29.4] — 2026-06-10
 
 ### Fixed

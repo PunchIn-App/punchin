@@ -530,11 +530,14 @@ ${PRINT_FONT_HEAD}
       {/* Toolbar row 1 — segmented period tabs, centered date nav, Log Manual.
           Stacks on mobile; a single grouped control bar at lg. */}
       <div className="flex-shrink-0 flex flex-col gap-2.5 px-4 py-2.5 border-b border-appBorderLight lg:flex-row lg:items-center">
-        <div role="tablist" className="flex lg:inline-flex flex-shrink-0 bg-appInput border border-appBorder rounded-xl p-1">
+        {/* A two-way period switch — modelled as a labelled group of toggle
+            buttons (aria-pressed) rather than a full ARIA tablist, which would
+            also require tabpanels, aria-controls, roving tabindex and arrow keys. */}
+        <div role="group" aria-label="Timesheet view" className="flex lg:inline-flex flex-shrink-0 bg-appInput border border-appBorder rounded-xl p-1">
           {['daily','weekly'].map(t => (
             <button key={t} onClick={() => setTab(t)}
-              role="tab"
-              aria-selected={tab === t}
+              type="button"
+              aria-pressed={tab === t}
               className={`flex-1 lg:flex-initial px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors
                 ${tab === t ? 'bg-appCard text-appText shadow-sm' : 'text-appTextMuted hover:text-appText'}`}>
               {t}
