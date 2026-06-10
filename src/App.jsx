@@ -24,6 +24,8 @@ import { hexToRgb } from './utils/color'
 import { decodeSnapshot } from './utils/transfer'
 import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
+import { fetchGoogleUser } from './sync/providers/google'
+import { fetchOneDriveUser } from './sync/providers/onedrive'
 import { consumeOAuthState } from './sync/oauthState'
 import { setSyncToken, setRefreshToken } from './sync/tokenStore'
 import { db } from './db'
@@ -53,8 +55,45 @@ export function describeSyncError(code) {
 
 const DEFAULT_VIEW = 'timer'
 
-function GitHubAccountConfirm({ username, onConfirm, onDismiss }) {
+// Per-provider copy for the connect-confirmation dialog. `prefix` is the handle
+// sigil (GitHub logins render as @login; Google/OneDrive show the bare email).
+// `note` reassures what access the grant actually gives — for Google/OneDrive
+// that's an app-folder-only scope, for GitHub the (broader) all-gists scope.
+const PROVIDER_CONNECT = {
+  github: {
+    label: 'GitHub',
+    prefix: '@',
+    storage: 'a private gist in this account',
+    note: (
+      <>
+        Connecting grants access to your GitHub gists. GitHub&apos;s gist permission covers{' '}
+        <span className="text-appText">all</span> your gists, not just PunchIn&apos;s — you can revoke it
+        anytime in your GitHub account settings.
+      </>
+    ),
+  },
+  google: {
+    label: 'Google Drive',
+    prefix: '',
+    storage: 'a hidden app folder in your Google Drive',
+    note: 'PunchIn only ever sees the files it creates in its own hidden app folder — never the rest of your Drive. You can revoke access anytime in your Google account settings.',
+  },
+  onedrive: {
+    label: 'OneDrive',
+    prefix: '',
+    storage: 'an app folder in your OneDrive',
+    note: 'PunchIn only ever accesses its own app folder — never the rest of your OneDrive. You can revoke access anytime in your Microsoft account settings.',
+  },
+}
+
+// Confirm WHICH account is being linked before any token is written (#83, #243
+// follow-up). Generalised from the original GitHub-only dialog so Google and
+// OneDrive get the same "Connect as <you>?" gate — the fix for connecting as the
+// wrong account with nothing on screen to catch it.
+function AccountConfirm({ provider, username, onConfirm, onDismiss }) {
   const dialogRef = useRef(null)
+  const cfg = PROVIDER_CONNECT[provider] ?? PROVIDER_CONNECT.github
+  const display = username ? `${cfg.prefix}${username}` : null
 
   useEffect(() => {
     dialogRef.current?.querySelector('[data-autofocus]')?.focus()
@@ -80,24 +119,18 @@ function GitHubAccountConfirm({ username, onConfirm, onDismiss }) {
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="gh-confirm-title"
+        aria-labelledby="connect-confirm-title"
         className="w-full max-w-sm bg-appCard rounded-2xl border border-appBorder shadow-xl p-5 space-y-4"
       >
         <div>
-          <p id="gh-confirm-title" className="font-display font-semibold text-appText">
-            Connect{username ? ` as @${username}` : ' GitHub account'}?
+          <p id="connect-confirm-title" className="font-display font-semibold text-appText">
+            Connect {cfg.label}{display ? ` as ${display}` : ''}?
           </p>
           <p className="text-sm text-appTextMuted mt-1">
-            {username
-              ? `Your data will sync to a private gist owned by @${username}.`
-              : 'Your data will sync to a private gist in this GitHub account.'
-            }{' '}If this isn&apos;t the right account, tap Cancel, sign out of GitHub in your browser, then try connecting again.
+            Your data will sync to {cfg.storage}{display ? `, signed in as ${display}` : ''}.{' '}
+            If this isn&apos;t the right account, tap Cancel, sign out of {cfg.label} in your browser, then try connecting again.
           </p>
-          <p className="text-xs text-appTextMuted mt-2">
-            Connecting grants access to your GitHub gists. GitHub&apos;s gist permission covers{' '}
-            <span className="text-appText">all</span> your gists, not just PunchIn&apos;s — you can revoke it
-            anytime in your GitHub account settings.
-          </p>
+          <p className="text-xs text-appTextMuted mt-2">{cfg.note}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -277,27 +310,37 @@ export default function App() {
   // link shouldn't silently change the user's data.
   const [importPrompt, setImportPrompt] = useState(null) // { snapshot, jobs, entries }
 
-  // GitHub OAuth: token is held here until the user confirms which account to
-  // use (#83). We fetch the username before asking so the dialog can show it.
-  // The token is never written to the DB until the user taps Connect.
-  const [pendingGitHubAuth, setPendingGitHubAuth] = useState(null) // { token, username }
+  // OAuth: the token is held here until the user confirms WHICH account to link
+  // (#83, generalised to all providers in the #243 follow-up). We fetch the
+  // account identity before asking so the dialog can name it; nothing is written
+  // to the DB until the user taps Connect. Shape:
+  //   { provider, token, username, refresh?, expiresIn? }
+  // GitHub has no refresh token / expiry (its gist token doesn't expire), so
+  // those are absent for github and present for google/onedrive.
+  const [pendingAuth, setPendingAuth] = useState(null)
 
-  const confirmGitHubConnect = useCallback(async () => {
-    if (!pendingGitHubAuth) return
-    await setSyncToken(pendingGitHubAuth.token) // encrypted at rest (issue #126)
+  const confirmConnect = useCallback(async () => {
+    if (!pendingAuth) return
+    const { provider, token, username, refresh, expiresIn } = pendingAuth
+    await setSyncToken(token) // encrypted at rest (issue #126)
+    if (refresh) await setRefreshToken(refresh) // encrypted at rest (issue #243)
     await db.settings.bulkPut([
-      { key: 'syncProvider', value: 'github' },
-      { key: 'syncTokenExpiry', value: null },
+      { key: 'syncProvider', value: provider },
+      // github's gist token never expires (no refresh); google/onedrive carry a
+      // real expiry so the background refresh knows when to renew (issue #243).
+      { key: 'syncTokenExpiry', value: expiresIn ? Date.now() + expiresIn : null },
       { key: 'syncFileId', value: null },
       { key: 'syncError', value: null },
-      { key: 'syncUsername', value: pendingGitHubAuth.username },
+      { key: 'syncUsername', value: username ?? null },
       { key: 'autoSync', value: true }, // default background sync ON at connect
     ])
-    setPendingGitHubAuth(null)
-  }, [pendingGitHubAuth])
+    setPendingAuth(null)
+  }, [pendingAuth])
 
-  const dismissGitHubConnect = useCallback(() => {
-    setPendingGitHubAuth(null)
+  const dismissConnect = useCallback(() => {
+    // Drop the in-memory token without writing it (matches GitHub's original
+    // cancel: nothing was persisted, so there's nothing to clean up).
+    setPendingAuth(null)
   }, [])
 
   // Handle OAuth callback tokens written into the URL hash by the provider.
@@ -344,26 +387,23 @@ export default function App() {
       if (!consumeOAuthState(params.get('state'))) {
         db.settings.put({ key: 'syncError', value: describeSyncError('state_mismatch') })
       } else if (provider === 'github') {
-        // GitHub may silently reuse the already-signed-in account, so hold the
-        // token in memory and confirm the account before saving (#83). GitHub
-        // gist tokens don't expire, so there's no refresh token / expiry.
+        // GitHub may silently reuse the already-signed-in account, so fetch the
+        // account identity and hold the token in memory until the user confirms
+        // WHICH account to link (#83). GitHub gist tokens don't expire, so no
+        // refresh token / expiry travels along.
         fetchGitHubUser(token)
-          .then(user => { if (!cancelled) setPendingGitHubAuth({ token, username: user?.login ?? null }) })
+          .then(user => { if (!cancelled) setPendingAuth({ provider, token, username: user?.login ?? null }) })
       } else if (provider === 'google' || provider === 'onedrive') {
         // Google/OneDrive: the worker already did the confidential-client
-        // code→token exchange and returned a refresh token, so save it (encrypted
-        // at rest, issue #126) for silent background renewal and start auto-sync.
+        // code→token exchange and returned a refresh token + expiry. Same as
+        // GitHub, hold them in memory and confirm the account first (issue #243
+        // follow-up) — nothing is persisted until the user taps Connect, so the
+        // refresh token (encrypted at rest, issue #126) is only saved on confirm.
         const refresh = params.get('sync_refresh')
         const expiresIn = parseInt(params.get('sync_expires') || '3600', 10) * 1000
-        setSyncToken(token)
-          .then(() => (refresh ? setRefreshToken(refresh) : null))
-          .then(() => db.settings.bulkPut([
-            { key: 'syncProvider', value: provider },
-            { key: 'syncTokenExpiry', value: Date.now() + expiresIn },
-            { key: 'syncFileId', value: null },
-            { key: 'syncError', value: null },
-            { key: 'autoSync', value: true }, // default background sync ON at connect
-          ]))
+        const fetchUser = provider === 'google' ? fetchGoogleUser : fetchOneDriveUser
+        fetchUser(token)
+          .then(username => { if (!cancelled) setPendingAuth({ provider, token, username: username ?? null, refresh, expiresIn }) })
       }
     }
 
@@ -485,11 +525,12 @@ export default function App() {
           onCancel={() => setImportPrompt(null)}
         />
       )}
-      {pendingGitHubAuth && (
-        <GitHubAccountConfirm
-          username={pendingGitHubAuth.username}
-          onConfirm={confirmGitHubConnect}
-          onDismiss={dismissGitHubConnect}
+      {pendingAuth && (
+        <AccountConfirm
+          provider={pendingAuth.provider}
+          username={pendingAuth.username}
+          onConfirm={confirmConnect}
+          onDismiss={dismissConnect}
         />
       )}
     </Layout>

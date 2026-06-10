@@ -31,6 +31,17 @@ vi.mock('./sync/providers/github', () => ({
   fetchGitHubUser: (...a) => mockFetchGitHubUser(...a),
 }))
 
+// Google/OneDrive now also fetch the account identity for the connect-confirm
+// dialog (parity with GitHub); mock so the callback tests are deterministic.
+const mockFetchGoogleUser = vi.fn().mockResolvedValue('rob@gmail.com')
+vi.mock('./sync/providers/google', () => ({
+  fetchGoogleUser: (...a) => mockFetchGoogleUser(...a),
+}))
+const mockFetchOneDriveUser = vi.fn().mockResolvedValue('rob@outlook.com')
+vi.mock('./sync/providers/onedrive', () => ({
+  fetchOneDriveUser: (...a) => mockFetchOneDriveUser(...a),
+}))
+
 // Access + refresh tokens are encrypted at rest via tokenStore (issues #126,
 // #243); mock it so the OAuth tests can assert the hand-off without real
 // WebCrypto/Dexie.
@@ -260,7 +271,7 @@ describe('App — OAuth callback handling', () => {
     render(<App />)
     await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
-    expect(screen.getByText(/Connect as @octocat/)).toBeInTheDocument()
+    expect(screen.getByText(/Connect GitHub as @octocat/)).toBeInTheDocument()
     // discloses the broad gist scope so the grant is informed (issue #127)
     expect(screen.getByText(/grants access to your GitHub gists/i)).toBeInTheDocument()
     // token must NOT be saved to DB until user confirms
@@ -313,13 +324,20 @@ describe('App — OAuth callback handling', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('stores the Google access + refresh token from the worker callback (issue #243)', async () => {
+  it('confirms the Google account, then stores the access + refresh token (issue #243, account parity)', async () => {
     window.location.hash = `#sync_token=googletoken&sync_provider=google&sync_refresh=grefresh&sync_expires=3600&state=${NONCE}`
     render(<App />)
-    await waitFor(() => expect(mockSetSyncToken).toHaveBeenCalledWith('googletoken'))
+    // The connect dialog now names the Google account; nothing is saved yet.
+    expect(await screen.findByText(/Connect Google Drive as rob@gmail.com/)).toBeInTheDocument()
+    expect(mockSetSyncToken).not.toHaveBeenCalled()
+    await act(async () => { screen.getByRole('button', { name: 'Connect' }).click() })
+    expect(mockSetSyncToken).toHaveBeenCalledWith('googletoken') // encrypted at rest (issue #126)
     expect(mockSetRefreshToken).toHaveBeenCalledWith('grefresh')
     expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
-      expect.arrayContaining([{ key: 'syncProvider', value: 'google' }])
+      expect.arrayContaining([
+        { key: 'syncProvider', value: 'google' },
+        { key: 'syncUsername', value: 'rob@gmail.com' },
+      ])
     )
   })
 
@@ -329,13 +347,19 @@ describe('App — OAuth callback handling', () => {
     await waitFor(() => expect(screen.getByText('SettingsView')).toBeInTheDocument())
   })
 
-  it('stores the OneDrive access + refresh token from the worker callback (issue #243)', async () => {
+  it('confirms the OneDrive account, then stores the access + refresh token (issue #243, account parity)', async () => {
     window.location.hash = `#sync_token=odtoken&sync_provider=onedrive&sync_refresh=odrefresh&sync_expires=3600&state=${NONCE}`
     render(<App />)
-    await waitFor(() => expect(mockSetSyncToken).toHaveBeenCalledWith('odtoken'))
+    expect(await screen.findByText(/Connect OneDrive as rob@outlook.com/)).toBeInTheDocument()
+    expect(mockSetSyncToken).not.toHaveBeenCalled()
+    await act(async () => { screen.getByRole('button', { name: 'Connect' }).click() })
+    expect(mockSetSyncToken).toHaveBeenCalledWith('odtoken')
     expect(mockSetRefreshToken).toHaveBeenCalledWith('odrefresh')
     expect(mockDbSettingsBulkPut).toHaveBeenCalledWith(
-      expect.arrayContaining([{ key: 'syncProvider', value: 'onedrive' }])
+      expect.arrayContaining([
+        { key: 'syncProvider', value: 'onedrive' },
+        { key: 'syncUsername', value: 'rob@outlook.com' },
+      ])
     )
   })
 

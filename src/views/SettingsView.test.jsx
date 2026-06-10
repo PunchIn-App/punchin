@@ -771,6 +771,24 @@ describe('SettingsView — Sync section', () => {
     expect(screen.getByText(/Just now/)).toBeInTheDocument()
   })
 
+  it('shows the connected account: @handle for GitHub', async () => {
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'github', syncUsername: 'octocat', lastSyncedAt: null }))
+    render(<SettingsView />)
+    expand('Data & Sync')
+    await screen.findByRole('button', { name: /Sync Now/i })
+    expect(screen.getByText('@octocat')).toBeInTheDocument()
+  })
+
+  it('shows the connected account: a plain email (no @ prefix) for Google/OneDrive', async () => {
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'onedrive', syncUsername: 'rob@outlook.com', lastSyncedAt: null }))
+    render(<SettingsView />)
+    expand('Data & Sync')
+    await screen.findByRole('button', { name: /Sync Now/i })
+    expect(screen.getByText('rob@outlook.com')).toBeInTheDocument()
+    // must NOT be prefixed like a GitHub handle
+    expect(screen.queryByText('@rob@outlook.com')).not.toBeInTheDocument()
+  })
+
   it('shows "Token expired" and disables Sync Now when a refresh actually failed (TOKEN_EXPIRED)', async () => {
     mockGetSettings.mockReturnValue(withSync({ syncProvider: 'google', syncError: 'TOKEN_EXPIRED' }))
     render(<SettingsView />)

@@ -181,7 +181,9 @@ export default function DataSyncPanel({ onBack }) {
                   )}
                 </div>
                 {settings.syncUsername && (
-                  <p className="text-xs text-appTextMuted mt-0.5">@{settings.syncUsername}</p>
+                  <p className="text-xs text-appTextMuted mt-0.5">
+                    {settings.syncProvider === 'github' ? '@' : ''}{settings.syncUsername}
+                  </p>
                 )}
                 <p className="text-xs text-appTextMuted mt-0.5">
                   {tokenExpired

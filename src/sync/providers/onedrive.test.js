@@ -1,4 +1,4 @@
-import { buildOneDriveOAuthUrl, pushToOneDrive, pullFromOneDrive } from './onedrive'
+import { buildOneDriveOAuthUrl, pushToOneDrive, pullFromOneDrive, fetchOneDriveUser } from './onedrive'
 
 // ---------------------------------------------------------------------------
 // buildOneDriveOAuthUrl (Auth Code via worker, confidential client, issue #243)
@@ -140,5 +140,43 @@ describe('pullFromOneDrive', () => {
   it('throws TOKEN_EXPIRED on a 401 (not treated as "no file"), so the UI prompts re-auth', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 401 })
     await expect(pullFromOneDrive('token')).rejects.toThrow('TOKEN_EXPIRED')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fetchOneDriveUser — account identity for the connect-confirm dialog
+// ---------------------------------------------------------------------------
+
+describe('fetchOneDriveUser', () => {
+  let fetchMock
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('GETs Graph /me with the bearer token and returns the userPrincipalName', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ userPrincipalName: 'rob@outlook.com', displayName: 'Rob' }) })
+    const who = await fetchOneDriveUser('token123')
+    expect(who).toBe('rob@outlook.com')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://graph.microsoft.com/v1.0/me')
+    expect(opts.headers.Authorization).toBe('Bearer token123')
+  })
+
+  it('falls back to mail, then displayName', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ mail: 'rob@work.com' }) })
+    expect(await fetchOneDriveUser('t')).toBe('rob@work.com')
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ displayName: 'Rob P' }) })
+    expect(await fetchOneDriveUser('t')).toBe('Rob P')
+  })
+
+  it('returns null on a failed lookup rather than throwing (never blocks connecting)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 500 })
+    expect(await fetchOneDriveUser('t')).toBeNull()
   })
 })
