@@ -110,6 +110,41 @@ describe('Layout — desktop sidebar', () => {
   it('shows "Off the clock" when nothing is running', () => {
     live.activeEntries = []
     render(<Layout activeView="timer" onNavigate={vi.fn()}><div /></Layout>)
-    expect(screen.getByText(/off the clock/i)).toBeInTheDocument()
+    // The lg card and the md rail's sr-only string both read "Off the clock"
+    // (both rendered by jsdom regardless of breakpoint), so assert on presence.
+    expect(screen.getAllByText(/off the clock/i).length).toBeGreaterThan(0)
+  })
+})
+
+// The md (tablet) icon-rail can't show the lg status card's text, so it conveys
+// the running state by PRESENCE — the amber dot renders only when on the clock,
+// and never shows a gray "off" dot — plus an sr-only string for screen readers
+// (WCAG 1.4.1, Use of Colour). jsdom renders both breakpoints' markup, so scope
+// to the md rail via its sr-only status text's container.
+describe('Layout — md icon-rail status (no colour-only state)', () => {
+  // The lg card and md rail both render in jsdom; the md rail is the
+  // `lg:hidden` status container. Its dot is the rounded-full child; its
+  // sr-only span carries the textual state.
+  const railContainer = (container) => container.querySelector('.lg\\:hidden')
+  const railDot = (rail) => rail.querySelector('span.rounded-full')
+  const railSrText = (rail) => rail.querySelector('span.sr-only').textContent
+
+  it('renders the amber dot AND an sr-only "On the clock" status when running', () => {
+    live.activeEntries = [{ punchIn: new Date() }, { punchIn: new Date() }]
+    const { container } = render(<Layout activeView="timer" onNavigate={vi.fn()}><div /></Layout>)
+    const rail = railContainer(container)
+    expect(railSrText(rail)).toMatch(/on the clock — 2 running/i)
+    const dot = railDot(rail)
+    expect(dot).not.toBeNull()
+    expect(dot.style.backgroundColor).toBe('var(--amber)')
+    expect(dot.className).toContain('animate-pulse')
+  })
+
+  it('renders NO dot and an sr-only "Off the clock" status when idle', () => {
+    live.activeEntries = []
+    const { container } = render(<Layout activeView="timer" onNavigate={vi.fn()}><div /></Layout>)
+    const rail = railContainer(container)
+    expect(railSrText(rail)).toMatch(/^off the clock$/i)
+    expect(railDot(rail)).toBeNull()
   })
 })

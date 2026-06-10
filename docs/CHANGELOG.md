@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.7] — 2026-06-10
+
+### Fixed
+- **Final accessibility polish.**
+  - **Labor-type glyphs are now legible inside their tinted chips in light mode** — the pastel icon was washing out against the near-white tint; it now darkens just enough to stay readable (≥3:1) while keeping its colour.
+  - **On tablet, the side-rail "on the clock" indicator no longer relies on colour alone** — the amber dot now appears only while a timer is running (its presence, not just its hue, signals the state), and a screen-reader status text states whether you're on or off the clock.
+
+---
+
 ## [0.29.6] — 2026-06-10
 
 ### Fixed

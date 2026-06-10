@@ -198,6 +198,20 @@
     letter-spacing: var(--track-over);
   }
 
+  /* Labor-type glyph ink (LaborGlyph.jsx). The glyph rides on a ~22%-tint chip
+     (withAlpha(color, '38')); the labor colour is passed in via `--glyph-ink`.
+     Dark mode keeps the full pastel (already 4.4–6.4:1 against the dark tint).
+     In light mode the tint composites near-white, so the full pastel falls to
+     ~1.48–2.27:1 against it (WCAG 1.4.11). Darkening the ink toward the ink
+     near-black (#0F1117) lifts every design-system pastel ≥3:1: at 60% the
+     worst case (yellow #E6C84B) reaches 3.58:1. */
+  .lg-glyph-ink {
+    color: var(--glyph-ink);
+  }
+  .light .lg-glyph-ink {
+    color: color-mix(in srgb, var(--glyph-ink) 60%, #0F1117);
+  }
+
   /* Scroll-snap "wheel" column for the reminder duration picker (issue #111).
      The mask fades the top/bottom rows for the wheel look; the selection is the
      centre row, framed by the band overlay in the component. */
