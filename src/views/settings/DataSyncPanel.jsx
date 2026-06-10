@@ -185,14 +185,21 @@ export default function DataSyncPanel({ onBack }) {
                     {settings.syncProvider === 'github' ? '@' : ''}{settings.syncUsername}
                   </p>
                 )}
-                <p className="text-xs text-appTextMuted mt-0.5">
-                  {tokenExpired
-                    ? 'Token expired — reconnect to continue syncing'
-                    : `Last synced: ${formatLastSync(settings.lastSyncedAt)}`}
-                </p>
-                {settings.syncError && !tokenExpired && (
-                  <p className="text-xs text-red-400 mt-0.5 truncate">{settings.syncError}</p>
-                )}
+                {/* Sync status changes reactively after Sync Now; announce it
+                    without stealing focus. The polite region is always mounted so
+                    a swapped-in message is reliably read; the syncError is an
+                    action result so it's role="alert" (assertive). Truncate is
+                    visual only — the full text stays in the accessibility tree. */}
+                <div aria-live="polite">
+                  <p className="text-xs text-appTextMuted mt-0.5" role="status">
+                    {tokenExpired
+                      ? 'Token expired — reconnect to continue syncing'
+                      : `Last synced: ${formatLastSync(settings.lastSyncedAt)}`}
+                  </p>
+                  {settings.syncError && !tokenExpired && (
+                    <p className="text-xs text-red-400 mt-0.5 truncate" role="alert">{settings.syncError}</p>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3 px-4 py-3 border-b border-appBorderLight">

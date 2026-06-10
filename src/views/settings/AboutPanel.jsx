@@ -93,7 +93,12 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
             <p className={`text-sm font-medium ${updateAvailable ? 'text-appAccent' : 'text-appText'}`}>
               {updateAvailable ? 'Update available' : 'Check for updates'}
             </p>
-            <p className="text-xs text-appTextMuted mt-0.5">
+            {/* role="status" / aria-live="polite": this <p> is always in the
+                DOM and only its text changes, so a screen reader announces the
+                check result ("Checking…" → "Already up to date" / "Update
+                available") even though the "latest" state self-clears after 3s
+                (WCAG 4.1.3). */}
+            <p className="text-xs text-appTextMuted mt-0.5" role="status" aria-live="polite">
               {updateAvailable                         && 'Tap to reload and apply the new version'}
               {!updateAvailable && updateStatus === 'checking' && 'Checking…'}
               {!updateAvailable && updateStatus === 'latest'   && 'Already up to date'}

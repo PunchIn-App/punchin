@@ -126,6 +126,26 @@ describe('TimerView — active timers', () => {
   })
 })
 
+describe('TimerView — status live region (WCAG 4.1.3)', () => {
+  it('announces the running-timer count via an aria-live="polite" subtitle', () => {
+    const active = [{ id: 1, jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: null }]
+    setupMocks({ active })
+    render(<TimerView />)
+    // The subtitle <p> hosts the "N timer(s) running" / "No active timers" text;
+    // its text swaps in place on punch in/out, so it must be a persistent polite
+    // region rather than a mounting/unmounting role="status" node.
+    const subtitle = screen.getByText(/timer running/i).closest('p')
+    expect(subtitle).toHaveAttribute('aria-live', 'polite')
+  })
+
+  it('keeps the same polite region in the idle state', () => {
+    setupMocks()
+    render(<TimerView />)
+    const subtitle = screen.getByText(/no active timers/i).closest('p')
+    expect(subtitle).toHaveAttribute('aria-live', 'polite')
+  })
+})
+
 describe('TimerView — last session', () => {
   it('shows Last Session block when idle and lastEntry exists', () => {
     const lastEntry = {

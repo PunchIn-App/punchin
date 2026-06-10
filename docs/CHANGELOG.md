@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.4] — 2026-06-10
+
+### Fixed
+- **Screen readers now hear status changes (accessibility).** Several actions used to change the screen silently; they're now announced via ARIA live regions, without moving your place on the page:
+  - Cloud-sync errors and the "token expired — reconnect" notice after **Sync Now**.
+  - The result of importing shared data (the new-entry count, or an error).
+  - The **Check for updates** result (which otherwise vanished after a few seconds before a screen reader could reach it).
+  - Punching in/out ("N timers running" / "No active timers").
+  - Timesheet search/filter results (the entry count and total as you type or filter).
+  - The "Notifications are blocked" notice when turning on Reminders is denied.
+
+---
+
 ## [0.29.3] — 2026-06-10
 
 ### Fixed

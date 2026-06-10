@@ -34,6 +34,7 @@ export default function DataTransfer() {
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState(null) // { success } | { error }
   const [enlarged, setEnlarged] = useState(false) // QR lightbox (issue: code too small to scan inline)
+  const importRef = useRef(null) // textarea — keep focus here after a successful import clears it
 
   const createLink = async () => {
     setGenerating(true)
@@ -75,7 +76,10 @@ export default function DataTransfer() {
       const snap = await decodeSnapshot(code)
       const added = await importSnapshot(snap)
       setImportMsg({ success: `Imported ${added} new ${added === 1 ? 'entry' : 'entries'}.` })
+      // Clearing the field disables the Import button; keep focus on the textarea
+      // so it doesn't drop to <body> (the success is announced by the live region).
       setImportText('')
+      importRef.current?.focus()
     } catch (e) {
       setImportMsg({ error: e.message || 'Could not import this link.' })
     } finally {
@@ -107,7 +111,7 @@ export default function DataTransfer() {
           {generating ? 'Creating…' : shareUrl ? 'Regenerate link' : 'Create share link'}
         </button>
 
-        {shareError && <p className="text-xs text-red-400">{shareError}</p>}
+        {shareError && <p role="alert" className="text-xs text-red-400">{shareError}</p>}
 
         {shareUrl && (
           <div className="space-y-3">
@@ -170,6 +174,7 @@ export default function DataTransfer() {
         </div>
 
         <textarea
+          ref={importRef}
           value={importText}
           onChange={e => { setImportText(e.target.value); setImportMsg(null) }}
           placeholder="Paste a PunchIn share link…"
@@ -187,8 +192,13 @@ export default function DataTransfer() {
           {importing ? 'Importing…' : 'Import data'}
         </button>
 
-        {importMsg?.success && <p className="text-xs text-green-400">{importMsg.success}</p>}
-        {importMsg?.error && <p className="text-xs text-red-400">{importMsg.error}</p>}
+        {/* A persistent polite region announces the success count without
+            stealing focus (WCAG 4.1.3); a failed import is an action result, so
+            it carries role="alert" to match the modal-form error idiom. */}
+        <p role="status" aria-live="polite" className="text-xs text-green-400 empty:hidden">
+          {importMsg?.success || ''}
+        </p>
+        {importMsg?.error && <p role="alert" className="text-xs text-red-400">{importMsg.error}</p>}
       </div>
     </div>
 

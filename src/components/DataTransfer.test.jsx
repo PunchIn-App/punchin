@@ -111,4 +111,29 @@ describe('DataTransfer — import', () => {
     await waitFor(() => expect(mockImport).toHaveBeenCalled())
     expect(await screen.findByText(/Imported 1 new entry/i)).toBeInTheDocument()
   })
+
+  // WCAG 4.1.3 — the import result must be announced to assistive tech.
+  it('announces a failed import via role="alert"', async () => {
+    render(<DataTransfer />)
+    fireEvent.change(screen.getByLabelText(/share link to import/i), { target: { value: 'not-a-link' } })
+    fireEvent.click(screen.getByRole('button', { name: /^import data$/i }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Paste a PunchIn share link or code first/i)
+  })
+
+  it('announces a successful import in a polite role="status" live region', async () => {
+    const { encodeSnapshot, buildShareUrl } = await import('../utils/transfer')
+    const code = await encodeSnapshot(snapshot)
+    const url = buildShareUrl(code, 'https://app.test', '/')
+
+    render(<DataTransfer />)
+    // The status region is persistent (always in the DOM) so the announcement is reliable.
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+
+    fireEvent.change(screen.getByLabelText(/share link to import/i), { target: { value: url } })
+    fireEvent.click(screen.getByRole('button', { name: /^import data$/i }))
+    await waitFor(() => expect(mockImport).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Imported 1 new entry/i))
+  })
 })

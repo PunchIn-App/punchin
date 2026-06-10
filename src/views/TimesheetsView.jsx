@@ -78,10 +78,15 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
 
   return (
     <div className="space-y-3">
-      {/* Summary bar */}
-      <div className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
+      {/* Summary bar — a persistent polite live region so typing in the search
+          box or changing a filter (which silently updates the list, Total, and
+          empty state) is announced to screen readers (WCAG 4.1.3). It stays in
+          the DOM across filter changes; only the Total + the sr-only entry count
+          change, which announces more reliably than a node that mounts/unmounts. */}
+      <div role="status" aria-live="polite" className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
         <span className="text-sm text-appTextMuted">Total</span>
         <span className="font-mono font-semibold text-appText text-lg">{formatDuration(sumDurationsInRange(filteredEntries.map(e => roundEntry(e, rm)), start, end), decimal)}</span>
+        <span className="sr-only">{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} this day</span>
       </div>
 
       {filteredEntries.length === 0 ? (
@@ -225,10 +230,14 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
     <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-4 lg:items-start">
       {/* Summary — on top on mobile, a sticky right rail on desktop */}
       <div className="space-y-3 mb-3 lg:mb-0 lg:order-2 lg:sticky lg:top-4">
-        {/* Hero week total */}
-        <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
+        {/* Hero week total — a persistent polite live region so a search/filter
+            change (which silently re-totals the week and re-buckets the days) is
+            announced to screen readers (WCAG 4.1.3). It stays in the DOM across
+            filter changes; only the total + the sr-only entry count change. */}
+        <div role="status" aria-live="polite" className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
           <p className="text-[10px] uppercase tracking-widest text-appTextMuted">Week total</p>
           <p className="font-mono font-bold text-appText text-3xl mt-1">{formatDuration(total, decimal)}</p>
+          <span className="sr-only">{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} this week</span>
         </div>
 
         {/* By job */}

@@ -458,6 +458,54 @@ describe('TimesheetsView — WeeklySheet with entries', () => {
   })
 })
 
+// ─── Live-region status announcements (WCAG 4.1.3) ─────────────────────────────
+
+describe('TimesheetsView — search/filter result is announced (live region)', () => {
+  it('DailySheet summary bar is a polite live region reflecting the entry count', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    // The Total summary bar carries role="status" + aria-live="polite" and an
+    // sr-only entry count, so a search/filter change is announced without focus.
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('Total')
+    expect(status).toHaveTextContent(/1 entry this day/i)
+  })
+
+  it('DailySheet live region updates to the empty result when search excludes all', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.change(screen.getByRole('searchbox', { name: /search time entries/i }), {
+      target: { value: 'xyzzy' },
+    })
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent(/0 entries this day/i)
+  })
+
+  it('WeeklySheet hero total is a polite live region reflecting the entry count', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('Week total')
+    expect(status).toHaveTextContent(/1 entry this week/i)
+  })
+
+  it('WeeklySheet live region updates to the empty result when search excludes all', () => {
+    setupWithEntries()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'weekly' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: /search time entries/i }), {
+      target: { value: 'xyzzy' },
+    })
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent(/0 entries this week/i)
+  })
+})
+
 // ─── Job filter dropdown ──────────────────────────────────────────────────────
 
 // Extra job fixture used for filter-mismatch tests (id=2 so it can be added as
