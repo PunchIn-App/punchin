@@ -1,58 +1,40 @@
 const FILE_NAME = 'punchin-data.json'
 
-// A 401 means the (implicit-flow, ~1h) access token has expired or been revoked.
-// Surface the shared TOKEN_EXPIRED signal so the UI prompts re-authentication
-// instead of showing a raw status code (issue #121). Other statuses pass through.
+// A 401 means the access token has expired or been revoked. Surface the shared
+// TOKEN_EXPIRED signal so sync silently refreshes it (issue #243) — or, if the
+// refresh token is gone too, the UI prompts re-authentication (issue #121).
+// Other statuses pass through.
 function httpError(label, status) {
   return new Error(status === 401 ? 'TOKEN_EXPIRED' : `${label} ${status}`)
 }
 
 const SCOPE = 'Files.ReadWrite.AppFolder User.Read'
-const TOKEN_ENDPOINT = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
 
-// OneDrive uses the Authorization Code flow with PKCE (issue #128): the
-// authorize endpoint returns a single-use `code` in the query string (not the
-// token in the URL fragment), which the app exchanges for the token via a
-// direct CORS POST below. Requires the Azure app registration to expose a
-// "Single-page application" redirect URI (see the PR's runbook).
-export function buildOneDriveOAuthUrl(clientId, state, codeChallenge) {
+// OneDrive uses the Authorization Code flow as a CONFIDENTIAL client via the
+// worker (issue #243), upgrading the earlier public-SPA + PKCE flow (issue #128).
+// The authorize endpoint returns a single-use `code`; the worker (which holds
+// the client secret) exchanges it at /oauth/onedrive/callback and hands back an
+// access token PLUS a refresh token. The `offline_access` scope is what makes
+// Microsoft issue the refresh token, and a confidential-client refresh token
+// lasts 90 days (vs 24h for an SPA redirect URI) — so this requires the Azure
+// app registration to expose the redirect URI under the "Web" platform, not
+// "Single-page application" (see the PR runbook). Tradeoff vs #128: the token
+// now travels back via the URL fragment (scrubbed on arrival) rather than a
+// direct POST — the cost of moving the secret-bearing exchange server-side.
+export function buildOneDriveOAuthUrl(clientId, callbackBase, state) {
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: window.location.origin + '/',
+    redirect_uri: `${callbackBase}/oauth/onedrive/callback`,
     response_type: 'code',
-    scope: SCOPE,
-    // `state` carries the provider label (for callback routing) plus a CSRF
-    // nonce verified on return (issue #125): `onedrive:<nonce>`.
-    state: state ? `onedrive:${state}` : 'onedrive',
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
+    scope: `${SCOPE} offline_access`,
+    // CSRF nonce verified on return (issue #125); the worker echoes it back and
+    // the provider is identified by the callback path, so no provider prefix.
+    ...(state ? { state } : {}),
     // Always show the account chooser instead of silently re-using the
-    // already-signed-in Microsoft account on reconnect. OneDrive has no
-    // client-side per-app revoke (its ~1h token just expires), so this prompt is
-    // the lever that keeps a reconnect from "pushing right through".
+    // already-signed-in Microsoft account on reconnect.
     prompt: 'select_account',
   })
   return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params}`
-}
-
-// Exchange the authorization code + PKCE verifier for an access token. OneDrive
-// is a public SPA client, so no client secret is involved and this runs entirely
-// in the browser via a CORS token request — the token is never in the URL.
-export async function exchangeOneDriveCode(clientId, code, codeVerifier) {
-  const res = await fetch(TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: window.location.origin + '/',
-      code_verifier: codeVerifier,
-      scope: SCOPE,
-    }),
-  })
-  if (!res.ok) throw httpError('OneDrive', res.status)
-  return res.json()
 }
 
 export async function pushToOneDrive(token, data) {

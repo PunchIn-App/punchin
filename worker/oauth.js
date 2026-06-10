@@ -144,6 +144,158 @@ async function handleRevoke(request, env) {
   }
 }
 
+async function handleGitHubCallback(url, env) {
+  const code = url.searchParams.get('code')
+  const appUrl = env.APP_URL || url.origin
+  // Echo GitHub's `state` back to the app so it can verify the CSRF nonce it
+  // minted before the redirect (issue #125).
+  const state = url.searchParams.get('state')
+  const stateParam = state ? `&state=${encodeURIComponent(state)}` : ''
+
+  if (!code) {
+    return Response.redirect(`${appUrl}/#sync_error=missing_code`)
+  }
+
+  try {
+    const res = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        client_id: env.GITHUB_CLIENT_ID,
+        client_secret: env.GITHUB_CLIENT_SECRET,
+        code,
+      }),
+    })
+    const data = await res.json()
+    if (!data.access_token) {
+      return Response.redirect(`${appUrl}/#sync_error=${encodeURIComponent(data.error_description || 'auth_failed')}`)
+    }
+    // GitHub gist tokens don't expire — no refresh/expiry to forward (issue #243).
+    return Response.redirect(
+      `${appUrl}/#sync_token=${encodeURIComponent(data.access_token)}&sync_provider=github${stateParam}`
+    )
+  } catch {
+    return Response.redirect(`${appUrl}/#sync_error=server_error`)
+  }
+}
+
+// Google & OneDrive run the Authorization Code flow as a CONFIDENTIAL client so
+// the issued grant includes a long-lived refresh token (issue #243): Google's
+// refresh token doesn't expire (published app), Microsoft's lasts 90 days for a
+// confidential client (vs 24h for an SPA redirect URI) and ROTATES on each use.
+// Both require the client *secret* for the code→token exchange — which must never
+// reach the browser — so the exchange (and later refresh) runs here in the worker.
+// `scope` is sent for Microsoft (a subset/equal of the authorize scopes, per MS
+// docs); Google derives the scope from the grant and rejects a redundant one.
+const OAUTH_PROVIDERS = {
+  google: {
+    tokenEndpoint: 'https://oauth2.googleapis.com/token',
+    idVar: 'GOOGLE_CLIENT_ID',
+    secretVar: 'GOOGLE_CLIENT_SECRET',
+    scope: null,
+  },
+  onedrive: {
+    tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+    idVar: 'ONEDRIVE_CLIENT_ID',
+    secretVar: 'ONEDRIVE_CLIENT_SECRET',
+    scope: 'Files.ReadWrite.AppFolder User.Read offline_access',
+  },
+}
+
+// Exchange a provider's authorization `code` for tokens, then hand the app back
+// the access token + its lifetime + the refresh token via the URL fragment
+// (scrubbed on arrival in App.jsx, same channel as GitHub/Google). The
+// redirect_uri MUST be byte-identical to the one the app sent to the authorize
+// endpoint — both resolve to `${APP_URL}/oauth/<provider>/callback`, so APP_URL
+// (worker) and VITE_APP_URL (build) must match the registered redirect URI.
+async function handleProviderCallback(url, env, provider) {
+  const p = OAUTH_PROVIDERS[provider]
+  const appUrl = env.APP_URL || url.origin
+  const state = url.searchParams.get('state')
+  const stateParam = state ? `&state=${encodeURIComponent(state)}` : ''
+  const code = url.searchParams.get('code')
+
+  if (!code) {
+    return Response.redirect(`${appUrl}/#sync_error=missing_code`)
+  }
+
+  try {
+    const body = {
+      client_id: env[p.idVar],
+      client_secret: env[p.secretVar],
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: `${appUrl}/oauth/${provider}/callback`,
+    }
+    if (p.scope) body.scope = p.scope
+    const res = await fetch(p.tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(body),
+    })
+    const data = await res.json()
+    if (!data.access_token) {
+      return Response.redirect(`${appUrl}/#sync_error=${encodeURIComponent(data.error_description || 'auth_failed')}`)
+    }
+    const frag = [
+      `sync_token=${encodeURIComponent(data.access_token)}`,
+      `sync_provider=${provider}`,
+    ]
+    if (data.refresh_token) frag.push(`sync_refresh=${encodeURIComponent(data.refresh_token)}`)
+    if (data.expires_in)    frag.push(`sync_expires=${encodeURIComponent(data.expires_in)}`)
+    return Response.redirect(`${appUrl}/#${frag.join('&')}${stateParam}`)
+  } catch {
+    return Response.redirect(`${appUrl}/#sync_error=server_error`)
+  }
+}
+
+// Silent background refresh (issue #243): the app POSTs {provider, refresh_token}
+// here and the worker trades it for a fresh access token using the client secret.
+// Status codes are the contract the app's tokenStore reads:
+//   401  → the refresh token is revoked/expired (invalid_grant): reconnect needed
+//   502  → upstream/transient failure: the app retries on the next sync tick
+//   200  → { access_token, expires_in, refresh_token? } (refresh_token only when
+//          the provider rotated it — Microsoft does, Google doesn't)
+async function handleRefresh(request, env) {
+  if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 })
+
+  let provider, refresh_token
+  try { ({ provider, refresh_token } = await request.json()) } catch { /* malformed → 400 below */ }
+  const p = OAUTH_PROVIDERS[provider]
+  if (!p || !refresh_token) return new Response('Bad Request', { status: 400 })
+
+  try {
+    const body = {
+      client_id: env[p.idVar],
+      client_secret: env[p.secretVar],
+      grant_type: 'refresh_token',
+      refresh_token,
+    }
+    if (p.scope) body.scope = p.scope
+    const res = await fetch(p.tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    // A dead refresh token surfaces as 400 invalid_grant from both providers —
+    // map it to 401 so the app prompts a one-time reconnect (not an endless retry).
+    if (res.status === 400 && data.error === 'invalid_grant') {
+      return new Response(JSON.stringify({ error: 'invalid_grant' }), {
+        status: 401, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    if (!res.ok || !data.access_token) return new Response('Bad Gateway', { status: 502 })
+    return new Response(JSON.stringify({
+      access_token: data.access_token,
+      expires_in: data.expires_in,
+      refresh_token: data.refresh_token, // present only when the provider rotates it
+    }), { headers: { 'Content-Type': 'application/json' } })
+  } catch {
+    return new Response('Bad Gateway', { status: 502 })
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
@@ -151,44 +303,12 @@ export default {
     const icon = await handleAccentIcon(url)
     if (icon) return withSecurityHeaders(icon)
 
-    if (url.pathname === '/oauth/revoke') {
-      return handleRevoke(request, env)
-    }
+    if (url.pathname === '/oauth/revoke')  return handleRevoke(request, env)
+    if (url.pathname === '/oauth/refresh') return handleRefresh(request, env)
+    if (url.pathname === '/oauth/google/callback')   return handleProviderCallback(url, env, 'google')
+    if (url.pathname === '/oauth/onedrive/callback') return handleProviderCallback(url, env, 'onedrive')
+    if (url.pathname === '/oauth/github/callback')   return handleGitHubCallback(url, env)
 
-    if (url.pathname !== '/oauth/github/callback') {
-      return withSecurityHeaders(await env.ASSETS.fetch(request))
-    }
-
-    const code = url.searchParams.get('code')
-    const appUrl = env.APP_URL || url.origin
-    // Echo GitHub's `state` back to the app so it can verify the CSRF nonce it
-    // minted before the redirect (issue #125).
-    const state = url.searchParams.get('state')
-    const stateParam = state ? `&state=${encodeURIComponent(state)}` : ''
-
-    if (!code) {
-      return Response.redirect(`${appUrl}/#sync_error=missing_code`)
-    }
-
-    try {
-      const res = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          client_id: env.GITHUB_CLIENT_ID,
-          client_secret: env.GITHUB_CLIENT_SECRET,
-          code,
-        }),
-      })
-      const data = await res.json()
-      if (!data.access_token) {
-        return Response.redirect(`${appUrl}/#sync_error=${encodeURIComponent(data.error_description || 'auth_failed')}`)
-      }
-      return Response.redirect(
-        `${appUrl}/#sync_token=${encodeURIComponent(data.access_token)}&sync_provider=github${stateParam}`
-      )
-    } catch {
-      return Response.redirect(`${appUrl}/#sync_error=server_error`)
-    }
+    return withSecurityHeaders(await env.ASSETS.fetch(request))
   },
 }

@@ -6,8 +6,8 @@ Only the latest release of PunchIn is actively supported with security updates.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.27.x  | Yes       |
-| < 0.27  | No        |
+| 0.28.x  | Yes       |
+| < 0.28  | No        |
 
 ## Scope
 
@@ -15,9 +15,15 @@ PunchIn is a client-only PWA: all user data lives in the browser's IndexedDB and
 there is no application backend. In scope are the application itself and the
 Cloudflare Worker that handles OAuth (`worker/oauth.js`). Out of scope is the
 user's own time-tracking data stored locally, which is plaintext by design and
-not encrypted at rest. The one exception is the cloud-sync **access token**,
-which is encrypted at rest with a non-extractable WebCrypto key as defense in
-depth (since v0.17.0).
+not encrypted at rest. The exceptions are the cloud-sync **access token** and,
+since v0.28.0, the OAuth **refresh token** (Google/OneDrive) — both encrypted at
+rest with a non-extractable WebCrypto key as defense in depth (access token since
+v0.17.0). Note that storing a refresh token raises the value of an active
+same-origin XSS from a single ~1-hour access token to long-lived background
+access (Google: until revoked; OneDrive: ~90 days, rotating). This is the same
+inherent limit of a no-backend PWA the access-token encryption already faced —
+the Worker's Content-Security-Policy remains the primary XSS control — but it is
+the conscious tradeoff for seamless background sync.
 
 ## Reporting a Vulnerability
 

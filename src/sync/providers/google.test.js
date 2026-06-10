@@ -4,43 +4,45 @@ import { buildGoogleOAuthUrl, pushToDrive, pullFromDrive } from './google'
 // buildGoogleOAuthUrl
 // ---------------------------------------------------------------------------
 
-describe('buildGoogleOAuthUrl', () => {
+describe('buildGoogleOAuthUrl (Auth Code via worker, issue #243)', () => {
+  const BASE = 'https://app.example'
+
   it('points to the Google OAuth v2 authorize endpoint', () => {
-    const url = buildGoogleOAuthUrl('google-client-id')
-    expect(url).toMatch(/^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth/)
+    expect(buildGoogleOAuthUrl('google-client-id', BASE)).toMatch(/^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth/)
   })
 
   it('includes the client_id param', () => {
-    const url = buildGoogleOAuthUrl('google-client-id')
-    expect(url).toContain('client_id=google-client-id')
+    expect(buildGoogleOAuthUrl('google-client-id', BASE)).toContain('client_id=google-client-id')
   })
 
-  it('uses response_type=token (implicit flow)', () => {
-    const url = buildGoogleOAuthUrl('id')
-    expect(url).toContain('response_type=token')
+  it('uses response_type=code (Authorization Code flow, not implicit)', () => {
+    expect(new URL(buildGoogleOAuthUrl('id', BASE)).searchParams.get('response_type')).toBe('code')
   })
 
   it('requests the drive.appdata scope', () => {
-    const url = buildGoogleOAuthUrl('id')
-    expect(url).toContain('drive.appdata')
+    expect(buildGoogleOAuthUrl('id', BASE)).toContain('drive.appdata')
   })
 
-  it('sets state=google', () => {
-    const url = buildGoogleOAuthUrl('id')
-    expect(url).toContain('state=google')
+  it('requests offline access so a refresh token is issued', () => {
+    expect(new URL(buildGoogleOAuthUrl('id', BASE)).searchParams.get('access_type')).toBe('offline')
   })
 
-  it('embeds the provider label and CSRF nonce in state when provided (issue #125)', () => {
-    expect(new URL(buildGoogleOAuthUrl('id', 'nonce123')).searchParams.get('state')).toBe('google:nonce123')
+  it('forces consent + account chooser so a refresh token is RE-issued on reconnect', () => {
+    // prompt=consent is required for Google to re-issue the refresh token on a
+    // silent re-grant; select_account keeps the chooser (issue #243).
+    expect(new URL(buildGoogleOAuthUrl('id', BASE)).searchParams.get('prompt')).toBe('consent select_account')
   })
 
-  it('includes a redirect_uri', () => {
-    const url = buildGoogleOAuthUrl('id')
-    expect(url).toContain('redirect_uri=')
+  it('points redirect_uri at the worker callback under the callbackBase', () => {
+    expect(new URL(buildGoogleOAuthUrl('id', BASE)).searchParams.get('redirect_uri')).toBe('https://app.example/oauth/google/callback')
   })
 
-  it('forces the account chooser with prompt=select_account (no silent reconnect)', () => {
-    expect(new URL(buildGoogleOAuthUrl('id')).searchParams.get('prompt')).toBe('select_account')
+  it('carries the raw CSRF nonce in state (provider identified by callback path, issue #125)', () => {
+    expect(new URL(buildGoogleOAuthUrl('id', BASE, 'nonce123')).searchParams.get('state')).toBe('nonce123')
+  })
+
+  it('omits state entirely when no nonce is given', () => {
+    expect(new URL(buildGoogleOAuthUrl('id', BASE)).searchParams.has('state')).toBe(false)
   })
 })
 

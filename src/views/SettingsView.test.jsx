@@ -771,12 +771,23 @@ describe('SettingsView — Sync section', () => {
     expect(screen.getByText(/Just now/)).toBeInTheDocument()
   })
 
-  it('shows "Token expired" and disables Sync Now when token is expired', async () => {
-    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'google', syncTokenExpiry: Date.now() - 1000 }))
+  it('shows "Token expired" and disables Sync Now when a refresh actually failed (TOKEN_EXPIRED)', async () => {
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'google', syncError: 'TOKEN_EXPIRED' }))
     render(<SettingsView />)
     expand('Data & Sync')
     expect(await screen.findByText(/Token expired/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sync Now/i })).toBeDisabled()
+  })
+
+  it('does NOT show "Token expired" for a merely-lapsed access token (it refreshes silently, issue #243)', async () => {
+    // A past syncTokenExpiry alone is recovered in the background, so the UI stays
+    // Connected and Sync Now stays enabled — only a TOKEN_EXPIRED error flips it.
+    mockGetSettings.mockReturnValue(withSync({ syncProvider: 'google', syncTokenExpiry: Date.now() - 1000 }))
+    render(<SettingsView />)
+    expand('Data & Sync')
+    expect(await screen.findByText(/Connected/)).toBeInTheDocument()
+    expect(screen.queryByText(/Token expired/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Sync Now/i })).not.toBeDisabled()
   })
 
   it('shows sync error when present', async () => {

@@ -230,3 +230,138 @@ describe('accent install icons (issue #228)', () => {
     expect(env.ASSETS.fetch).toHaveBeenCalled()
   })
 })
+
+describe('worker Google/OneDrive OAuth callbacks — confidential-client code exchange (issue #243)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  const env = {
+    APP_URL: 'https://app.example',
+    GOOGLE_CLIENT_ID: 'g-id', GOOGLE_CLIENT_SECRET: 'g-secret',
+    ONEDRIVE_CLIENT_ID: 'od-id', ONEDRIVE_CLIENT_SECRET: 'od-secret',
+  }
+  const callback = (provider, qs) =>
+    worker.fetch({ url: `https://app.example/oauth/${provider}/callback?${qs}` }, env)
+
+  it('Google: exchanges the code and redirects with token + refresh + expiry + provider + state', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ access_token: 'gtok', refresh_token: 'grefresh', expires_in: 3600 }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const loc = (await callback('google', 'code=AUTH&state=NONCE')).headers.get('location')
+    expect(loc).toContain('sync_token=gtok')
+    expect(loc).toContain('sync_provider=google')
+    expect(loc).toContain('sync_refresh=grefresh')
+    expect(loc).toContain('sync_expires=3600')
+    expect(loc).toContain('state=NONCE')
+    // Exchange used the secret + a redirect_uri byte-identical to the authorize one; Google gets NO scope.
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://oauth2.googleapis.com/token')
+    const body = new URLSearchParams(opts.body)
+    expect(body.get('grant_type')).toBe('authorization_code')
+    expect(body.get('client_id')).toBe('g-id')
+    expect(body.get('client_secret')).toBe('g-secret')
+    expect(body.get('redirect_uri')).toBe('https://app.example/oauth/google/callback')
+    expect(body.has('scope')).toBe(false)
+  })
+
+  it('OneDrive: exchanges at the MS endpoint with scope (incl. offline_access) + matching redirect_uri', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ access_token: 'odtok', refresh_token: 'odrefresh', expires_in: 3600 }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const loc = (await callback('onedrive', 'code=AUTH&state=NONCE')).headers.get('location')
+    expect(loc).toContain('sync_token=odtok')
+    expect(loc).toContain('sync_provider=onedrive')
+    expect(loc).toContain('sync_refresh=odrefresh')
+    const body = new URLSearchParams(fetchMock.mock.calls[0][1].body)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://login.microsoftonline.com/common/oauth2/v2.0/token')
+    expect(body.get('redirect_uri')).toBe('https://app.example/oauth/onedrive/callback')
+    expect(body.get('scope')).toContain('offline_access')
+    expect(body.get('client_secret')).toBe('od-secret')
+  })
+
+  it('redirects with missing_code when no code is present', async () => {
+    expect((await callback('google', 'state=x')).headers.get('location')).toBe('https://app.example/#sync_error=missing_code')
+  })
+
+  it("passes the provider's error_description through when no token comes back", async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ error_description: 'bad_grant' }) }))
+    expect((await callback('google', 'code=AUTH&state=N')).headers.get('location')).toBe('https://app.example/#sync_error=bad_grant')
+  })
+
+  it('redirects with server_error when the exchange throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')))
+    expect((await callback('onedrive', 'code=AUTH&state=N')).headers.get('location')).toBe('https://app.example/#sync_error=server_error')
+  })
+
+  it('omits sync_refresh / sync_expires when the provider returns none', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ access_token: 'tokonly' }) }))
+    const loc = (await callback('google', 'code=AUTH&state=N')).headers.get('location')
+    expect(loc).toContain('sync_token=tokonly')
+    expect(loc).not.toContain('sync_refresh')
+    expect(loc).not.toContain('sync_expires')
+  })
+})
+
+describe('worker /oauth/refresh — silent token refresh (issue #243)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  const env = {
+    GOOGLE_CLIENT_ID: 'g-id', GOOGLE_CLIENT_SECRET: 'g-secret',
+    ONEDRIVE_CLIENT_ID: 'od-id', ONEDRIVE_CLIENT_SECRET: 'od-secret',
+  }
+  const refresh = (body, method = 'POST') =>
+    worker.fetch({ url: 'https://app.example/oauth/refresh', method, json: async () => body }, env)
+
+  it('rejects a non-POST request with 405', async () => {
+    expect((await worker.fetch({ url: 'https://app.example/oauth/refresh', method: 'GET' }, env)).status).toBe(405)
+  })
+
+  it('returns 400 for a missing/unknown provider or missing token', async () => {
+    expect((await refresh({ provider: 'google' })).status).toBe(400)                      // no token
+    expect((await refresh({ refresh_token: 'r' })).status).toBe(400)                      // no provider
+    expect((await refresh({ provider: 'github', refresh_token: 'r' })).status).toBe(400)  // github isn't refreshable
+  })
+
+  it('returns 400 on a malformed JSON body', async () => {
+    const res = await worker.fetch(
+      { url: 'https://app.example/oauth/refresh', method: 'POST', json: async () => { throw new Error('bad') } }, env,
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('Google: POSTs grant_type=refresh_token (+secret, no scope) and returns the new access token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ access_token: 'g-new', expires_in: 3600 }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await refresh({ provider: 'google', refresh_token: 'g-r' })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.access_token).toBe('g-new')
+    expect(json.expires_in).toBe(3600)
+    expect(json.refresh_token).toBeUndefined() // Google doesn't rotate
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://oauth2.googleapis.com/token')
+    const body = new URLSearchParams(opts.body)
+    expect(body.get('grant_type')).toBe('refresh_token')
+    expect(body.get('refresh_token')).toBe('g-r')
+    expect(body.get('client_secret')).toBe('g-secret')
+    expect(body.has('scope')).toBe(false)
+  })
+
+  it('OneDrive: includes scope and forwards the rotated refresh token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ access_token: 'od-new', expires_in: 3600, refresh_token: 'od-rotated' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await refresh({ provider: 'onedrive', refresh_token: 'od-r' })
+    expect((await res.json()).refresh_token).toBe('od-rotated')
+    expect(new URLSearchParams(fetchMock.mock.calls[0][1].body).get('scope')).toContain('offline_access')
+  })
+
+  it('maps a dead refresh token (400 invalid_grant) to 401 so the app reconnects once', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant' }) }))
+    expect((await refresh({ provider: 'onedrive', refresh_token: 'dead' })).status).toBe(401)
+  })
+
+  it('returns 502 on a transient upstream failure (so the app retries)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }))
+    expect((await refresh({ provider: 'google', refresh_token: 'r' })).status).toBe(502)
+  })
+
+  it('returns 502 when the upstream fetch throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')))
+    expect((await refresh({ provider: 'google', refresh_token: 'r' })).status).toBe(502)
+  })
+})

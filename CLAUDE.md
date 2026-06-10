@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.27.0
+**Version:** 0.28.0
 
 ---
 
@@ -23,7 +23,7 @@ punchin/
 ├── docs/       # CHANGELOG, THIRD-PARTY-LICENSES, ARCHITECTURE.md, TEST-COVERAGE.md, RELEASING.md, SETTINGS.md, SCREENSHOTS.md, THEMING.md, screenshots/, licenses/
 └── src/        # app source
     ├── main.jsx, App.jsx    # entry point; root tab/theme/accent + OAuth-callback shell
-    ├── sync/                # cloud sync: config, oauthState, tokenStore, pkce, syncManager + providers/ (github, google, onedrive)
+    ├── sync/                # cloud sync: config, oauthState, tokenStore (access + refresh tokens), syncManager + providers/ (github, google, onedrive)
     ├── components/          # modals, cards, pickers (TimerCard, EditEntryModal, ConfirmModal, ColorPicker, ChangelogModal, …)
     ├── views/               # Timer, Jobs, Timesheets, Analytics, Settings (+ settings/ drill-in panels)
     ├── hooks/               # useSettings, usePwaUpdate, usePlatformContext, useInstallPrompt, useFocusTrap, useReminders, …
@@ -151,7 +151,7 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 | `jobs` | `id, name, laborTypeId, isActive, uuid` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field; optional `color` field (the job's own colour for its card left-rail — unindexed, no migration; falls back to its labor type's colour when unset) |
 | `entries` | `id, jobId, laborTypeId, punchIn, punchOut, uuid` | Time records; optional `notes` (string) field |
 | `deletions` | `uuid, deletedAt` | Delete **tombstones**: when an entry is removed it is hard-deleted from `entries` (so every view/analytics/export query is unaffected) and its `uuid` is recorded here with a `deletedAt` timestamp, so cloud merge propagates the deletion across devices instead of the entry resurrecting from a peer's snapshot. Use `deleteEntry(id)` (in `db.js`) to delete an entry — never `db.entries.delete` directly. |
-| `secrets` | `name` | At-rest-encrypted sync credentials (issue #126): a non-extractable AES-GCM `CryptoKey` and the encrypted sync token. The OAuth token is **never** stored in plaintext IndexedDB. Access only through `src/sync/tokenStore.js` (`setSyncToken`/`getSyncToken`/`clearSyncToken`) — never read/write the token directly. |
+| `secrets` | `name` | At-rest-encrypted sync credentials (issues #126, #243): a non-extractable AES-GCM `CryptoKey`, the encrypted access token, and the encrypted OAuth **refresh** token (Google/OneDrive). Neither token is **ever** stored in plaintext IndexedDB. Access only through `src/sync/tokenStore.js` (`setSyncToken`/`getSyncToken`/`clearSyncToken` and `setRefreshToken`/`getRefreshToken`) — never read/write the tokens directly. |
 
 All three data tables also carry a `uuid` (stable cross-device identifier) and an `updatedAt` (ms epoch) field, stamped automatically by Dexie `creating`/`updating` hooks in `db.js`. `uuid` survives sync/transfer so cloud merge can identify the *same* record across devices (independent of the local-only auto-increment `id`); `updatedAt` is the basis for last-write-wins conflict resolution. The `creating` hook only fills in missing values, so a record merged in from another device keeps its remote `uuid`/`updatedAt`.
 

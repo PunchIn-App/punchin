@@ -1,35 +1,32 @@
 const FILE_NAME = 'punchin-data.json'
 
-// A 401 means the (implicit-flow, ~1h) access token has expired or been revoked.
-// Surface the shared TOKEN_EXPIRED signal so the UI prompts re-authentication
-// instead of showing a raw status code (issue #121). Other statuses pass through.
+// A 401 means the access token has expired or been revoked. Surface the shared
+// TOKEN_EXPIRED signal so sync silently refreshes it (issue #243) — or, if the
+// refresh token is gone too, the UI prompts re-authentication (issue #121).
+// Other statuses pass through.
 function httpError(label, status) {
   return new Error(status === 401 ? 'TOKEN_EXPIRED' : `${label} ${status}`)
 }
 
-// Google intentionally stays on the implicit flow (response_type=token), unlike
-// OneDrive's Auth Code + PKCE (issue #128). Google "Web application" OAuth
-// clients require the client *secret* for the code→token exchange even with
-// PKCE — there is no no-secret public-client web flow. Doing Auth Code for
-// Google would therefore require routing the exchange through a server with the
-// secret, and a stateless Cloudflare Worker can only hand the token back to the
-// SPA via the URL fragment again — so it wouldn't achieve the goal of keeping
-// the token out of the URL without a stateful backend. The fragment is already
-// scrubbed immediately on return (App.jsx), which is the available mitigation.
-export function buildGoogleOAuthUrl(clientId, state) {
+// Google uses the Authorization Code flow via the worker (issue #243). A "Web
+// application" client requires the client *secret* for the code→token exchange,
+// so the worker (which holds the secret) does it at /oauth/google/callback and
+// hands back an access token PLUS a refresh token for silent background renewal.
+// `access_type=offline` is what makes Google issue the refresh token, and
+// `prompt=consent` is required to RE-issue it on a reconnect (Google omits the
+// refresh token on a silent re-grant otherwise); `select_account` keeps the
+// account chooser so a reconnect can pick a different account.
+export function buildGoogleOAuthUrl(clientId, callbackBase, state) {
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: window.location.origin + '/',
-    response_type: 'token',
+    redirect_uri: `${callbackBase}/oauth/google/callback`,
+    response_type: 'code',
     scope: 'https://www.googleapis.com/auth/drive.appdata',
-    // `state` carries the provider label (for callback routing) plus a CSRF
-    // nonce verified on return (issue #125): `google:<nonce>`.
-    state: state ? `google:${state}` : 'google',
-    // Always show the account chooser instead of silently re-issuing a token to
-    // the already-signed-in Google account. Without this, reconnecting after a
-    // disconnect "pushes right through" with no chance to pick a different
-    // account — see the matching revoke-on-disconnect in syncManager.
-    prompt: 'select_account',
+    access_type: 'offline',
+    prompt: 'consent select_account',
+    // CSRF nonce verified on return (issue #125); the worker echoes it back and
+    // the provider is identified by the callback path, so no provider prefix.
+    ...(state ? { state } : {}),
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }

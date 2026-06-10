@@ -3,19 +3,20 @@ import { useSettings } from './useSettings'
 import { setAutoSyncEnabled, trigger, PERIODIC_MS } from '../sync/autoSync'
 
 // Drives the auto-sync engine from settings + the app lifecycle — mount once at
-// the app root. Auto-sync runs only while connected, opted in, and the token is
-// live; `autoSync !== false` means users who connected before this shipped (no
-// stored value) get it ON by default, matching "default ON at connect".
+// the app root. Auto-sync runs only while connected and opted in; `autoSync !==
+// false` means users who connected before this shipped (no stored value) get it
+// ON by default, matching "default ON at connect".
 //
-// GitHub tokens don't expire, so this is fully seamless there today; Google /
-// OneDrive (~1h, non-refreshable until the refresh-token work lands) will hit
-// TOKEN_EXPIRED, at which point the engine stops and the "Reconnect" nudge shows.
+// Seamless on every provider now (issue #243): GitHub's token never expires, and
+// an expired Google/OneDrive access token is refreshed silently inside runSync.
+// So a merely-lapsed access-token expiry is NOT a stop signal — gating on it would
+// disable the very open-trigger that performs the refresh. The only stop is
+// syncError === 'TOKEN_EXPIRED', set when a refresh actually failed (a dead or
+// absent refresh token), at which point the engine stops and "Reconnect" shows.
 export function useAutoSync() {
   const { settings } = useSettings()
   const connected = !!settings.syncProvider
-  const tokenExpired =
-    (settings.syncTokenExpiry && Date.now() > settings.syncTokenExpiry) ||
-    settings.syncError === 'TOKEN_EXPIRED'
+  const tokenExpired = settings.syncError === 'TOKEN_EXPIRED'
   const enabled = connected && settings.autoSync !== false && !tokenExpired
 
   useEffect(() => {

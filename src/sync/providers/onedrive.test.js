@@ -1,79 +1,46 @@
-import { buildOneDriveOAuthUrl, exchangeOneDriveCode, pushToOneDrive, pullFromOneDrive } from './onedrive'
+import { buildOneDriveOAuthUrl, pushToOneDrive, pullFromOneDrive } from './onedrive'
 
 // ---------------------------------------------------------------------------
-// buildOneDriveOAuthUrl
+// buildOneDriveOAuthUrl (Auth Code via worker, confidential client, issue #243)
 // ---------------------------------------------------------------------------
 
-describe('buildOneDriveOAuthUrl', () => {
+describe('buildOneDriveOAuthUrl (Auth Code via worker, issue #243)', () => {
+  const BASE = 'https://app.example'
+
   it('points to the Microsoft OAuth v2 authorize endpoint', () => {
-    const url = buildOneDriveOAuthUrl('od-client-id')
-    expect(url).toMatch(/^https:\/\/login\.microsoftonline\.com/)
+    expect(buildOneDriveOAuthUrl('od-client-id', BASE)).toMatch(/^https:\/\/login\.microsoftonline\.com/)
   })
 
   it('includes the client_id param', () => {
-    const url = buildOneDriveOAuthUrl('od-client-id')
-    expect(url).toContain('client_id=od-client-id')
+    expect(buildOneDriveOAuthUrl('od-client-id', BASE)).toContain('client_id=od-client-id')
   })
 
-  it('uses response_type=code with PKCE (Auth Code flow, issue #128)', () => {
-    const url = buildOneDriveOAuthUrl('id', 'nonce', 'challenge123')
-    expect(url).toContain('response_type=code')
-    expect(url).toContain('code_challenge=challenge123')
-    expect(url).toContain('code_challenge_method=S256')
+  it('uses response_type=code with NO PKCE challenge (the worker holds the secret)', () => {
+    const url = buildOneDriveOAuthUrl('id', BASE, 'nonce')
+    expect(new URL(url).searchParams.get('response_type')).toBe('code')
+    expect(url).not.toContain('code_challenge')
   })
 
-  it('requests the AppFolder scope', () => {
-    const url = buildOneDriveOAuthUrl('id')
-    expect(url).toContain('AppFolder')
+  it('requests the AppFolder scope plus offline_access (for a refresh token)', () => {
+    const scope = new URL(buildOneDriveOAuthUrl('id', BASE)).searchParams.get('scope')
+    expect(scope).toContain('Files.ReadWrite.AppFolder')
+    expect(scope).toContain('offline_access')
   })
 
-  it('sets state=onedrive', () => {
-    const url = buildOneDriveOAuthUrl('id')
-    expect(url).toContain('state=onedrive')
+  it('points redirect_uri at the worker callback under the callbackBase', () => {
+    expect(new URL(buildOneDriveOAuthUrl('id', BASE)).searchParams.get('redirect_uri')).toBe('https://app.example/oauth/onedrive/callback')
   })
 
-  it('embeds the provider label and CSRF nonce in state when provided (issue #125)', () => {
-    expect(new URL(buildOneDriveOAuthUrl('id', 'nonce123')).searchParams.get('state')).toBe('onedrive:nonce123')
+  it('carries the raw CSRF nonce in state (provider identified by callback path, issue #125)', () => {
+    expect(new URL(buildOneDriveOAuthUrl('id', BASE, 'nonce123')).searchParams.get('state')).toBe('nonce123')
   })
 
-  it('includes a redirect_uri', () => {
-    const url = buildOneDriveOAuthUrl('id')
-    expect(url).toContain('redirect_uri=')
+  it('omits state entirely when no nonce is given', () => {
+    expect(new URL(buildOneDriveOAuthUrl('id', BASE)).searchParams.has('state')).toBe(false)
   })
 
   it('forces the account chooser with prompt=select_account (no silent reconnect)', () => {
-    expect(new URL(buildOneDriveOAuthUrl('id')).searchParams.get('prompt')).toBe('select_account')
-  })
-})
-
-// ---------------------------------------------------------------------------
-// exchangeOneDriveCode (Auth Code + PKCE, issue #128)
-// ---------------------------------------------------------------------------
-
-describe('exchangeOneDriveCode', () => {
-  let fetchMock
-  beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock) })
-  afterEach(() => vi.unstubAllGlobals())
-
-  it('POSTs code + verifier to the token endpoint and returns the token JSON', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'odtoken', expires_in: 3600 }) })
-    const data = await exchangeOneDriveCode('client-id', 'authcode', 'verifier-xyz')
-    expect(data.access_token).toBe('odtoken')
-    const [url, opts] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://login.microsoftonline.com/common/oauth2/v2.0/token')
-    expect(opts.method).toBe('POST')
-    const body = new URLSearchParams(opts.body)
-    expect(body.get('grant_type')).toBe('authorization_code')
-    expect(body.get('code')).toBe('authcode')
-    expect(body.get('code_verifier')).toBe('verifier-xyz')
-    expect(body.get('client_id')).toBe('client-id')
-  })
-
-  it('throws TOKEN_EXPIRED on a 401 and a status error otherwise', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 401 })
-    await expect(exchangeOneDriveCode('id', 'c', 'v')).rejects.toThrow('TOKEN_EXPIRED')
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 400 })
-    await expect(exchangeOneDriveCode('id', 'c', 'v')).rejects.toThrow('OneDrive 400')
+    expect(new URL(buildOneDriveOAuthUrl('id', BASE)).searchParams.get('prompt')).toBe('select_account')
   })
 })
 

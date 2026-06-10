@@ -9,7 +9,7 @@ import {
 } from './providers/github'
 import { pushToDrive, pullFromDrive } from './providers/google'
 import { pushToOneDrive, pullFromOneDrive } from './providers/onedrive'
-import { getSyncToken, getFreshAccessToken, clearSyncToken } from './tokenStore'
+import { getSyncToken, getRefreshToken, getFreshAccessToken, clearSyncToken } from './tokenStore'
 
 async function getSettings() {
   const rows = await db.settings.toArray()
@@ -291,18 +291,26 @@ export async function disconnectSync() {
     try { await deleteDeviceFile(token, s.syncFileId, getDeviceId()) } catch {}
   }
 
-  // Best-effort: kill THIS device's token at the provider so disconnect revokes
-  // access provider-side, not merely locally — wiping the encrypted token below
-  // only forgets it on this device, and the still-signed-in browser session
-  // could otherwise be handed a fresh token silently ("pushed right through").
-  // Deliberately device-scoped: GitHub uses DELETE …/token (other devices keep
-  // syncing — not …/grant, which is account-wide), Google revokes just this
-  // token (~1h-lived anyway). Drops the app's ACCESS only — the cloud copy of
-  // the data is untouched and reconnecting re-discovers it. Both go through the
-  // worker; OneDrive has no client-side revoke (its ~1h token simply expires —
-  // the account chooser is forced via prompt=select_account instead).
-  if (token && (s.syncProvider === 'github' || s.syncProvider === 'google')) {
-    try { await revokeViaWorker(s.syncProvider, token) } catch {}
+  // Best-effort: revoke THIS device's access at the provider so disconnect drops
+  // it provider-side, not merely locally — wiping the encrypted tokens below only
+  // forgets them on this device, and the still-signed-in browser session could
+  // otherwise be handed a fresh token silently ("pushed right through").
+  //   GitHub   — DELETE …/token (device-scoped; other devices keep syncing — not
+  //              …/grant, which is account-wide).
+  //   Google   — revoke the REFRESH token, which cascades to the whole grant and
+  //              its access tokens (revoking only the access token would leave the
+  //              long-lived refresh token alive); fall back to the access token.
+  //   OneDrive — Microsoft has no simple client-side per-app revoke, so its 90-day
+  //              refresh token can't be killed here; it's cleared locally below and
+  //              a reconnect is gated by prompt=select_account. (Residual: the
+  //              refresh token stays valid at Microsoft until it expires.)
+  // All revocations drop ACCESS only — the cloud copy of the data is untouched and
+  // reconnecting re-discovers it. (issue #243)
+  if (s.syncProvider === 'github' && token) {
+    try { await revokeViaWorker('github', token) } catch {}
+  } else if (s.syncProvider === 'google') {
+    const toRevoke = (await getRefreshToken()) || token
+    if (toRevoke) { try { await revokeViaWorker('google', toRevoke) } catch {} }
   }
 
   await clearSyncToken() // remove the encrypted token (and any legacy plaintext)
