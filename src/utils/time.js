@@ -44,92 +44,21 @@ export function formatDuration(ms, decimal) {
   return decimal ? formatDecimalHours(ms) : formatDurationHM(ms)
 }
 
-// Round a Date to a local clock increment (in minutes). `dir` is 'floor',
-// 'ceil', or 'nearest'. Works in local minutes-of-day (with fractional seconds)
-// so 15/30-min increments land on the wall-clock :00/:15/:30/:45 boundaries the
-// user expects, independent of time zone, and `setMinutes` handles the hour/day
-// rollover.
-function roundLocalTime(date, increment, dir) {
-  const d = new Date(date)
-  const minutesOfDay =
-    d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60 + d.getMilliseconds() / 60000
-  const units = minutesOfDay / increment
-  const rounded =
-    (dir === 'ceil' ? Math.ceil(units) : dir === 'floor' ? Math.floor(units) : Math.round(units)) * increment
-  d.setHours(0, 0, 0, 0)
-  d.setMinutes(rounded)
-  return d
-}
-
 /**
- * Round a completed entry's worked interval "in the user's favour" for billing
- * (issue #208): floor punchIn down and ceil punchOut up to `roundingMinutes`, so
- * e.g. an 8:07 → 8:20 entry billed to the quarter hour becomes 8:00 → 8:30. A
- * `roundingMinutes` of 0 (off) or a still-running entry is returned unchanged.
- * Returns a shallow copy with adjusted punchIn/punchOut, so every duration/clip
- * helper above works on it without change.
- * @param {Entry} entry @param {number} [roundingMinutes] @returns {Entry}
+ * Round a worked DURATION (milliseconds) to a billing increment of `minutes` —
+ * the per-task billing model (issue #274). `mode` is 'nearest' (default — the
+ * standard "round to the nearest 15 min") or 'up' (round each task UP, so a short
+ * task is never lost). Rounding OFF (`minutes` 0/undefined) or a sub-minute
+ * duration passes through unchanged, so a ~0-duration entry isn't inflated to a
+ * full increment. Rounding DURATIONS (not start/end times) means two independent
+ * entries can never double-count a shared task-switch boundary — and per-entry
+ * rounded hours stay correct when each task bills at its own rate.
+ * @param {number} ms @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} ms
  */
-export function roundEntry(entry, roundingMinutes) {
-  // No rounding when it's off, the entry is still running, or it's under a minute
-  // ("0m"): flooring punch-in and ceiling punch-out would inflate a ~0-duration
-  // entry up to a full increment (e.g. 0m → 0.25 h), which is a bug, not a favour.
-  if (!roundingMinutes || !entry.punchOut || getEntryDuration(entry) < 60000) return entry
-  return {
-    ...entry,
-    punchIn:  roundLocalTime(entry.punchIn,  roundingMinutes, 'floor'),
-    punchOut: roundLocalTime(entry.punchOut, roundingMinutes, 'ceil'),
-  }
-}
-
-/**
- * Round a set of entries for billing "in the user's favour" while treating
- * back-to-back entries as ONE continuous session, so a task switch (entry A ends
- * exactly when entry B begins) isn't billed on both sides and inflated (issue
- * #274). For each maximal run of contiguous completed entries
- * (entry[i].punchOut === entry[i+1].punchIn):
- *   - the run's first punchIn is floored down and its last punchOut is ceiled up
- *     (the favour is applied once, at the real start/stop of the session), and
- *   - every internal shared boundary is rounded to the NEAREST increment a single
- *     time and reused as both the earlier entry's punchOut and the later entry's
- *     punchIn — so the rounded rows tile the run with no gap or overlap and sum
- *     exactly to the rounded run span.
- * An isolated entry (no contiguous neighbour) is floored-in / ceiled-out exactly
- * like {@link roundEntry}. Running and sub-minute entries are not rounded.
- *
- * Returns a Map keyed by entry `id` containing ONLY the entries that were rounded;
- * callers look up `map.get(e.id) ?? e` so an entry's rounded copy is the same in
- * the day total, the week total, and any job/labour-filtered view — rounding is a
- * property of the worked session, not of which rows happen to be shown. An empty
- * map (rounding off) means every caller falls back to the raw entry.
- *
- * @param {Entry[]} entries @param {number} [roundingMinutes] @returns {Map<number, Entry>}
- */
-export function roundEntriesContiguous(entries, roundingMinutes) {
-  const map = new Map()
-  if (!roundingMinutes || !entries?.length) return map
-  // Only completed, ≥1-minute entries are rounded (matches roundEntry's guards).
-  const sorted = entries
-    .filter(e => e.punchOut && getEntryDuration(e) >= 60000)
-    .sort((a, b) =>
-      new Date(a.punchIn) - new Date(b.punchIn) || new Date(a.punchOut) - new Date(b.punchOut))
-  let i = 0
-  while (i < sorted.length) {
-    // Extend the run while the next entry starts exactly where this one ends.
-    let j = i
-    while (
-      j + 1 < sorted.length &&
-      new Date(sorted[j].punchOut).getTime() === new Date(sorted[j + 1].punchIn).getTime()
-    ) j++
-    for (let k = i; k <= j; k++) {
-      const e = sorted[k]
-      const punchIn = roundLocalTime(e.punchIn, roundingMinutes, k === i ? 'floor' : 'nearest')
-      const punchOut = roundLocalTime(e.punchOut, roundingMinutes, k === j ? 'ceil' : 'nearest')
-      map.set(e.id, { ...e, punchIn, punchOut })
-    }
-    i = j + 1
-  }
-  return map
+export function roundDurationMs(ms, minutes, mode = 'nearest') {
+  if (!minutes || ms < 60000) return ms
+  const inc = minutes * 60000
+  return (mode === 'up' ? Math.ceil(ms / inc) : Math.round(ms / inc)) * inc
 }
 
 /** @param {Entry} entry @returns {number} milliseconds */
@@ -253,12 +182,25 @@ export function sumDurationsInRange(entries, start, end) {
 }
 
 /**
- * Like {@link sumDurationsInRange} but INCLUDES running timers, each valued to
- * `now` (ms epoch) so an on-screen total ticks live (issue #265). Exports/print
- * filter to completed entries instead, so they never show a moving value (the UI
- * warns when a running timer makes the screen and an export differ).
- * @param {Entry[]} entries @param {Date} start @param {Date} end @param {number} [now] @returns {number} milliseconds
+ * An entry's BILLED duration within [start, end]: a COMPLETED entry's clipped
+ * duration rounded per the billing policy (`minutes` increment + `mode`,
+ * issue #274); a RUNNING entry's clipped duration is returned live and UNrounded
+ * (it's still accruing, so rounding it would make it jump in steps — issue #265).
+ * @param {Entry} entry @param {Date} start @param {Date} end @param {number} now @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
  */
-export function sumDurationsInRangeLive(entries, start, end, now = Date.now()) {
-  return entries.reduce((acc, e) => acc + getEntryDurationInRange(e, start, end, now), 0)
+export function billedDurationInRange(entry, start, end, now = Date.now(), minutes, mode) {
+  const dur = getEntryDurationInRange(entry, start, end, now)
+  return entry.punchOut ? roundDurationMs(dur, minutes, mode) : dur
+}
+
+/**
+ * Billable on-screen total for a window: each completed entry's clipped duration
+ * rounded per the policy, plus running timers live and unrounded (issues
+ * #274/#265). Per-entry rounding (not a rounded total) keeps per-job/per-rate
+ * sums correct, and rows sum exactly to this. Exports/print filter to completed
+ * entries; the UI warns when a running timer makes the screen and an export differ.
+ * @param {Entry[]} entries @param {Date} start @param {Date} end @param {number} now @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
+ */
+export function sumBilledInRange(entries, start, end, now = Date.now(), minutes, mode) {
+  return entries.reduce((acc, e) => acc + billedDurationInRange(e, start, end, now, minutes, mode), 0)
 }

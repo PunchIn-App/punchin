@@ -6,9 +6,9 @@ import { db, deleteEntry } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { useNowTicker } from '../hooks/useNowTicker'
 import {
-  formatDuration, formatTime, roundEntriesContiguous,
+  formatDuration, formatTime, roundDurationMs,
   getDayRange, getWeekRange, getWeekDays,
-  entryOverlapsRange, getEntryDurationInRange, sumDurationsInRangeLive,
+  entryOverlapsRange, billedDurationInRange, sumBilledInRange,
 } from '../utils/time'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
 import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
@@ -27,7 +27,8 @@ const OVERNIGHT_LOOKBACK_MS = 24 * 60 * 60 * 1000
 
 function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { settings } = useSettings()
-  const rm = settings.roundingMinutes     // billable rounding increment (issue #208)
+  const rm = settings.roundingMinutes     // billable rounding increment (issues #208/#274)
+  const mode = settings.roundingMode      // 'nearest' | 'up'
   const decimal = !!settings.decimalHours
   const { start, end } = getDayRange(date)
   const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
@@ -75,14 +76,6 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
     // start.getTime() keys the day; jobMap/ltMap back getJob/getLT.
   }, [entries, start.getTime(), searchQuery, filterJobId, filterLaborTypeId, jobMap, ltMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Round entries treating back-to-back ones as one continuous session (issue
-  // #274). Computed over the FULL window (not filteredEntries) so a session's
-  // shared boundaries are rounded once even across jobs/labour types and a job
-  // filter doesn't change an entry's billed time. `billed` looks up the rounded
-  // copy; entries not rounded (running, sub-minute, rounding off) fall back raw.
-  const roundedById = useMemo(() => roundEntriesContiguous(entries ?? [], rm), [entries, rm])
-  const billed = (e) => roundedById.get(e.id) ?? e
-
   // Tick while a timer overlaps this day so its live time grows in the Total and
   // its row (issue #265); idle days register no interval.
   const hasRunning = (filteredEntries ?? []).some(e => !e.punchOut)
@@ -99,7 +92,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
           change, which announces more reliably than a node that mounts/unmounts. */}
       <div role="status" aria-live="polite" className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
         <span className="text-sm text-appTextMuted">Total</span>
-        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(sumDurationsInRangeLive(filteredEntries.map(billed), start, end, now), decimal)}</span>
+        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(sumBilledInRange(filteredEntries, start, end, now, rm, mode), decimal)}</span>
         <span className="sr-only">{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} this day</span>
       </div>
 
@@ -112,11 +105,9 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
         filteredEntries.map(entry => {
           const job = getJob(entry.jobId)
           const lt  = getLT(entry.laborTypeId)
-          // Clip to the day so an overnight entry shows only the portion worked
-          // today, keeping the card durations summing to the day Total (#136).
-          // Billed (contiguous-session rounded) first so cards agree with the Total;
-          // a running row grows live via `now` (issue #265).
-          const dur = getEntryDurationInRange(billed(entry), start, end, now)
+          // Billed duration: the entry's clipped time rounded per policy (#136/#274),
+          // so the cards sum to the day Total; a running row grows live via `now` (#265).
+          const dur = billedDurationInRange(entry, start, end, now, rm, mode)
           // Leading dot is the JOB's own colour (its identity cue), falling back to
           // its labor type's colour — distinct from the LaborTag's labor colour.
           const jobColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
@@ -158,7 +149,8 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
 function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { settings } = useSettings()
   const wsMon = settings.weekStartsMonday // complete via DEFAULT_SETTINGS merge (issue #134)
-  const rm = settings.roundingMinutes     // billable rounding increment (issue #208)
+  const rm = settings.roundingMinutes     // billable rounding increment (issues #208/#274)
+  const mode = settings.roundingMode      // 'nearest' | 'up'
   const decimal = !!settings.decimalHours
   const { start, end } = getWeekRange(date, wsMon)
   const days = getWeekDays(date, wsMon)
@@ -208,30 +200,25 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
     })
   }, [allEntries, start.getTime(), searchQuery, filterJobId, filterLaborTypeId, jobMap, ltMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Contiguous-session rounding over the FULL week window (issue #274) so shared
-  // task-switch boundaries are billed once, not on both sides — see DailySheet.
-  const roundedById = useMemo(() => roundEntriesContiguous(allEntries ?? [], rm), [allEntries, rm])
-  const billed = (e) => roundedById.get(e.id) ?? e
-
   // Tick while a timer overlaps this week so its live time grows in the totals
   // (issue #265); idle weeks register no interval.
   const hasRunning = (allEntries ?? []).some(e => !e.punchOut)
   const now = useNowTicker(hasRunning, 1000)
 
-  // Week total + per-job breakdown, derived once from the filtered set (#138).
-  // Running timers ARE included now, valued to `now` (issue #265).
+  // Week total + per-job breakdown (#138). Each entry's billed duration is rounded
+  // per policy (#274); running timers included live (#265). Per-job rounding keeps
+  // per-rate sums correct.
   const { total, jobTotals } = useMemo(() => {
     if (!filteredEntries) return { total: 0, jobTotals: {} }
-    const rounded = filteredEntries.map(billed)
     return {
-      total: sumDurationsInRangeLive(rounded, start, end, now),
-      jobTotals: rounded.reduce((acc, e) => {
-        const ms = getEntryDurationInRange(e, start, end, now) // clip to week (#136), incl. running (#265)
+      total: sumBilledInRange(filteredEntries, start, end, now, rm, mode),
+      jobTotals: filteredEntries.reduce((acc, e) => {
+        const ms = billedDurationInRange(e, start, end, now, rm, mode) // clip to week (#136), incl. running (#265)
         if (ms > 0) acc[e.jobId] = (acc[e.jobId] || 0) + ms
         return acc
       }, {}),
     }
-  }, [filteredEntries, start.getTime(), end.getTime(), roundedById, now]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filteredEntries, start.getTime(), end.getTime(), now, rm, mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bucket entries into the seven days once, instead of re-filtering the whole
   // week per day on every render (the O(7×entries) pass the finding flags) (#138).
@@ -244,10 +231,10 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
       // it touches; totals clip each entry to the day it's shown under and skip
       // running timers, so the rows sum to dayTotal (#136, #137).
       const dayEntries = filteredEntries.filter(e => entryOverlapsRange(e, ds, de))
-      const dayTotal = sumDurationsInRangeLive(dayEntries.map(billed), ds, de, now)
+      const dayTotal = sumBilledInRange(dayEntries, ds, de, now, rm, mode)
       return { day, ds, de, dayEntries, dayTotal }
     })
-  }, [filteredEntries, start.getTime(), roundedById, now]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filteredEntries, start.getTime(), now, rm, mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!filteredEntries) return null
 
@@ -343,7 +330,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="font-mono text-appTextMuted">{formatDuration(getEntryDurationInRange(billed(e), ds, de, now), decimal)}</span>
+                        <span className="font-mono text-appTextMuted">{formatDuration(billedDurationInRange(e, ds, de, now, rm, mode), decimal)}</span>
                         <div className="flex items-center gap-1">
                           <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
@@ -372,7 +359,8 @@ export default function TimesheetsView() {
   const [currentDate, setDate] = useState(new Date())
   const { settings }          = useSettings()
   const wsMon                  = settings.weekStartsMonday // DEFAULT_SETTINGS merge (issue #134)
-  const rm                     = settings.roundingMinutes  // billable rounding for exports (issue #208)
+  const rm                     = settings.roundingMinutes  // billable rounding for exports (issues #208/#274)
+  const mode                   = settings.roundingMode     // 'nearest' | 'up'
 
   // Modals state
   const [editingEntry, setEditingEntry]   = useState(null)
@@ -449,22 +437,14 @@ export default function TimesheetsView() {
       rangeLabel = `${format(start, 'yyyy-MM-dd')}_${format(end, 'yyyy-MM-dd')}`
     }
 
-    // Round over the SAME look-back window the screen uses (issue #136) so a
-    // cross-midnight contiguous session anchors identically on screen and in the
-    // export — then export only the rows whose punchIn falls in the period
-    // (issues #208/#274). Without the look-back the export would re-anchor the
-    // day's first entry and disagree with the screen by an increment.
-    const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
-    const windowEntries = await db.entries.where('punchIn').between(queryStart, end, true, true).toArray()
-    const roundedById = roundEntriesContiguous(windowEntries, rm)
-    const entries = windowEntries.filter(e => { const d = new Date(e.punchIn); return d >= start && d <= end })
+    const entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
     const rows = [['Date', 'Job', 'Client', 'Labor Type', 'Start', 'End', 'Duration (h)', 'Notes']]
-    for (const raw of entries) {
-      if (!raw.punchOut) continue
-      const e = roundedById.get(raw.id) ?? raw
+    for (const e of entries) {
+      if (!e.punchOut) continue
       const job = jobs?.find(j => j.id === e.jobId)
       const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
-      const dur = (new Date(e.punchOut) - new Date(e.punchIn)) / 3600000
+      // Bill the rounded DURATION (issues #208/#274); Start/End stay the actual times.
+      const dur = roundDurationMs(new Date(e.punchOut) - new Date(e.punchIn), rm, mode) / 3600000
       rows.push([
         format(new Date(e.punchIn), 'yyyy-MM-dd'),
         job?.name || '',
@@ -473,7 +453,7 @@ export default function TimesheetsView() {
         formatTime(e.punchIn, settings.timeFormat),
         formatTime(e.punchOut, settings.timeFormat),
         dur.toFixed(2),
-        raw.notes || '',
+        e.notes || '',
       ])
     }
 
@@ -496,17 +476,11 @@ export default function TimesheetsView() {
       titleStr = `Week of ${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
     }
 
-    // Round over the screen's look-back window (issue #136) so a cross-midnight
-    // session anchors the same on paper as on screen; print only the rows whose
-    // punchIn falls in the period (issues #208/#274) so the times, per-row hours,
-    // and total all reflect what's billed and sum consistently.
-    const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
-    const windowEntries = await db.entries.where('punchIn').between(queryStart, end, true, true).toArray()
-    const roundedById = roundEntriesContiguous(windowEntries, rm)
-    const completed = windowEntries
-      .filter(e => !!e.punchOut && new Date(e.punchIn) >= start && new Date(e.punchIn) <= end)
-      .map(e => roundedById.get(e.id) ?? e)
-    const totalMs = completed.reduce((s, e) => s + (new Date(e.punchOut) - new Date(e.punchIn)), 0)
+    // Each entry's billed DURATION is rounded per policy (issues #208/#274); the
+    // printed Start/End stay the actual times and the per-row hours sum to the total.
+    const entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
+    const completed = entries.filter(e => !!e.punchOut)
+    const totalMs = completed.reduce((s, e) => s + roundDurationMs(new Date(e.punchOut) - new Date(e.punchIn), rm, mode), 0)
     const totalHrs = (totalMs / 3600000).toFixed(2)
 
     const rows = completed
@@ -514,7 +488,7 @@ export default function TimesheetsView() {
       .map(e => {
         const job = jobs?.find(j => j.id === e.jobId)
         const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
-        const hrs = ((new Date(e.punchOut) - new Date(e.punchIn)) / 3600000).toFixed(2)
+        const hrs = (roundDurationMs(new Date(e.punchOut) - new Date(e.punchIn), rm, mode) / 3600000).toFixed(2)
         return `<tr>
           <td>${format(new Date(e.punchIn), 'EEE, MMM d')}</td>
           <td>${job?.name || '—'}${job?.clientName ? `<br><span class="sub">${job.clientName}</span>` : ''}</td>

@@ -3,9 +3,9 @@ import {
   formatDurationHM,
   formatDecimalHours,
   formatDuration,
-  roundEntry,
-  roundEntriesContiguous,
-  sumDurationsInRangeLive,
+  roundDurationMs,
+  billedDurationInRange,
+  sumBilledInRange,
   getEntryDuration,
   formatTime,
   formatDate,
@@ -473,26 +473,31 @@ describe('sumDurationsInRange', () => {
 })
 
 // ---------------------------------------------------------------------------
-// sumDurationsInRangeLive (issue #265 — includes running timers at `now`)
+// sumBilledInRange (issues #265/#274 — rounded completed + live running)
 // ---------------------------------------------------------------------------
-describe('sumDurationsInRangeLive', () => {
+describe('sumBilledInRange', () => {
   const start = new Date(2024, 0, 15, 0, 0, 0)
   const end   = new Date(2024, 0, 15, 23, 59, 59, 999)
 
-  it('INCLUDES a running entry, valued to the passed now', () => {
-    const now = new Date(2024, 0, 15, 11, 30).getTime() // 30 min after the running punchIn
+  it('rounding off: includes a running entry live, unrounded', () => {
+    const now = new Date(2024, 0, 15, 11, 30).getTime()
     const entries = [
       { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 10, 0) }, // 1h completed
-      { punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null },                         // running, 30m to now
+      { punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null },                         // running, 30m
     ]
-    expect(sumDurationsInRangeLive(entries, start, end, now)).toBe(60 * 60_000 + 30 * 60_000)
+    expect(sumBilledInRange(entries, start, end, now)).toBe(60 * 60_000 + 30 * 60_000)
+  })
+
+  it('rounds completed entries but leaves the running one live (no step-jumping)', () => {
+    const now = new Date(2024, 0, 15, 11, 7).getTime() // running for 7m — would be 0 if nearest-rounded
+    const entries = [{ punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null }]
+    expect(sumBilledInRange(entries, start, end, now, 15, 'nearest')).toBe(7 * 60_000) // raw, not 0
   })
 
   it('grows as now advances (live)', () => {
     const entries = [{ punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null }]
-    const t1 = sumDurationsInRangeLive(entries, start, end, new Date(2024, 0, 15, 11, 10).getTime())
-    const t2 = sumDurationsInRangeLive(entries, start, end, new Date(2024, 0, 15, 11, 40).getTime())
-    expect(t2).toBeGreaterThan(t1)
+    const t1 = sumBilledInRange(entries, start, end, new Date(2024, 0, 15, 11, 10).getTime(), 15, 'nearest')
+    const t2 = sumBilledInRange(entries, start, end, new Date(2024, 0, 15, 11, 40).getTime(), 15, 'nearest')
     expect(t2 - t1).toBe(30 * 60_000)
   })
 })
@@ -523,115 +528,71 @@ describe('formatDuration', () => {
 })
 
 // ---------------------------------------------------------------------------
-// roundEntry (issue #208)
+// roundDurationMs (issues #208/#274 — round each task's billed duration)
 // ---------------------------------------------------------------------------
-describe('roundEntry', () => {
-  it('rounds in the user’s favour: 8:07→8:20 becomes 8:00→8:30 at a quarter hour', () => {
-    const e = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: new Date(2024, 0, 15, 8, 20) }
-    const r = roundEntry(e, 15)
-    expect(r.punchIn).toEqual(new Date(2024, 0, 15, 8, 0))
-    expect(r.punchOut).toEqual(new Date(2024, 0, 15, 8, 30))
-    expect(getEntryDuration(r)).toBe(30 * 60_000)
+describe('roundDurationMs', () => {
+  const M = (mins) => mins * 60_000
+
+  it('rounds a duration to the nearest increment by default', () => {
+    expect(roundDurationMs(M(92), 15)).toBe(M(90))  // 1h32m → 1h30m
+    expect(roundDurationMs(M(34), 15)).toBe(M(30))  // 34m → 30m
+    expect(roundDurationMs(M(21), 15)).toBe(M(15))  // 21m → 15m
+    expect(roundDurationMs(M(8),  15)).toBe(M(15))  // 8m → 15m (≥ half)
+    expect(roundDurationMs(M(7),  15)).toBe(0)      // 7m → 0  (< half, rounds down)
   })
 
-  it('rounds to the half hour: 9:05→9:50 becomes 9:00→10:00', () => {
-    const e = { punchIn: new Date(2024, 0, 15, 9, 5), punchOut: new Date(2024, 0, 15, 9, 50) }
-    const r = roundEntry(e, 30)
-    expect(r.punchIn).toEqual(new Date(2024, 0, 15, 9, 0))
-    expect(r.punchOut).toEqual(new Date(2024, 0, 15, 10, 0))
+  it("rounds UP in 'up' mode so a short task is never lost", () => {
+    expect(roundDurationMs(M(7),  15, 'up')).toBe(M(15))  // 7m → 15m (the lost-task case)
+    expect(roundDurationMs(M(92), 15, 'up')).toBe(M(105)) // 1h32m → 1h45m
+    expect(roundDurationMs(M(15), 15, 'up')).toBe(M(15))  // exact stays exact
+    expect(roundDurationMs(M(50), 30, 'up')).toBe(M(60))  // half-hour increment
   })
 
-  it('leaves exact-boundary times unchanged (8:00→8:30 stays 8:00→8:30)', () => {
-    const e = { punchIn: new Date(2024, 0, 15, 8, 0), punchOut: new Date(2024, 0, 15, 8, 30) }
-    const r = roundEntry(e, 15)
-    expect(r.punchIn).toEqual(e.punchIn)
-    expect(r.punchOut).toEqual(e.punchOut)
+  it('is a no-op when rounding is off (0 / undefined)', () => {
+    expect(roundDurationMs(M(34), 0)).toBe(M(34))
+    expect(roundDurationMs(M(34), undefined, 'up')).toBe(M(34))
   })
 
-  it('is a no-op when rounding is off (0)', () => {
-    const e = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: new Date(2024, 0, 15, 8, 20) }
-    expect(roundEntry(e, 0)).toBe(e)
-  })
-
-  it('leaves a still-running entry untouched (no punchOut to bill yet)', () => {
-    const e = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: null }
-    expect(roundEntry(e, 15)).toBe(e)
-  })
-
-  it('ceils a punch-out with leftover seconds up to the next increment', () => {
-    const e = { punchIn: new Date(2024, 0, 15, 8, 0, 0), punchOut: new Date(2024, 0, 15, 8, 30, 1) }
-    const r = roundEntry(e, 15)
-    expect(r.punchOut).toEqual(new Date(2024, 0, 15, 8, 45))
-  })
-
-  it('does NOT inflate a 0-minute (sub-minute) entry to a full increment', () => {
-    // Punch in and straight back out: 0 minutes must stay 0, not become 0.25 h.
-    const zero = { punchIn: new Date(2024, 0, 15, 8, 7), punchOut: new Date(2024, 0, 15, 8, 7) }
-    expect(roundEntry(zero, 15)).toBe(zero)
-    expect(getEntryDuration(roundEntry(zero, 15))).toBe(0)
-    // A 30-second entry is still "0m" — leave it untouched rather than bill 15 min.
-    const subMinute = { punchIn: new Date(2024, 0, 15, 8, 7, 0), punchOut: new Date(2024, 0, 15, 8, 7, 30) }
-    expect(roundEntry(subMinute, 15)).toBe(subMinute)
+  it('does NOT inflate a sub-minute duration to a full increment (either mode)', () => {
+    expect(roundDurationMs(0, 15, 'up')).toBe(0)             // 0 stays 0
+    expect(roundDurationMs(30_000, 15, 'up')).toBe(30_000)   // 30s stays 30s
+    expect(roundDurationMs(30_000, 15)).toBe(30_000)
   })
 })
 
 // ---------------------------------------------------------------------------
-// roundEntriesContiguous (issue #274 — don't double-bill task switches)
+// Continuous-workday billing (issue #274) — duration rounding doesn't double-bill
+// a task switch and is robust to the millisecond punch gap startTimer leaves.
 // ---------------------------------------------------------------------------
-describe('roundEntriesContiguous', () => {
-  const E = (id, h1, m1, h2, m2) => ({ id, punchIn: new Date(2024, 0, 15, h1, m1), punchOut: new Date(2024, 0, 15, h2, m2) })
-  const hrs = (e) => getEntryDuration(e) / 3_600_000
-  const total = (map, entries) => entries.reduce((s, e) => s + getEntryDuration(map.get(e.id) ?? e), 0) / 3_600_000
+describe('billing a continuous workday split into tasks (issue #274)', () => {
+  const start = new Date(2024, 0, 15, 0, 0, 0)
+  const end   = new Date(2024, 0, 15, 23, 59, 59, 999)
+  const now   = new Date(2024, 0, 15, 18, 0).getTime()
+  // 8:00→17:08 split Admin/Install/Travel/Admin. The hand-offs carry a few-ms gap
+  // (as real punches do) — bit-exact contiguity would NOT hold; duration rounding
+  // doesn't care.
+  const day = [
+    { id: 1, jobId: 1, punchIn: new Date(2024, 0, 15, 8, 0, 0, 0),    punchOut: new Date(2024, 0, 15, 9, 32, 0, 0) },
+    { id: 2, jobId: 2, punchIn: new Date(2024, 0, 15, 9, 32, 0, 250), punchOut: new Date(2024, 0, 15, 10, 6, 0, 0) },
+    { id: 3, jobId: 3, punchIn: new Date(2024, 0, 15, 10, 6, 0, 400), punchOut: new Date(2024, 0, 15, 10, 27, 0, 0) },
+    { id: 4, jobId: 1, punchIn: new Date(2024, 0, 15, 10, 27, 0, 600), punchOut: new Date(2024, 0, 15, 17, 8, 0, 0) },
+  ]
+  const h = (e, mode) => billedDurationInRange(e, start, end, now, 15, mode) / 3_600_000
 
-  it('rounds a continuous workday split into 4 tasks to its outer span, not each task (the #274 report)', () => {
-    // 8:00→17:08 worked continuously, split Admin/Install/Travel/Admin. Per-entry
-    // rounding billed 10.00h; the run should round to 8:00→17:15 = 9.25h.
-    const entries = [E(1, 8, 0, 9, 32), E(2, 9, 32, 10, 6), E(3, 10, 6, 10, 27), E(4, 10, 27, 17, 8)]
-    const map = roundEntriesContiguous(entries, 15)
-    expect(hrs(map.get(1))).toBeCloseTo(1.5, 5)   // 8:00→9:30  (was 1.75)
-    expect(hrs(map.get(2))).toBeCloseTo(0.5, 5)   // 9:30→10:00
-    expect(hrs(map.get(3))).toBeCloseTo(0.5, 5)   // 10:00→10:30
-    expect(hrs(map.get(4))).toBeCloseTo(6.75, 5)  // 10:30→17:15
-    expect(total(map, entries)).toBeCloseTo(9.25, 5) // rows sum exactly to the rounded span
+  it('nearest: rounds each task independently — no inflation from the switches', () => {
+    expect(h(day[0], 'nearest')).toBeCloseTo(1.5, 5)   // 92m → 90m (was 1.75 under the old bug)
+    expect(h(day[1], 'nearest')).toBeCloseTo(0.5, 5)   // ~34m → 30m
+    expect(h(day[2], 'nearest')).toBeCloseTo(0.25, 5)  // ~21m → 15m
+    expect(h(day[3], 'nearest')).toBeCloseTo(6.75, 5)  // ~401m → 405m
+    expect(sumBilledInRange(day, start, end, now, 15, 'nearest') / 3_600_000).toBeCloseTo(9.0, 5) // was 10.0
   })
 
-  it('tiles shared boundaries with no gap or overlap', () => {
-    const entries = [E(1, 8, 0, 9, 32), E(2, 9, 32, 10, 6)]
-    const map = roundEntriesContiguous(entries, 15)
-    expect(map.get(1).punchOut.getTime()).toBe(map.get(2).punchIn.getTime())
+  it('round up: each task rounds up so nothing short is lost', () => {
+    expect(sumBilledInRange(day, start, end, now, 15, 'up') / 3_600_000).toBeCloseTo(9.75, 5)
   })
 
-  it('rounds an isolated entry exactly like roundEntry (floor in / ceil out)', () => {
-    const map = roundEntriesContiguous([E(1, 8, 7, 8, 20)], 15)
-    expect(map.get(1).punchIn).toEqual(new Date(2024, 0, 15, 8, 0))
-    expect(map.get(1).punchOut).toEqual(new Date(2024, 0, 15, 8, 30))
-  })
-
-  it('does not merge entries separated by a gap (each rounded in isolation)', () => {
-    const entries = [E(1, 8, 5, 9, 0), E(2, 10, 0, 11, 5)] // 1h gap between them
-    const map = roundEntriesContiguous(entries, 15)
-    expect(map.get(1).punchIn).toEqual(new Date(2024, 0, 15, 8, 0))  // floored (run start)
-    expect(map.get(1).punchOut).toEqual(new Date(2024, 0, 15, 9, 0)) // ceiled (run end)
-    expect(map.get(2).punchIn).toEqual(new Date(2024, 0, 15, 10, 0))
-    expect(map.get(2).punchOut).toEqual(new Date(2024, 0, 15, 11, 15))
-  })
-
-  it('returns an empty map when rounding is off, so callers fall back to raw entries', () => {
-    expect(roundEntriesContiguous([E(1, 8, 0, 9, 0)], 0).size).toBe(0)
-    expect(roundEntriesContiguous([E(1, 8, 0, 9, 0)], undefined).size).toBe(0)
-  })
-
-  it('does not round running or sub-minute entries', () => {
-    const running = { id: 1, punchIn: new Date(2024, 0, 15, 8, 0), punchOut: null }
-    const subMinute = E(2, 8, 0, 8, 0) // 0 duration
-    const map = roundEntriesContiguous([running, subMinute], 15)
-    expect(map.has(1)).toBe(false)
-    expect(map.has(2)).toBe(false)
-  })
-
-  it('does not mutate the input array order', () => {
-    const entries = [E(2, 10, 0, 11, 0), E(1, 8, 0, 9, 0)]
-    roundEntriesContiguous(entries, 15)
-    expect(entries.map(e => e.id)).toEqual([2, 1]) // still caller order
+  it('rows sum exactly to the total (no per-entry vs total drift)', () => {
+    const rows = day.reduce((s, e) => s + billedDurationInRange(e, start, end, now, 15, 'nearest'), 0)
+    expect(rows).toBe(sumBilledInRange(day, start, end, now, 15, 'nearest'))
   })
 })

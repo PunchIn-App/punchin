@@ -121,8 +121,8 @@ describe('InvoiceModal — line items calculation', () => {
     expect(screen.getAllByText('$100.00').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('bills rounded hours when rounding is on (#208)', async () => {
-    mockSettings = { weekStartsMonday: true, roundingMinutes: 30 }
+  it('bills nearest-rounded hours when rounding is on (#208/#274)', async () => {
+    mockSettings = { weekStartsMonday: true, roundingMinutes: 30, roundingMode: 'nearest' }
     useLiveQuery.mockImplementation((_fn, deps) => deps?.[2]
       ? [{ id: 9, jobId: 1, laborTypeId: 1,
            punchIn:  new Date('2025-06-01T09:05:00'),
@@ -130,11 +130,27 @@ describe('InvoiceModal — line items calculation', () => {
       : [])
     renderModal()
     pickJob()
-    // 9:05–9:50 is 0.75 h raw; rounded in the user's favour to the half hour it's
-    // 9:00–10:00 = 1.00 h, billed at $100/hr → $100.00 (not the raw $75.00).
+    // 9:05–9:50 is 45 min = 0.75 h raw. The task's DURATION rounds to the nearest
+    // half hour → 1.00 h, billed at $100/hr → $100.00 (not the raw $75.00).
     await waitFor(() => expect(screen.getAllByText('1.00').length).toBeGreaterThanOrEqual(1))
     expect(screen.getAllByText('$100.00').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('0.75')).not.toBeInTheDocument()
+  })
+
+  it('round-up mode never rounds a short task down (#274)', async () => {
+    mockSettings = { weekStartsMonday: true, roundingMinutes: 30, roundingMode: 'up' }
+    useLiveQuery.mockImplementation((_fn, deps) => deps?.[2]
+      ? [{ id: 9, jobId: 1, laborTypeId: 1,
+           punchIn:  new Date('2025-06-01T09:00:00'),
+           punchOut: new Date('2025-06-01T09:20:00') }]
+      : [])
+    renderModal()
+    pickJob()
+    // 9:00–9:20 is 20 min = 0.33 h raw. 'Nearest' would round it DOWN to 0 and
+    // lose the time; 'up' rounds the duration up to the half hour → 0.50 h =
+    // $50.00. This is the #274 "my real-world minutes shouldn't vanish" case.
+    await waitFor(() => expect(screen.getAllByText('0.50').length).toBeGreaterThanOrEqual(1))
+    expect(screen.getAllByText('$50.00').length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows "—" for amount when job has no rate set for that labor type', async () => {

@@ -9,7 +9,7 @@ import {
 import { db } from '../db'
 import EntitySelect from './EntitySelect'
 import DatePicker from './pickers/DatePicker'
-import { getEntryDuration, roundEntriesContiguous, formatTime, entryOverlapsRange } from '../utils/time'
+import { getEntryDuration, roundDurationMs, formatTime, entryOverlapsRange } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, escHtml } from '../utils/printDocument'
 import { LaborTag } from './LaborGlyph'
@@ -126,21 +126,18 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 
   const lineItems = useMemo(() => {
     if (!allEntries?.length) return []
-    // Round the invoiced entries as contiguous sessions (issue #274) so a task
-    // switch between this client's own back-to-back jobs isn't billed on both
-    // sides. (Scoped to the invoiced set; a session that crosses to a DIFFERENT
-    // client rounds its boundary in isolation, as before.)
-    const roundedById = roundEntriesContiguous(allEntries, settings.roundingMinutes)
-    return allEntries.map(raw => {
-      const e = roundedById.get(raw.id) ?? raw
-      const eJob = jobMap.get(e.jobId)   // the entry's OWN job — a client invoice spans several, each at its own rate
-      const lt = laborTypes?.find(l => l.id === e.laborTypeId)
-      const hours = getEntryDuration(e) / 3600000
-      const rate  = (eJob?.laborRates?.[e.laborTypeId]) ?? null
+    // Bill each entry's rounded DURATION per policy (issues #208/#274). Per-line
+    // rounding keeps the per-job/per-rate amounts correct (hours × that job's rate)
+    // and the line hours sum to the invoice total; the shown Start/End stay actual.
+    return allEntries.map(entry => {
+      const eJob = jobMap.get(entry.jobId)   // the entry's OWN job — a client invoice spans several, each at its own rate
+      const lt = laborTypes?.find(l => l.id === entry.laborTypeId)
+      const hours = roundDurationMs(getEntryDuration(entry), settings.roundingMinutes, settings.roundingMode) / 3600000
+      const rate  = (eJob?.laborRates?.[entry.laborTypeId]) ?? null
       const amount = rate != null ? hours * rate : null
-      return { entry: e, job: eJob, lt, hours, rate, amount }
+      return { entry, job: eJob, lt, hours, rate, amount }
     }).sort((a, b) => new Date(a.entry.punchIn) - new Date(b.entry.punchIn))
-  }, [allEntries, jobMap, laborTypes, settings.roundingMinutes])
+  }, [allEntries, jobMap, laborTypes, settings.roundingMinutes, settings.roundingMode])
 
   const totalHours  = lineItems.reduce((s, li) => s + li.hours, 0)
   const totalAmount = lineItems.every(li => li.amount != null)

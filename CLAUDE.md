@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.30.0
+**Version:** 0.31.0
 
 ---
 
@@ -314,8 +314,7 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `formatDurationHM(ms)` → `"Xh Ym"` for summaries
 - `formatDecimalHours(ms)` → `"1.50 h"` decimal-hours string for billing display (issue #208)
 - `formatDuration(ms, decimal)` → decimal hours when `decimal` is set, else `"Xh Ym"` (issue #208)
-- `roundEntry(entry, roundingMinutes)` → single-entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off, still running, or under a minute (a "0m" entry must not inflate to a full increment, e.g. 0.25 h) (issue #208)
-- `roundEntriesContiguous(entries, roundingMinutes)` → `Map<id, roundedEntry>` of the rounded entries, treating **back-to-back** entries (`punchOut === next punchIn`) as one continuous session: floor the run's first punchIn / ceil its last punchOut, round each internal shared boundary to NEAREST once. So a task switch isn't billed on both sides and inflated (issue #274). Compute it over the **unfiltered** window; callers look up `map.get(e.id) ?? e`. Isolated entries match `roundEntry`
+- `roundDurationMs(ms, minutes, mode?)` → a worked **duration** (ms) rounded to a billing increment of `minutes`; `mode` is `'nearest'` (default — standard round-to-nearest) or `'up'` (round each task up, so a short task is never lost). No-op when `minutes` is 0/undefined or the duration is under a minute (a "0m" entry must not inflate to a full increment). Rounding the **duration** (not start/end times) means two independent entries can never double-count a shared task-switch boundary, and per-entry rounded hours stay correct when each task bills at its own rate (issues #208/#274 — replaces the old endpoint-rounding `roundEntry`/`roundEntriesContiguous`)
 - `getEntryDuration(entry)` → milliseconds (handles active entries via `Date.now()`)
 - `getEntryDurationInRange(entry, start, end, now?)` → ms of the entry clipped to `[start,end]`; a running entry is valued to `now` (default `Date.now()` — pass a ticking value for a live total, issue #265)
 - `formatTime(date)` → `"h:mm a"` time-only string (date-fns)
@@ -325,7 +324,8 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `isEntryInRange(entry, start, end)` → boolean
 - `sumDurations(entries)` → total ms (all entries)
 - `sumDurationsInRange(entries, start, end)` → completed-only total clipped to the window (the completed-only base; the #137 export semantics — exports currently filter completed inline rather than calling this)
-- `sumDurationsInRangeLive(entries, start, end, now?)` → like the above but **includes** running timers valued to `now`, for live on-screen totals (issue #265)
+- `billedDurationInRange(entry, start, end, now?, minutes?, mode?)` → an entry's **billed** ms within the window: a completed entry's clipped duration rounded per the policy (`minutes` + `mode`, via `roundDurationMs`); a running entry returned live and **unrounded** so an accruing timer doesn't jump in steps (issues #274/#265)
+- `sumBilledInRange(entries, start, end, now?, minutes?, mode?)` → live on-screen billable total: each completed entry rounded per the policy plus running timers live/unrounded. Per-entry rounding (not a rounded total) keeps per-rate sums correct and makes rows sum exactly to the total (issues #274/#265)
 
 ---
 

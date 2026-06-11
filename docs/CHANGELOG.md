@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.31.0] — 2026-06-11
+
+### Changed
+- **Round billed time — rebuilt as per-task duration rounding (#274).** "Round billed time" now rounds each task's logged **duration** on its own, and the control offers two modes: **Nearest** (the new default — standard round-to-the-nearest ¼ or ½ hour) and **Round up** (rounds each task up so short, real-world minutes are never dropped to zero). This replaces the previous endpoint "in your favour" rounding, whose continuous-session detection relied on tasks being bit-exact back-to-back and so misfired on a normal hard cut between timers — inflating a short task's neighbours or leaving totals that didn't reconcile. Because each task rounds independently, a task switch is never double-billed, per-row hours sum exactly to the day/week total, and per-rate invoice amounts stay correct. Existing installs keep their current increment and default to **Nearest**; pick **Round up** in Settings → General if you'd rather never lose a short task.
+
+### Fixed
+- **Settings → Reminders — removed the duplicate ⓘ.** The Reminders row's info (ⓘ) popover repeated the permanent "checked on your device while PunchIn is open" notice already shown beneath it, so it's been dropped — the standing notice is the single source of that explanation.
+
+---
+
 ## [0.30.0] — 2026-06-11
 
 ### Added

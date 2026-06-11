@@ -6,8 +6,8 @@ Only the latest release of PunchIn is actively supported with security updates.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.30.x  | Yes       |
-| < 0.30  | No        |
+| 0.31.x  | Yes       |
+| < 0.31  | No        |
 
 ## Scope
 

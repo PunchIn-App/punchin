@@ -56,8 +56,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
             <SettingsRow
               icon={Bell}
               title="Reminders"
-              subtitle="Local nudges, checked while PunchIn is open"
-              info="PunchIn has no server, so reminders are checked on your device while the app is open and caught up when you reopen it — a fully closed app can't be woken to alert at an exact time."
+              subtitle="Checked on your device while PunchIn is open, and caught up when you reopen it"
               right={
                 <Toggle
                   ariaLabel="Enable reminders"
