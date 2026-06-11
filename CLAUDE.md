@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.29.7
+**Version:** 0.30.0
 
 ---
 
@@ -159,7 +159,7 @@ All three data tables also carry a `uuid` (stable cross-device identifier) and a
 
 - **Active timer:** `punchOut = null`
 - **Completed entry:** `punchOut = <Date>`
-- Analytics and timesheets only show completed entries (must have `punchOut`)
+- **Live on-screen totals include the running timer.** TimerView tiles, Timesheets totals, and Analytics totals/charts count an active entry's accrued time, valued to a ticking `now` via `useNowTicker` (issue #265). **Exports stay completed-only** — CSV/Print/`InvoiceModal` filter to completed entries (`!!e.punchOut`), so they never bill a moving value; the UI shows a notice when a running timer in scope makes the export total less than the screen. (This intentionally relaxes the old #137 "totals match exports" invariant for live on-screen totals only.)
 
 ### Soft-Delete / Archive Pattern
 
@@ -314,14 +314,18 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `formatDurationHM(ms)` → `"Xh Ym"` for summaries
 - `formatDecimalHours(ms)` → `"1.50 h"` decimal-hours string for billing display (issue #208)
 - `formatDuration(ms, decimal)` → decimal hours when `decimal` is set, else `"Xh Ym"` (issue #208)
-- `roundEntry(entry, roundingMinutes)` → entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off, still running, or under a minute (a "0m" entry must not inflate to a full increment, e.g. 0.25 h) (issue #208)
-- `getEntryDuration(entry)` → milliseconds (handles active entries)
+- `roundEntry(entry, roundingMinutes)` → single-entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off, still running, or under a minute (a "0m" entry must not inflate to a full increment, e.g. 0.25 h) (issue #208)
+- `roundEntriesContiguous(entries, roundingMinutes)` → `Map<id, roundedEntry>` of the rounded entries, treating **back-to-back** entries (`punchOut === next punchIn`) as one continuous session: floor the run's first punchIn / ceil its last punchOut, round each internal shared boundary to NEAREST once. So a task switch isn't billed on both sides and inflated (issue #274). Compute it over the **unfiltered** window; callers look up `map.get(e.id) ?? e`. Isolated entries match `roundEntry`
+- `getEntryDuration(entry)` → milliseconds (handles active entries via `Date.now()`)
+- `getEntryDurationInRange(entry, start, end, now?)` → ms of the entry clipped to `[start,end]`; a running entry is valued to `now` (default `Date.now()` — pass a ticking value for a live total, issue #265)
 - `formatTime(date)` → `"h:mm a"` time-only string (date-fns)
 - `formatDate(date)` → `"EEE, MMM d"` date-only string (date-fns)
 - `getDayRange(date?)` / `getWeekRange(date?, weekStartsMonday?)` → `{start, end}`
 - `getWeekDays(date?, weekStartsMonday?)` → `Date[]` all days in the week
 - `isEntryInRange(entry, start, end)` → boolean
-- `sumDurations(entries)` → total ms
+- `sumDurations(entries)` → total ms (all entries)
+- `sumDurationsInRange(entries, start, end)` → completed-only total clipped to the window (the completed-only base; the #137 export semantics — exports currently filter completed inline rather than calling this)
+- `sumDurationsInRangeLive(entries, start, end, now?)` → like the above but **includes** running timers valued to `now`, for live on-screen totals (issue #265)
 
 ---
 

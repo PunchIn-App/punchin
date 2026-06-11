@@ -62,13 +62,18 @@ const AN_ENTRY = {
 }
 const AN_ENTRY_WITH_NOTES = { ...AN_ENTRY, id: 2, notes: 'Design review' }
 
-// Routes useLiveQuery: [] deps → JOBS then LABOR_TYPES (interleaved); [number] → entries
+// Route useLiveQuery by what each query reads (robust to call order/count — the
+// view has several `[]`-deps queries: jobs, laborTypes, and the running-timer
+// probe — so parity-based routing would swap them on re-render).
+function routeQuery(fn, entries, JOBSET, LTSET) {
+  const src = String(fn)
+  if (src.includes('laborTypes')) return LTSET
+  if (src.includes('db.jobs')) return JOBSET
+  if (src.includes('punchOut')) return entries.filter(e => !e.punchOut) // running-timer probe
+  return entries // the dated window query
+}
 function setupWithEntries(entries = [AN_ENTRY]) {
-  let n = 0
-  useLiveQuery.mockImplementation((_fn, deps) => {
-    if (!deps || deps.length === 0) return (n++ % 2 === 0) ? JOBS : LABOR_TYPES
-    return entries
-  })
+  useLiveQuery.mockImplementation((fn) => routeQuery(fn, entries, JOBS, LABOR_TYPES))
 }
 
 beforeEach(() => {
@@ -278,17 +283,26 @@ describe('TimesheetsView — DailySheet with entries', () => {
 // ─── Totals correctness: running timers + cross-day clipping (#136, #137) ──────
 
 describe('TimesheetsView — daily Total correctness', () => {
-  it('excludes a still-running timer from the daily Total (#137)', () => {
-    const completed = { ...AN_ENTRY } // 11:00 → 12:00, a completed hour
-    const running   = {
-      id: 9, jobId: 1, laborTypeId: 1,
-      punchIn: new Date(TODAY.getTime() - 5 * 3600000), // running for hours
-      punchOut: null, notes: null,
+  it('INCLUDES a still-running timer in the daily Total, valued live (#265)', () => {
+    // Pin "now" to noon so the running timer's elapsed time is deterministic.
+    vi.useFakeTimers()
+    vi.setSystemTime(TODAY)
+    try {
+      const completed = { ...AN_ENTRY } // 11:00 → 12:00, a completed hour
+      const running   = {
+        id: 9, jobId: 1, laborTypeId: 1,
+        punchIn: new Date(TODAY.getTime() - 5 * 3600000), // started 07:00 → 5h so far
+        punchOut: null, notes: null,
+      }
+      setupWithEntries([completed, running])
+      render(<TimesheetsView />)
+      // 1h completed + 5h running so far = 6h (running is now counted live)
+      expect(screen.getByText('Total').nextElementSibling).toHaveTextContent(/^6h$/)
+      // ...and the running timer in view is flagged for exports
+      expect(screen.getByText(/exports bill completed time only|total less until you punch out/i)).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
     }
-    setupWithEntries([completed, running])
-    render(<TimesheetsView />)
-    // Total counts only the completed hour, not the running timer's elapsed time
-    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent(/^1h$/)
   })
 
   it('counts the in-day portion of an entry that began the night before (#136)', () => {
@@ -568,11 +582,7 @@ const LABOR_TYPES_TWO = [
 /** Like setupWithEntries but populates both JOBS_TWO and LABOR_TYPES_TWO so
  *  selects have two real options each. */
 function setupWithTwoOptions(entries = [AN_ENTRY]) {
-  let n = 0
-  useLiveQuery.mockImplementation((_fn, deps) => {
-    if (!deps || deps.length === 0) return (n++ % 2 === 0) ? JOBS_TWO : LABOR_TYPES_TWO
-    return entries
-  })
+  useLiveQuery.mockImplementation((fn) => routeQuery(fn, entries, JOBS_TWO, LABOR_TYPES_TWO))
 }
 
 // The filters are bespoke EntitySelect (compact) pickers, not native <select>:
@@ -611,11 +621,7 @@ describe('TimesheetsView — client filter (the job picker also selects a whole 
     ]
     const mk = (id, jobId) => ({ id, jobId, laborTypeId: 1, punchIn: new Date(TODAY.getTime() - 3600000), punchOut: new Date(TODAY), notes: null })
     const entries = [mk(1, 1), mk(2, 2), mk(3, 3)]
-    let n = 0
-    useLiveQuery.mockImplementation((_fn, deps) => {
-      if (!deps || deps.length === 0) return (n++ % 2 === 0) ? jobs : LABOR_TYPES
-      return entries
-    })
+    useLiveQuery.mockImplementation((fn) => routeQuery(fn, entries, jobs, LABOR_TYPES))
     render(<TimesheetsView />)
     pickFilter('filter by job', 'whole client') // the only client option: "Acme · whole client"
     expect(screen.getByRole('button', { name: /edit entry for acme web/i })).toBeInTheDocument()
@@ -682,11 +688,7 @@ describe('TimesheetsView — clientName search match', () => {
   it('keeps entry visible when search matches the client name', () => {
     // Use a job with a clientName so the matchesClient branch executes
     const jobsWithClient = [{ id: 1, name: 'Acme Corp', clientName: 'Big Client', isActive: true }]
-    let n = 0
-    useLiveQuery.mockImplementation((_fn, deps) => {
-      if (!deps || deps.length === 0) return (n++ % 2 === 0) ? jobsWithClient : LABOR_TYPES
-      return [AN_ENTRY]
-    })
+    useLiveQuery.mockImplementation((fn) => routeQuery(fn, [AN_ENTRY], jobsWithClient, LABOR_TYPES))
     render(<TimesheetsView />)
     fireEvent.change(screen.getByRole('searchbox', { name: /search time entries/i }), {
       target: { value: 'big client' },

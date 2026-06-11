@@ -13,7 +13,7 @@
 | `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
 | `decimalHours` | boolean | `false` — show timesheet durations as decimal hours (`1.50 h`) instead of `1h 30m` (issue #208) |
 | `roundingMinutes` | number (`0` \| `15` \| `30`) | `0` — round each billable entry in the user's favour (start floored, end ceiled) for timesheets & invoices; `0` = off (issue #208) |
-| `timeFormat` | `"auto"` \| `"12h"` \| `"24h"` | `"auto"` (match the device's 12/24h preference) — clock-time rendering in timers, timesheets & invoices (`formatTime(date, fmt)`) |
+| `timeFormat` | `"auto"` \| `"12h"` \| `"24h"` | `"auto"` follows the device locale's 12/24h convention (resolved via `Intl` `hourCycle`; on Android Chrome this also picks up the OS 24-hour toggle via a `-u-hc-` locale extension, but iOS Safari doesn't expose that toggle to the web — pick `12h`/`24h` to force it). Clock-time rendering in timers, timesheets & invoices (`formatTime(date, fmt)`) |
 | `defaultCurrency` | ISO 4217 string | `"USD"` — formats invoice/CSV amounts via `Intl.NumberFormat` (`utils/format.js`) |
 | `billingName` | string | `""` — Billing profile: your name (the invoice "Billed from" identity) |
 | `billingBusiness` | string | `""` — Billing profile: business name |

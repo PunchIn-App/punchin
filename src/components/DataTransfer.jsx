@@ -193,11 +193,15 @@ export default function DataTransfer() {
         </button>
 
         {/* A persistent polite region announces the success count without
-            stealing focus (WCAG 4.1.3); a failed import is an action result, so
-            it carries role="alert" to match the modal-form error idiom. */}
-        <p role="status" aria-live="polite" className="text-xs text-green-400 empty:hidden">
-          {importMsg?.success || ''}
-        </p>
+            stealing focus (WCAG 4.1.3). It is always mounted and sr-only (out of
+            the visual flow) rather than display:none-when-empty — a live region
+            revealed together with its text is often NOT announced, and a
+            display:none region isn't in the accessibility tree at all. The
+            visible green confirmation below is aria-hidden so it isn't read
+            twice. A failed import is an action result, so it carries
+            role="alert" to match the modal-form error idiom. */}
+        <span role="status" aria-live="polite" className="sr-only">{importMsg?.success || ''}</span>
+        {importMsg?.success && <p className="text-xs text-green-400" aria-hidden="true">{importMsg.success}</p>}
         {importMsg?.error && <p role="alert" className="text-xs text-red-400">{importMsg.error}</p>}
       </div>
     </div>

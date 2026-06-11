@@ -4,6 +4,8 @@ import {
   formatDecimalHours,
   formatDuration,
   roundEntry,
+  roundEntriesContiguous,
+  sumDurationsInRangeLive,
   getEntryDuration,
   formatTime,
   formatDate,
@@ -130,6 +132,31 @@ describe('formatTime', () => {
   })
   it("'auto' resolves to a valid time string (device preference)", () => {
     expect(formatTime(new Date(2024, 0, 15, 14, 5), 'auto')).toMatch(/^(2:05 PM|14:05)$/)
+  })
+
+  describe("'auto' resolves the device hour cycle (issue #264)", () => {
+    const origLanguages = Object.getOwnPropertyDescriptor(navigator, 'languages')
+    const setLanguages = (langs) => Object.defineProperty(navigator, 'languages', { value: langs, configurable: true })
+    afterEach(() => {
+      if (origLanguages) Object.defineProperty(navigator, 'languages', origLanguages)
+    })
+
+    it("renders 24-hour when the device locale carries a 24-hour override (-u-hc-h23)", () => {
+      // Android Chrome surfaces the OS 'use 24-hour time' toggle this way; the old
+      // hour12-based detection missed it and stayed 12-hour.
+      setLanguages(['en-US-u-hc-h23'])
+      expect(formatTime(new Date(2024, 0, 15, 14, 5), 'auto')).toBe('14:05')
+    })
+
+    it('renders 24-hour for a 24-hour-default locale (en-GB)', () => {
+      setLanguages(['en-GB'])
+      expect(formatTime(new Date(2024, 0, 15, 14, 5), 'auto')).toBe('14:05')
+    })
+
+    it('renders 12-hour for a 12-hour-default locale (en-US)', () => {
+      setLanguages(['en-US'])
+      expect(formatTime(new Date(2024, 0, 15, 14, 5), 'auto')).toBe('2:05 PM')
+    })
   })
 })
 
@@ -446,6 +473,31 @@ describe('sumDurationsInRange', () => {
 })
 
 // ---------------------------------------------------------------------------
+// sumDurationsInRangeLive (issue #265 — includes running timers at `now`)
+// ---------------------------------------------------------------------------
+describe('sumDurationsInRangeLive', () => {
+  const start = new Date(2024, 0, 15, 0, 0, 0)
+  const end   = new Date(2024, 0, 15, 23, 59, 59, 999)
+
+  it('INCLUDES a running entry, valued to the passed now', () => {
+    const now = new Date(2024, 0, 15, 11, 30).getTime() // 30 min after the running punchIn
+    const entries = [
+      { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 10, 0) }, // 1h completed
+      { punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null },                         // running, 30m to now
+    ]
+    expect(sumDurationsInRangeLive(entries, start, end, now)).toBe(60 * 60_000 + 30 * 60_000)
+  })
+
+  it('grows as now advances (live)', () => {
+    const entries = [{ punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null }]
+    const t1 = sumDurationsInRangeLive(entries, start, end, new Date(2024, 0, 15, 11, 10).getTime())
+    const t2 = sumDurationsInRangeLive(entries, start, end, new Date(2024, 0, 15, 11, 40).getTime())
+    expect(t2).toBeGreaterThan(t1)
+    expect(t2 - t1).toBe(30 * 60_000)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // formatDecimalHours / formatDuration (issue #208)
 // ---------------------------------------------------------------------------
 describe('formatDecimalHours', () => {
@@ -520,5 +572,66 @@ describe('roundEntry', () => {
     // A 30-second entry is still "0m" — leave it untouched rather than bill 15 min.
     const subMinute = { punchIn: new Date(2024, 0, 15, 8, 7, 0), punchOut: new Date(2024, 0, 15, 8, 7, 30) }
     expect(roundEntry(subMinute, 15)).toBe(subMinute)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// roundEntriesContiguous (issue #274 — don't double-bill task switches)
+// ---------------------------------------------------------------------------
+describe('roundEntriesContiguous', () => {
+  const E = (id, h1, m1, h2, m2) => ({ id, punchIn: new Date(2024, 0, 15, h1, m1), punchOut: new Date(2024, 0, 15, h2, m2) })
+  const hrs = (e) => getEntryDuration(e) / 3_600_000
+  const total = (map, entries) => entries.reduce((s, e) => s + getEntryDuration(map.get(e.id) ?? e), 0) / 3_600_000
+
+  it('rounds a continuous workday split into 4 tasks to its outer span, not each task (the #274 report)', () => {
+    // 8:00→17:08 worked continuously, split Admin/Install/Travel/Admin. Per-entry
+    // rounding billed 10.00h; the run should round to 8:00→17:15 = 9.25h.
+    const entries = [E(1, 8, 0, 9, 32), E(2, 9, 32, 10, 6), E(3, 10, 6, 10, 27), E(4, 10, 27, 17, 8)]
+    const map = roundEntriesContiguous(entries, 15)
+    expect(hrs(map.get(1))).toBeCloseTo(1.5, 5)   // 8:00→9:30  (was 1.75)
+    expect(hrs(map.get(2))).toBeCloseTo(0.5, 5)   // 9:30→10:00
+    expect(hrs(map.get(3))).toBeCloseTo(0.5, 5)   // 10:00→10:30
+    expect(hrs(map.get(4))).toBeCloseTo(6.75, 5)  // 10:30→17:15
+    expect(total(map, entries)).toBeCloseTo(9.25, 5) // rows sum exactly to the rounded span
+  })
+
+  it('tiles shared boundaries with no gap or overlap', () => {
+    const entries = [E(1, 8, 0, 9, 32), E(2, 9, 32, 10, 6)]
+    const map = roundEntriesContiguous(entries, 15)
+    expect(map.get(1).punchOut.getTime()).toBe(map.get(2).punchIn.getTime())
+  })
+
+  it('rounds an isolated entry exactly like roundEntry (floor in / ceil out)', () => {
+    const map = roundEntriesContiguous([E(1, 8, 7, 8, 20)], 15)
+    expect(map.get(1).punchIn).toEqual(new Date(2024, 0, 15, 8, 0))
+    expect(map.get(1).punchOut).toEqual(new Date(2024, 0, 15, 8, 30))
+  })
+
+  it('does not merge entries separated by a gap (each rounded in isolation)', () => {
+    const entries = [E(1, 8, 5, 9, 0), E(2, 10, 0, 11, 5)] // 1h gap between them
+    const map = roundEntriesContiguous(entries, 15)
+    expect(map.get(1).punchIn).toEqual(new Date(2024, 0, 15, 8, 0))  // floored (run start)
+    expect(map.get(1).punchOut).toEqual(new Date(2024, 0, 15, 9, 0)) // ceiled (run end)
+    expect(map.get(2).punchIn).toEqual(new Date(2024, 0, 15, 10, 0))
+    expect(map.get(2).punchOut).toEqual(new Date(2024, 0, 15, 11, 15))
+  })
+
+  it('returns an empty map when rounding is off, so callers fall back to raw entries', () => {
+    expect(roundEntriesContiguous([E(1, 8, 0, 9, 0)], 0).size).toBe(0)
+    expect(roundEntriesContiguous([E(1, 8, 0, 9, 0)], undefined).size).toBe(0)
+  })
+
+  it('does not round running or sub-minute entries', () => {
+    const running = { id: 1, punchIn: new Date(2024, 0, 15, 8, 0), punchOut: null }
+    const subMinute = E(2, 8, 0, 8, 0) // 0 duration
+    const map = roundEntriesContiguous([running, subMinute], 15)
+    expect(map.has(1)).toBe(false)
+    expect(map.has(2)).toBe(false)
+  })
+
+  it('does not mutate the input array order', () => {
+    const entries = [E(2, 10, 0, 11, 0), E(1, 8, 0, 9, 0)]
+    roundEntriesContiguous(entries, 15)
+    expect(entries.map(e => e.id)).toEqual([2, 1]) // still caller order
   })
 })

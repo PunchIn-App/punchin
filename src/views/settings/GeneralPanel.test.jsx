@@ -31,9 +31,11 @@ describe('GeneralPanel — time display & billing (#208)', () => {
     expect(screen.getByRole('switch', { name: /decimal hours/i })).toHaveAttribute('aria-checked', 'true')
   })
 
+  // The dropdown's accessible name is the full "…to the nearest" label, which
+  // distinguishes it from the row's "About Round billed time" ⓘ disclosure.
   it('sets the rounding increment from the dropdown', () => {
     render(<GeneralPanel onBack={() => {}} />)
-    fireEvent.click(screen.getByRole('button', { name: /round billed time/i }))
+    fireEvent.click(screen.getByRole('button', { name: /round billed time to the nearest/i }))
     fireEvent.click(screen.getByRole('option', { name: '¼ hour' }))
     expect(mockUpdateSetting).toHaveBeenCalledWith('roundingMinutes', 15)
   })
@@ -41,11 +43,11 @@ describe('GeneralPanel — time display & billing (#208)', () => {
   it('shows the current rounding selection', () => {
     mockSettings = { roundingMinutes: 30 }
     render(<GeneralPanel onBack={() => {}} />)
-    expect(screen.getByRole('button', { name: /round billed time/i })).toHaveTextContent('½ hour')
+    expect(screen.getByRole('button', { name: /round billed time to the nearest/i })).toHaveTextContent('½ hour')
   })
 
   it('defaults the rounding dropdown to Off when unset', () => {
     render(<GeneralPanel onBack={() => {}} />)
-    expect(screen.getByRole('button', { name: /round billed time/i })).toHaveTextContent('Off')
+    expect(screen.getByRole('button', { name: /round billed time to the nearest/i })).toHaveTextContent('Off')
   })
 })

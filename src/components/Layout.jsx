@@ -4,6 +4,7 @@ import { Clock, Briefcase, Calendar, BarChart2, Settings } from 'lucide-react'
 import { db } from '../db'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
+import { useNowTicker } from '../hooks/useNowTicker'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 import { hasWaitingUpdate } from '../utils/pwa'
 import { PunchMark, Wordmark } from './BrandMark'
@@ -46,12 +47,16 @@ export default function Layout({ activeView, onNavigate, children }) {
   // per-second re-render.
   const activeEntries = useLiveQuery(() => db.entries.filter(e => !e.punchOut).toArray(), [])
   const activeCount = activeEntries?.length
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!activeCount) return
-    const id = setInterval(() => setNow(Date.now()), 30000)
-    return () => clearInterval(id)
-  }, [activeCount])
+  // Three-state clock status, single-sourced for the lg status card AND the md
+  // icon-rail's sr-only text: 'loading' (query still undefined — render/voice
+  // nothing per issue #135), 'on' (≥1 running), or 'off' (0). Without the
+  // loading state either surface would present a wrong "Off the clock" while the
+  // query resolves; on lg widths the md rail is display:none, so the card is what
+  // a screen reader actually reads.
+  const clockState = activeCount === undefined ? 'loading' : activeCount ? 'on' : 'off'
+  // Coarse 30s ticker keeps the "on the clock" duration fresh without a global
+  // per-second re-render; only runs while a timer is active (issue #265).
+  const now = useNowTicker(!!activeCount, 30000)
   const activeMs = (activeEntries || []).reduce((s, e) => s + (now - new Date(e.punchIn).getTime()), 0)
 
   // Fire the tap haptic synchronously in the click handler (iOS needs the
@@ -129,12 +134,14 @@ export default function Layout({ activeView, onNavigate, children }) {
               style={{ backgroundColor: activeCount ? 'var(--amber)' : 'var(--text-disabled)' }}
             />
             <div className="min-w-0">
-              {activeCount
+              {clockState === 'on'
                 ? <>
                     <p className="text-[13px] font-bold text-appText leading-tight">On the clock</p>
                     <p className="text-[11px] text-appTextMuted">{activeCount} timer{activeCount === 1 ? '' : 's'} · {formatDurationHM(activeMs)}</p>
                   </>
-                : <p className="text-[13px] font-medium text-appTextMuted">Off the clock</p>}
+                : clockState === 'off'
+                  ? <p className="text-[13px] font-medium text-appTextMuted">Off the clock</p>
+                  : null /* still loading — don't present a wrong idle state (issue #135) */}
             </div>
           </div>
           {/* md icon-rail: presence conveys state without relying on hue (WCAG
@@ -150,9 +157,11 @@ export default function Layout({ activeView, onNavigate, children }) {
               />
             )}
             <span className="sr-only">
-              {activeCount
+              {clockState === 'on'
                 ? `On the clock — ${activeCount} running`
-                : 'Off the clock'}
+                : clockState === 'off'
+                  ? 'Off the clock'
+                  : '' /* still loading — don't voice a wrong state (issue #135) */}
             </span>
           </div>
         </div>

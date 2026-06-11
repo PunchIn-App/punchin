@@ -101,6 +101,23 @@ describe('useSwipeDismiss', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('still dismisses when iOS rubber-band overscroll drives scrollTop negative at the top', () => {
+    // On iOS a downward drag on a scroller already pinned at the top rubber-bands
+    // and WebKit reports a transient NEGATIVE scrollTop. That must NOT cancel the
+    // dismiss — only a real downward content scroll (scrollTop increases) does.
+    const onClose = vi.fn()
+    render(<Sheet onClose={onClose} />)
+    const list = screen.getByTestId('list')
+    makeScrollable(list, { scrollTop: 0 })
+
+    fireEvent.touchStart(list, touch(100))
+    list.scrollTop = -12 // overscroll bounce while pinned at the top
+    fireEvent.touchMove(list, touch(160))
+    fireEvent.touchEnd(list, touch(200))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('ignores a small downward swipe under the threshold', () => {
     const onClose = vi.fn()
     render(<Sheet onClose={onClose} />)

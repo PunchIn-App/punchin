@@ -10,6 +10,7 @@ import {
 import { LaborGlyphChip } from '../components/LaborGlyph'
 import { formatMoney } from '../utils/format'
 import { useSettings } from '../hooks/useSettings'
+import { useNowTicker } from '../hooks/useNowTicker'
 
 const TOOLTIP = {
   backgroundColor: 'var(--bg-tertiary)',
@@ -32,11 +33,15 @@ export default function AnalyticsView() {
   const startDate = startOfDay(subDays(new Date(), days - 1))
 
   // Indexed range query (issue #132): the `punchIn` index narrows to the period
-  // window; the completed-only predicate (.and) runs on that small set, not the
-  // whole table.
-  const entries    = useLiveQuery(() => db.entries.where('punchIn').aboveOrEqual(startDate).and(e => !!e.punchOut).toArray(), [period])
+  // window. Running timers are INCLUDED now (no completed-only predicate) so a
+  // timer's accrued time shows live in the totals/charts (issue #265).
+  const entries    = useLiveQuery(() => db.entries.where('punchIn').aboveOrEqual(startDate).toArray(), [period])
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
+
+  // Tick (coarsely — these are Recharts surfaces) while a timer runs so its time
+  // grows in the bars/totals; idle periods register no interval (issue #265).
+  const now = useNowTicker((entries ?? []).some(e => !e.punchOut), 30000)
 
   // Derive every chart dataset in one memo so the O(days×entries) bucketing and
   // the per-job / per-labor-type filter passes only re-run when the data or the
@@ -68,7 +73,7 @@ export default function AnalyticsView() {
       const de   = endOfDay(day)
       const hrs  = entries
         .filter(e => entryOverlapsRange(e, ds, de))
-        .reduce((a, e) => a + getEntryDurationInRange(e, ds, de), 0) / 3600000
+        .reduce((a, e) => a + getEntryDurationInRange(e, ds, de, now), 0) / 3600000
       return { date: format(day, days === 7 ? 'EEE' : 'M/d'), hours: parseFloat(hrs.toFixed(2)) }
     })
 
@@ -90,7 +95,7 @@ export default function AnalyticsView() {
     })).filter(d => d.value > 0)
 
     return { total, dailyData, jobData, ltData, earnings, ratedCount }
-  }, [entries, jobs, laborTypes, days])
+  }, [entries, jobs, laborTypes, days, now])
 
   if (!entries || !jobs || !laborTypes) {
     return (
@@ -276,8 +281,8 @@ export default function AnalyticsView() {
 
       {entries.length === 0 && (
         <div className="flex flex-col items-center py-10 text-appTextMuted">
-          <p className="text-sm">No completed entries in this period.</p>
-          <p className="text-xs mt-1">Punch in and out to see analytics.</p>
+          <p className="text-sm">No entries in this period.</p>
+          <p className="text-xs mt-1">Punch in to see analytics.</p>
         </div>
       )}
     </div>

@@ -32,10 +32,12 @@
 | `src/hooks/usePlatformContext.test.js` | OS detection (iOS/Android/desktop), `isIOSSafari` (Safari vs CriOS/FxiOS/EdgiOS), `isIPad` incl. desktop-mode iPad (touch-capable "Macintosh" → iOS) vs real Mac, standalone mode detection |
 | `src/hooks/useHapticFeedback.test.jsx` | `hapticEl` JSX for iOS / null for others; `trigger` routes vibrate/label-click/no-op by platform |
 | `src/hooks/useReminders.test.js` | fires a notification when an enabled reminder condition is met; no-ops when reminders disabled or permission not granted |
+| `src/hooks/useNowTicker.test.jsx` | static (no interval) while inactive; advances on the interval while active; freezes when it becomes inactive; resyncs to now on re-activation (issue #265) |
 | `src/hooks/useInstallPrompt.test.js` | `canInstall`/`isInstalled` state from `pwa:install-ready`/`pwa:installed`; `promptInstall` accept/dismiss outcomes |
 | `src/components/ChangelogModal.test.jsx` | Render, markdown parsing, close button/Escape/backdrop, focus trap, device-Back (popstate) dismiss |
 | `src/components/LicenseModal.test.jsx` | Dialog a11y, default app-license (BUSL) tab, switch to third-party (aria-pressed), close button/Escape/backdrop, device-Back (popstate) dismiss |
 | `src/components/InstallPromptModal.test.jsx` | All three modes (native / ios-safari / ios-other), dialog a11y, Install/Not-now/Got-it/Escape/backdrop |
+| `src/components/InfoButton.test.jsx` | Labeled icon button collapsed by default; click opens the panel + flips `aria-expanded`; Escape closes and restores focus (and doesn't bubble to a surrounding modal); outside-click closes |
 | `src/components/FirstRunImport.test.jsx` | Renders the carry-over prompt; import/sync/dismiss actions; valid-backup import → importSnapshot + dismiss; invalid file → alert, no import |
 | `src/components/ColorPicker.test.jsx` | Preset swatches, custom hex picker, `aria-pressed`, Escape close |
 | `src/components/GlyphPicker.test.jsx` | Quick-pick row + "more" button, `onChange` on pick, `aria-checked` selection, search-chosen glyph stays visible, search filter + select, empty-state |

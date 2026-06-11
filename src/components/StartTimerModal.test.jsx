@@ -448,6 +448,26 @@ describe('StartTimerModal — job listbox keyboard model', () => {
     expect(opts[1]).toHaveAttribute('aria-selected', 'true')
   })
 
+  it('keeps the roving focus put when a background jobs re-emission lands while the menu is open', () => {
+    // useLiveQuery emits a FRESH array reference on every DB write (cloud sync,
+    // another tab). Simulate that by returning new object copies each call, then
+    // open the menu, arrow down, and force a re-render: the seeded roving index
+    // must NOT reset and yank focus back to the first/selected option.
+    let n = 0
+    useLiveQuery.mockImplementation(() =>
+      ++n % 2 === 1 ? JOBS3.map(j => ({ ...j })) : TYPES3.map(t => ({ ...t })))
+
+    render(<StartTimerModal onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    const listbox = screen.getByRole('listbox')
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(screen.getAllByRole('option')[1])
+
+    // A re-render driven by unrelated state (typing a note) re-emits fresh jobs.
+    fireEvent.change(screen.getByPlaceholderText('What are you working on?'), { target: { value: 'x' } })
+    expect(document.activeElement).toBe(screen.getAllByRole('option')[1]) // focus unchanged
+  })
+
   it('arrowing then Enter selects the active option and returns focus to the trigger (PR1)', () => {
     render(<StartTimerModal onClose={vi.fn()} />)
     const trigger = screen.getByRole('button', { name: /^job/i })
