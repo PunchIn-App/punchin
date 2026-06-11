@@ -4,8 +4,8 @@ import {
   formatDecimalHours,
   formatDuration,
   roundDurationMs,
-  billedDurationInRange,
-  sumBilledInRange,
+  billedEntryDuration,
+  sumBilled,
   getEntryDuration,
   formatTime,
   formatDate,
@@ -473,31 +473,44 @@ describe('sumDurationsInRange', () => {
 })
 
 // ---------------------------------------------------------------------------
-// sumBilledInRange (issues #265/#274 — rounded completed + live running)
+// billedEntryDuration / sumBilled (issues #265/#274 — rounded completed + live
+// running, attributed whole to the punchIn day, never split across windows)
 // ---------------------------------------------------------------------------
-describe('sumBilledInRange', () => {
-  const start = new Date(2024, 0, 15, 0, 0, 0)
-  const end   = new Date(2024, 0, 15, 23, 59, 59, 999)
+describe('billedEntryDuration', () => {
+  it('rounds a completed entry by its FULL duration', () => {
+    const e = { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 9, 50) } // 50m
+    expect(billedEntryDuration(e, Date.now(), 30, 'nearest')).toBe(60 * 60_000) // 50m → 60m
+    expect(billedEntryDuration(e, Date.now(), 0)).toBe(50 * 60_000)             // off → raw
+  })
 
+  it('bills the whole entry regardless of any window — a cross-midnight entry is not split', () => {
+    // 23:40 → 00:50 next day = 70m. There is no clipping: the whole 70m rounds
+    // once and is attributed (by the caller) to the punchIn day.
+    const overnight = { punchIn: new Date(2024, 0, 15, 23, 40), punchOut: new Date(2024, 0, 16, 0, 50) }
+    expect(billedEntryDuration(overnight, Date.now(), 30, 'nearest')).toBe(60 * 60_000) // round(70m) = 60m, once
+  })
+
+  it('returns a running entry live and UNrounded (no step-jumping, #265)', () => {
+    const now = new Date(2024, 0, 15, 11, 7).getTime() // running 7m — would be 0 if nearest-rounded
+    const e = { punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null }
+    expect(billedEntryDuration(e, now, 15, 'nearest')).toBe(7 * 60_000) // raw, not 0
+  })
+})
+
+describe('sumBilled', () => {
   it('rounding off: includes a running entry live, unrounded', () => {
     const now = new Date(2024, 0, 15, 11, 30).getTime()
     const entries = [
       { punchIn: new Date(2024, 0, 15, 9, 0), punchOut: new Date(2024, 0, 15, 10, 0) }, // 1h completed
       { punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null },                         // running, 30m
     ]
-    expect(sumBilledInRange(entries, start, end, now)).toBe(60 * 60_000 + 30 * 60_000)
-  })
-
-  it('rounds completed entries but leaves the running one live (no step-jumping)', () => {
-    const now = new Date(2024, 0, 15, 11, 7).getTime() // running for 7m — would be 0 if nearest-rounded
-    const entries = [{ punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null }]
-    expect(sumBilledInRange(entries, start, end, now, 15, 'nearest')).toBe(7 * 60_000) // raw, not 0
+    expect(sumBilled(entries, now)).toBe(60 * 60_000 + 30 * 60_000)
   })
 
   it('grows as now advances (live)', () => {
     const entries = [{ punchIn: new Date(2024, 0, 15, 11, 0), punchOut: null }]
-    const t1 = sumBilledInRange(entries, start, end, new Date(2024, 0, 15, 11, 10).getTime(), 15, 'nearest')
-    const t2 = sumBilledInRange(entries, start, end, new Date(2024, 0, 15, 11, 40).getTime(), 15, 'nearest')
+    const t1 = sumBilled(entries, new Date(2024, 0, 15, 11, 10).getTime(), 15, 'nearest')
+    const t2 = sumBilled(entries, new Date(2024, 0, 15, 11, 40).getTime(), 15, 'nearest')
     expect(t2 - t1).toBe(30 * 60_000)
   })
 })
@@ -565,8 +578,6 @@ describe('roundDurationMs', () => {
 // a task switch and is robust to the millisecond punch gap startTimer leaves.
 // ---------------------------------------------------------------------------
 describe('billing a continuous workday split into tasks (issue #274)', () => {
-  const start = new Date(2024, 0, 15, 0, 0, 0)
-  const end   = new Date(2024, 0, 15, 23, 59, 59, 999)
   const now   = new Date(2024, 0, 15, 18, 0).getTime()
   // 8:00→17:08 split Admin/Install/Travel/Admin. The hand-offs carry a few-ms gap
   // (as real punches do) — bit-exact contiguity would NOT hold; duration rounding
@@ -577,22 +588,22 @@ describe('billing a continuous workday split into tasks (issue #274)', () => {
     { id: 3, jobId: 3, punchIn: new Date(2024, 0, 15, 10, 6, 0, 400), punchOut: new Date(2024, 0, 15, 10, 27, 0, 0) },
     { id: 4, jobId: 1, punchIn: new Date(2024, 0, 15, 10, 27, 0, 600), punchOut: new Date(2024, 0, 15, 17, 8, 0, 0) },
   ]
-  const h = (e, mode) => billedDurationInRange(e, start, end, now, 15, mode) / 3_600_000
+  const h = (e, mode) => billedEntryDuration(e, now, 15, mode) / 3_600_000
 
   it('nearest: rounds each task independently — no inflation from the switches', () => {
     expect(h(day[0], 'nearest')).toBeCloseTo(1.5, 5)   // 92m → 90m (was 1.75 under the old bug)
     expect(h(day[1], 'nearest')).toBeCloseTo(0.5, 5)   // ~34m → 30m
     expect(h(day[2], 'nearest')).toBeCloseTo(0.25, 5)  // ~21m → 15m
     expect(h(day[3], 'nearest')).toBeCloseTo(6.75, 5)  // ~401m → 405m
-    expect(sumBilledInRange(day, start, end, now, 15, 'nearest') / 3_600_000).toBeCloseTo(9.0, 5) // was 10.0
+    expect(sumBilled(day, now, 15, 'nearest') / 3_600_000).toBeCloseTo(9.0, 5) // was 10.0
   })
 
   it('round up: each task rounds up so nothing short is lost', () => {
-    expect(sumBilledInRange(day, start, end, now, 15, 'up') / 3_600_000).toBeCloseTo(9.75, 5)
+    expect(sumBilled(day, now, 15, 'up') / 3_600_000).toBeCloseTo(9.75, 5)
   })
 
   it('rows sum exactly to the total (no per-entry vs total drift)', () => {
-    const rows = day.reduce((s, e) => s + billedDurationInRange(e, start, end, now, 15, 'nearest'), 0)
-    expect(rows).toBe(sumBilledInRange(day, start, end, now, 15, 'nearest'))
+    const rows = day.reduce((s, e) => s + billedEntryDuration(e, now, 15, 'nearest'), 0)
+    expect(rows).toBe(sumBilled(day, now, 15, 'nearest'))
   })
 })

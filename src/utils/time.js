@@ -182,25 +182,31 @@ export function sumDurationsInRange(entries, start, end) {
 }
 
 /**
- * An entry's BILLED duration within [start, end]: a COMPLETED entry's clipped
- * duration rounded per the billing policy (`minutes` increment + `mode`,
- * issue #274); a RUNNING entry's clipped duration is returned live and UNrounded
- * (it's still accruing, so rounding it would make it jump in steps — issue #265).
- * @param {Entry} entry @param {Date} start @param {Date} end @param {number} now @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
+ * An entry's BILLED duration (ms), independent of any window: a COMPLETED entry's
+ * FULL duration rounded per the billing policy (`minutes` increment + `mode`,
+ * issue #274); a RUNNING entry's live elapsed time, UNrounded (it's still
+ * accruing, so rounding it would make it jump in steps — issue #265).
+ *
+ * Attribution to a day/week is by `punchIn` (the caller filters with
+ * {@link isEntryInRange}), so an entry bills ONCE, whole, on the day it started —
+ * it is never split across the days it spans. That makes on-screen day/week
+ * totals reconcile exactly with the CSV / print / invoice exports, which bill the
+ * same way (whole rounded duration, keyed on punchIn). A daily timesheet rounding
+ * each task on its own also keeps per-job/per-rate amounts correct.
+ * @param {Entry} entry @param {number} [now] @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
  */
-export function billedDurationInRange(entry, start, end, now = Date.now(), minutes, mode) {
-  const dur = getEntryDurationInRange(entry, start, end, now)
-  return entry.punchOut ? roundDurationMs(dur, minutes, mode) : dur
+export function billedEntryDuration(entry, now = Date.now(), minutes, mode) {
+  if (!entry.punchOut) return Math.max(0, now - new Date(entry.punchIn).getTime())
+  return roundDurationMs(getEntryDuration(entry), minutes, mode)
 }
 
 /**
- * Billable on-screen total for a window: each completed entry's clipped duration
- * rounded per the policy, plus running timers live and unrounded (issues
- * #274/#265). Per-entry rounding (not a rounded total) keeps per-job/per-rate
- * sums correct, and rows sum exactly to this. Exports/print filter to completed
- * entries; the UI warns when a running timer makes the screen and an export differ.
- * @param {Entry[]} entries @param {Date} start @param {Date} end @param {number} now @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
+ * Billable on-screen total: the sum of {@link billedEntryDuration} over `entries`
+ * already filtered to a window by punchIn. Per-entry rounding (not a rounded
+ * total) keeps per-job/per-rate sums correct, and the rows sum exactly to this
+ * (issues #274/#265).
+ * @param {Entry[]} entries @param {number} [now] @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
  */
-export function sumBilledInRange(entries, start, end, now = Date.now(), minutes, mode) {
-  return entries.reduce((acc, e) => acc + billedDurationInRange(e, start, end, now, minutes, mode), 0)
+export function sumBilled(entries, now = Date.now(), minutes, mode) {
+  return entries.reduce((acc, e) => acc + billedEntryDuration(e, now, minutes, mode), 0)
 }

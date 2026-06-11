@@ -8,7 +8,7 @@ import { useNowTicker } from '../hooks/useNowTicker'
 import {
   formatDuration, formatTime, roundDurationMs,
   getDayRange, getWeekRange, getWeekDays,
-  entryOverlapsRange, billedDurationInRange, sumBilledInRange,
+  isEntryInRange, billedEntryDuration, sumBilled,
 } from '../utils/time'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
 import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
@@ -17,13 +17,11 @@ import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
 import ConfirmModal from '../components/ConfirmModal'
 
-// Entries can start before a viewed day/week and run into it (an overnight
-// shift's morning half). The punchIn index can't express "overlaps [start,end]"
-// directly, so each reactive query looks back one day past the window start and
-// the entryOverlapsRange filter drops anything that doesn't actually touch it.
-// A day covers every realistic overnight shift; a forgotten multi-day timer
-// still surfaces in the Timer view with its "Overnight Run?" flag. (issue #136)
-const OVERNIGHT_LOOKBACK_MS = 24 * 60 * 60 * 1000
+// Billing attributes each entry to the day it punched IN — an entry bills once,
+// whole, on its start day, never split across the days it spans (issues #274/#136).
+// So the on-screen day/week totals reconcile exactly with the CSV / print /
+// invoice exports, which key on punchIn the same way. A forgotten cross-midnight
+// timer still surfaces in the Timer view with its "Overnight Run?" flag.
 
 function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLaborTypeId, onEdit, onDelete }) {
   const { settings } = useSettings()
@@ -31,13 +29,11 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
   const mode = settings.roundingMode      // 'nearest' | 'up'
   const decimal = !!settings.decimalHours
   const { start, end } = getDayRange(date)
-  const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
   const entries = useLiveQuery(
     // Indexed range query (issue #132): punchIn is a Date key, so Dexie serves
-    // this from the `punchIn` index instead of scanning the whole table. The
-    // window reaches back a day (issue #136) to catch overnight entries that
-    // began before this day; entryOverlapsRange below drops the rest.
-    () => db.entries.where('punchIn').between(queryStart, end, true, true).toArray(),
+    // this from the `punchIn` index instead of scanning the whole table. Entries
+    // are attributed to their punchIn day, so the day window is exactly [start,end].
+    () => db.entries.where('punchIn').between(start, end, true, true).toArray(),
     [start.getTime()]
   )
   // id→record lookups built once per data change, not an O(n) find per row (#138).
@@ -51,7 +47,6 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
   const filteredEntries = useMemo(() => {
     if (!entries) return null
     return entries.filter(e => {
-      if (!entryOverlapsRange(e, start, end)) return false // drop look-back non-overlaps (#136)
       const job = getJob(e.jobId)
       const lt = getLT(e.laborTypeId)
 
@@ -92,7 +87,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
           change, which announces more reliably than a node that mounts/unmounts. */}
       <div role="status" aria-live="polite" className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
         <span className="text-sm text-appTextMuted">Total</span>
-        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(sumBilledInRange(filteredEntries, start, end, now, rm, mode), decimal)}</span>
+        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(sumBilled(filteredEntries, now, rm, mode), decimal)}</span>
         <span className="sr-only">{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} this day</span>
       </div>
 
@@ -105,9 +100,9 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
         filteredEntries.map(entry => {
           const job = getJob(entry.jobId)
           const lt  = getLT(entry.laborTypeId)
-          // Billed duration: the entry's clipped time rounded per policy (#136/#274),
-          // so the cards sum to the day Total; a running row grows live via `now` (#265).
-          const dur = billedDurationInRange(entry, start, end, now, rm, mode)
+          // Billed duration: the entry's full time rounded per policy (#274), so the
+          // cards sum to the day Total; a running row grows live via `now` (#265).
+          const dur = billedEntryDuration(entry, now, rm, mode)
           // Leading dot is the JOB's own colour (its identity cue), falling back to
           // its labor type's colour — distinct from the LaborTag's labor colour.
           const jobColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
@@ -154,16 +149,15 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const decimal = !!settings.decimalHours
   const { start, end } = getWeekRange(date, wsMon)
   const days = getWeekDays(date, wsMon)
-  const queryStart = new Date(start.getTime() - OVERNIGHT_LOOKBACK_MS)
   // Which day rows are expanded. The weekly view reads as a clean day-totals list
   // (design-system fidelity); a populated day discloses its entries on tap.
   const [expanded, setExpanded] = useState({})
 
   const allEntries = useLiveQuery(
-    // Indexed range query (issue #132) with a one-day look-back (issue #136) so
-    // an entry that began the night before the week still counts toward it;
-    // entryOverlapsRange below drops anything in the margin that doesn't touch it.
-    () => db.entries.where('punchIn').between(queryStart, end, true, true).toArray(),
+    // Indexed range query (issue #132): entries are attributed to their punchIn
+    // day, so the week window is exactly [start, end] — each entry bills once,
+    // whole, on its start day (issues #274/#136).
+    () => db.entries.where('punchIn').between(start, end, true, true).toArray(),
     [start.getTime()]
   )
   // id→record lookups built once per data change, not an O(n) find per row (#138).
@@ -176,7 +170,6 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const filteredEntries = useMemo(() => {
     if (!allEntries) return null
     return allEntries.filter(e => {
-      if (!entryOverlapsRange(e, start, end)) return false // drop look-back non-overlaps (#136)
       const job = getJob(e.jobId)
       const lt = getLT(e.laborTypeId)
 
@@ -211,27 +204,25 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const { total, jobTotals } = useMemo(() => {
     if (!filteredEntries) return { total: 0, jobTotals: {} }
     return {
-      total: sumBilledInRange(filteredEntries, start, end, now, rm, mode),
+      total: sumBilled(filteredEntries, now, rm, mode),
       jobTotals: filteredEntries.reduce((acc, e) => {
-        const ms = billedDurationInRange(e, start, end, now, rm, mode) // clip to week (#136), incl. running (#265)
+        const ms = billedEntryDuration(e, now, rm, mode) // whole entry, incl. running (#265)
         if (ms > 0) acc[e.jobId] = (acc[e.jobId] || 0) + ms
         return acc
       }, {}),
     }
   }, [filteredEntries, start.getTime(), end.getTime(), now, rm, mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Bucket entries into the seven days once, instead of re-filtering the whole
-  // week per day on every render (the O(7×entries) pass the finding flags) (#138).
+  // Bucket entries into the seven days by punchIn — each entry lands in exactly
+  // one day, so the day totals partition the week and sum to the week total
+  // (#138). Done once, not re-filtered per day on every render.
   const dayData = useMemo(() => {
     if (!filteredEntries) return []
     return days.map(day => {
       const ds = new Date(day); ds.setHours(0,0,0,0)
       const de = new Date(day); de.setHours(23,59,59,999)
-      // Overlap (not punchIn-only) so an overnight entry appears under both days
-      // it touches; totals clip each entry to the day it's shown under and skip
-      // running timers, so the rows sum to dayTotal (#136, #137).
-      const dayEntries = filteredEntries.filter(e => entryOverlapsRange(e, ds, de))
-      const dayTotal = sumBilledInRange(dayEntries, ds, de, now, rm, mode)
+      const dayEntries = filteredEntries.filter(e => isEntryInRange(e, ds, de))
+      const dayTotal = sumBilled(dayEntries, now, rm, mode)
       return { day, ds, de, dayEntries, dayTotal }
     })
   }, [filteredEntries, start.getTime(), now, rm, mode]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -330,7 +321,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="font-mono text-appTextMuted">{formatDuration(billedDurationInRange(e, ds, de, now, rm, mode), decimal)}</span>
+                        <span className="font-mono text-appTextMuted">{formatDuration(billedEntryDuration(e, now, rm, mode), decimal)}</span>
                         <div className="flex items-center gap-1">
                           <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
@@ -376,13 +367,13 @@ export default function TimesheetsView() {
   const jobs       = useLiveQuery(() => db.jobs.toArray(), [])
   const laborTypes = useLiveQuery(() => db.laborTypes.toArray(), [])
 
-  // Does a running timer fall inside the currently-viewed day/week? If so the
-  // live on-screen Total counts it, but CSV/Print/Invoice exports cover completed
-  // time only — so the export will total less. We warn rather than silently
-  // disagree (issue #265).
+  // Did a running timer punch in within the currently-viewed day/week? If so the
+  // live on-screen Total counts it (attributed to its punchIn day), but
+  // CSV/Print/Invoice exports cover completed time only — so the export will total
+  // less. We warn rather than silently disagree (issue #265).
   const runningEntries = useLiveQuery(() => db.entries.filter(e => !e.punchOut).toArray(), [])
   const exportWindow = tab === 'daily' ? getDayRange(currentDate) : getWeekRange(currentDate, wsMon)
-  const runningInView = (runningEntries ?? []).some(e => entryOverlapsRange(e, exportWindow.start, exportWindow.end))
+  const runningInView = (runningEntries ?? []).some(e => isEntryInRange(e, exportWindow.start, exportWindow.end))
 
   // A job's filter dot is its own colour, else its labor type's (mirrors the
   // job card's left-rail colour resolution).
