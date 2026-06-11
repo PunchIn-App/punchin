@@ -200,6 +200,7 @@ describe('buildFeedbackBugUrl', () => {
     expect(p.get('os')).toBe('Windows 10 / 11')
     expect(p.get('device')).toMatch(/^Desktop \(\d+×\d+\)$/)
     expect(p.get('template')).toBeNull() // not a GitHub issue form
+    expect(p.get('from')).toBe('app') // overlay-safe exits on the worker (punchin-feedback#6)
   })
 
   it('carries theme + accent when provided', () => {
@@ -218,11 +219,11 @@ describe('buildFeedbackBugUrl', () => {
 })
 
 describe('buildFeedbackFeatureUrl', () => {
-  it('points to the feedback feature form (no prefill)', () => {
-    expect(buildFeedbackFeatureUrl()).toBe('https://feedback.trackmytime.today/feature')
+  it('points to the feedback feature form (no prefill beyond app context)', () => {
+    expect(buildFeedbackFeatureUrl()).toBe('https://feedback.trackmytime.today/feature?from=app')
   })
 
   it('carries theme + accent when provided', () => {
-    expect(buildFeedbackFeatureUrl('light', '#abc')).toBe('https://feedback.trackmytime.today/feature?theme=light&accent=%23abc')
+    expect(buildFeedbackFeatureUrl('light', '#abc')).toBe('https://feedback.trackmytime.today/feature?theme=light&accent=%23abc&from=app')
   })
 })

@@ -99,13 +99,18 @@ function withTheme(params, theme, accent) {
 
 // Self-hosted feedback forms (no GitHub account required). The bug form gets the
 // same prefilled environment metadata as the GitHub form; the feature form
-// carries no environment fields. Both also carry the app's theme + accent.
+// carries no environment fields. Both also carry the app's theme + accent, plus
+// `from=app`: these links open in an in-app browser overlay (Android Custom Tab /
+// iOS in-app Safari) that navigation can't escape, so the worker swaps its root
+// links for a "close this window" exit (punchin-feedback#6, #277).
 export function buildFeedbackBugUrl(appVersion, isStandalone, os, theme, accent) {
   const params = withTheme(new URLSearchParams(bugMetadata(appVersion, isStandalone, os)), theme, accent)
+  params.set('from', 'app')
   return `${FEEDBACK_BASE}/bug?${params.toString()}`
 }
 
 export function buildFeedbackFeatureUrl(theme, accent) {
-  const qs = withTheme(new URLSearchParams(), theme, accent).toString()
-  return qs ? `${FEEDBACK_BASE}/feature?${qs}` : `${FEEDBACK_BASE}/feature`
+  const params = withTheme(new URLSearchParams(), theme, accent)
+  params.set('from', 'app')
+  return `${FEEDBACK_BASE}/feature?${params.toString()}`
 }
