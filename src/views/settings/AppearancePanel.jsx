@@ -13,7 +13,8 @@ export default function AppearancePanel({ onBack }) {
         <SettingsRow
           icon={Monitor}
           title="Theme"
-          subtitle="Auto follows your device setting"
+          subtitle="Light, dark, or follow device"
+          info="Auto tracks your device's light/dark setting and switches automatically when it changes."
           right={
             <div role="group" aria-label="Theme" className="flex items-center gap-0.5 bg-appBg rounded-lg p-0.5 border border-appBorder">
               {[

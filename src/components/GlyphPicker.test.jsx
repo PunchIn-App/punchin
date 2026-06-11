@@ -40,6 +40,36 @@ describe('GlyphPicker', () => {
     expect(coffee).toHaveAttribute('aria-checked', 'true')
   })
 
+  it('keeps a search-chosen glyph reachable after arrowing off it onto a stock glyph', () => {
+    // 'coffee' is non-quick → pinned at index 0. ArrowRight selects the next
+    // (a stock quick glyph); the pinned custom glyph must STAY in the row so
+    // ArrowLeft can return to it — otherwise one arrow press strands it off the
+    // keyboard path with no way back.
+    const onChange = vi.fn()
+    const { rerender } = render(<GlyphPicker value="coffee" onChange={onChange} />)
+    expect(screen.getByRole('radio', { name: 'coffee' })).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('radiogroup', { name: 'Glyph' }), { key: 'ArrowRight' })
+    // Controlled component: the parent passes the newly-selected value back.
+    const next = onChange.mock.calls[0][0]
+    expect(next).not.toBe('coffee')          // moved onto a stock glyph
+    rerender(<GlyphPicker value={next} onChange={onChange} />)
+    expect(screen.getByRole('radio', { name: 'coffee' })).toBeInTheDocument() // still pinned
+  })
+
+  it('ignores arrow/Home keys fired on the non-radio "More glyphs" trigger', () => {
+    // The trigger lives inside the quick-row radiogroup; arrow keys there must not
+    // mutate the selection or yank focus onto a radio.
+    const onChange = vi.fn()
+    render(<GlyphPicker value="punchin" onChange={onChange} />)
+    const trigger = screen.getByRole('button', { name: /more glyphs/i })
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    fireEvent.keyDown(trigger, { key: 'ArrowLeft' })
+    fireEvent.keyDown(trigger, { key: 'Home' })
+    expect(onChange).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('opens a search dropdown, filters, and selects from it', () => {
     const onChange = vi.fn()
     render(<GlyphPicker value="" onChange={onChange} />)

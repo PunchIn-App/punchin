@@ -107,13 +107,13 @@ describe('AnalyticsView — empty state', () => {
   it('shows empty-state message when no entries exist', () => {
     setupMocks({ entries: [] })
     render(<AnalyticsView />)
-    expect(screen.getByText(/no completed entries in this period/i)).toBeInTheDocument()
+    expect(screen.getByText(/no entries in this period/i)).toBeInTheDocument()
   })
 
-  it('shows "Punch in and out to see analytics." when entries are empty', () => {
+  it('shows "Punch in to see analytics." when entries are empty', () => {
     setupMocks({ entries: [] })
     render(<AnalyticsView />)
-    expect(screen.getByText('Punch in and out to see analytics.')).toBeInTheDocument()
+    expect(screen.getByText('Punch in to see analytics.')).toBeInTheDocument()
   })
 })
 

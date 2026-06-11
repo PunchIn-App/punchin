@@ -109,7 +109,9 @@ describe('DataTransfer — import', () => {
     fireEvent.change(screen.getByLabelText(/share link to import/i), { target: { value: url } })
     fireEvent.click(screen.getByRole('button', { name: /^import data$/i }))
     await waitFor(() => expect(mockImport).toHaveBeenCalled())
-    expect(await screen.findByText(/Imported 1 new entry/i)).toBeInTheDocument()
+    // The count appears twice: the persistent sr-only announcer and the visible
+    // (aria-hidden) confirmation. Both carry the message.
+    expect((await screen.findAllByText(/Imported 1 new entry/i)).length).toBeGreaterThan(0)
   })
 
   // WCAG 4.1.3 — the import result must be announced to assistive tech.

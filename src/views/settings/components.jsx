@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react'
+import InfoButton from '../../components/InfoButton'
 
 // Shared Settings primitives, extracted from the SettingsView monolith so each
 // panel can compose them (issue #144).
@@ -30,13 +31,18 @@ export function Toggle({ value, onChange, ariaLabel }) {
   )
 }
 
-export function SettingsRow({ icon: Icon, title, subtitle, right }) {
+export function SettingsRow({ icon: Icon, title, subtitle, right, info }) {
   return (
     <div className="flex items-center justify-between px-4 py-4 gap-3">
       <div className="flex items-center gap-3 min-w-0">
         <Icon className="w-4 h-4 text-appTextMuted flex-shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm text-appText font-medium">{title}</p>
+          {/* `info` moves on-demand detail off the caption into a ⓘ disclosure
+              (the InfoButton is phrasing content, so it's valid inside this <p>). */}
+          <p className="text-sm text-appText font-medium">
+            {title}
+            {info && <InfoButton label={`About ${title}`} className="ml-1.5">{info}</InfoButton>}
+          </p>
           {subtitle && <p className="text-xs text-appTextMuted mt-0.5">{subtitle}</p>}
         </div>
       </div>

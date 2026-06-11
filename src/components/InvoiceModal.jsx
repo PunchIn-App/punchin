@@ -9,7 +9,7 @@ import {
 import { db } from '../db'
 import EntitySelect from './EntitySelect'
 import DatePicker from './pickers/DatePicker'
-import { getEntryDuration, roundEntry, formatTime } from '../utils/time'
+import { getEntryDuration, roundEntriesContiguous, formatTime, entryOverlapsRange } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, escHtml } from '../utils/printDocument'
 import { LaborTag } from './LaborGlyph'
@@ -102,6 +102,19 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
       : inRange.filter(e => e.jobId === Number(selectedJobId))
   }, [start?.getTime(), end?.getTime(), selectedJobId, jobs])
 
+  // A running timer is only relevant to THIS invoice if it's for the invoiced
+  // job/client and overlaps the period — then the (completed-only) invoice omits
+  // time the user is still accruing, so we say so. A timer on a different
+  // job/client doesn't affect this invoice and shows no warning (issue #265).
+  const runningAffectsInvoice = useLiveQuery(async () => {
+    if (!start || !end || !selectedJobId) return false
+    const running = await db.entries.filter(e => !e.punchOut).toArray()
+    return running.some(e =>
+      entryOverlapsRange(e, start, end) &&
+      (isClientSel ? jobMap.get(e.jobId)?.clientName === selClient : e.jobId === Number(selectedJobId)),
+    )
+  }, [start?.getTime(), end?.getTime(), selectedJobId, jobs])
+
   const job = isClientSel ? null : jobs?.find(j => j.id === Number(selectedJobId))
   // Display identity for the title / billed-to band: a client invoice bills the
   // client across its jobs; a single-job invoice bills that job's client (or the
@@ -113,10 +126,13 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 
   const lineItems = useMemo(() => {
     if (!allEntries?.length) return []
+    // Round the invoiced entries as contiguous sessions (issue #274) so a task
+    // switch between this client's own back-to-back jobs isn't billed on both
+    // sides. (Scoped to the invoiced set; a session that crosses to a DIFFERENT
+    // client rounds its boundary in isolation, as before.)
+    const roundedById = roundEntriesContiguous(allEntries, settings.roundingMinutes)
     return allEntries.map(raw => {
-      // Bill in the user's favour: round the entry (start down, end up) so the
-      // invoiced hours, amount, and shown Start/End times are consistent (#208).
-      const e = roundEntry(raw, settings.roundingMinutes)
+      const e = roundedById.get(raw.id) ?? raw
       const eJob = jobMap.get(e.jobId)   // the entry's OWN job — a client invoice spans several, each at its own rate
       const lt = laborTypes?.find(l => l.id === e.laborTypeId)
       const hours = getEntryDuration(e) / 3600000
@@ -424,6 +440,11 @@ ${totalAmount != null ? `<div class="paperfoot">
           {/* Line items table */}
           {selectedJobId && allEntries !== undefined && (
             <div>
+              {runningAffectsInvoice && (
+                <p role="note" className="mb-3 rounded-lg border border-appBorder bg-appInput/40 px-3 py-2 text-xs text-appTextMuted">
+                  A timer is still running for this {isClientSel ? 'client' : 'job'} in this period. The invoice bills completed time only — punch out to include the in-progress entry.
+                </p>
+              )}
               {lineItems.length === 0 ? (
                 <p className="text-sm text-appTextMuted text-center py-6">No completed entries in this period.</p>
               ) : (

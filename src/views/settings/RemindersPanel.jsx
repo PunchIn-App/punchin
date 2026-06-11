@@ -41,7 +41,7 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
 
   return (
     <Panel title="Reminders" onBack={onBack}>
-      <div className="rounded-xl border border-appBorder bg-appCard divide-y divide-appBorderLight">
+      <div className="rounded-xl border border-appBorder bg-appCard">
         {!notifSupported ? (
           <div className="px-4 py-4">
             <p className="text-sm text-appText font-medium">Reminders aren't available here</p>
@@ -52,10 +52,12 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
           </div>
         ) : (
           <>
+            <div className="divide-y divide-appBorderLight">
             <SettingsRow
               icon={Bell}
               title="Reminders"
-              subtitle="Checked on your device while PunchIn is open, and caught up when you reopen it"
+              subtitle="Local nudges, checked while PunchIn is open"
+              info="PunchIn has no server, so reminders are checked on your device while the app is open and caught up when you reopen it — a fully closed app can't be woken to alert at an exact time."
               right={
                 <Toggle
                   ariaLabel="Enable reminders"
@@ -64,21 +66,6 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                 />
               }
             />
-
-            {/* Permission denied is the result of flipping the toggle on, so it
-                must be announced (WCAG 4.1.3). A persistent polite region whose
-                content toggles is more reliable than mounting/unmounting an
-                alert node — the row collapses to nothing when not denied. */}
-            <div role="status" aria-live="polite">
-              {notifPerm === 'denied' && (
-                <div className="px-4 py-3 bg-red-500/5">
-                  <p className="text-xs text-red-400">
-                    Notifications are blocked. Allow notifications for PunchIn in your browser or
-                    device settings, then turn reminders on again.
-                  </p>
-                </div>
-              )}
-            </div>
 
             {remindersOn && (
               <>
@@ -217,6 +204,23 @@ export default function RemindersPanel({ onBack, notifPerm, setNotifPerm }) {
                 </ReminderRow>
               </>
             )}
+            </div>
+
+            {/* Permission denied is the result of flipping the toggle on, so it
+                must be announced (WCAG 4.1.3). A persistent polite region whose
+                content toggles is more reliable than mounting/unmounting an alert
+                node. It sits OUTSIDE the divided list above so an empty
+                (not-denied) region never adds a stray divide-y hairline. */}
+            <div role="status" aria-live="polite">
+              {notifPerm === 'denied' && (
+                <div className="px-4 py-3 bg-red-500/5 border-t border-appBorderLight">
+                  <p className="text-xs text-red-400">
+                    Notifications are blocked. Allow notifications for PunchIn in your browser or
+                    device settings, then turn reminders on again.
+                  </p>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>

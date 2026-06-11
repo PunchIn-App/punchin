@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.30.0] — 2026-06-11
+
+### Added
+- **Timer / Timesheets / Analytics — live stats while a timer runs.** Today, This week, and Avg-per-day on the Timer home, the Timesheets totals, and the Analytics totals and charts now include the running timer's accrued time and update live, instead of staying frozen until you punch out. CSV, Print, and Invoice exports still bill completed time only, and the screen shows a notice when a running timer would make an export total less than what you see. (#265)
+- **Settings — info (ⓘ) popovers.** Long setting descriptions are trimmed to one line, with the full explanation moved into a tappable ⓘ that opens a small, keyboard- and screen-reader-accessible help popover. Applied to Time format, Round billed time, Decimal hours, Concurrent timers, Reminders, Number invoices, and Theme.
+
+### Fixed
+- **Timesheets — rounding no longer over-bills back-to-back work.** With "Round billed time" on, a continuous workday split into several tasks is now rounded as one session, so the hand-off between tasks isn't rounded up on both sides. A 9.14-hour day that previously totalled 10.00 h at quarter-hour rounding now reads 9.25 h, and the per-row hours, day/week totals, CSV, print, and invoices all agree. (#274)
+- **Settings — "Auto" time format follows your region more reliably.** It now reads the device locale's 12/24-hour convention (and picks up the OS 24-hour setting on Android). On iPhone the system clock setting isn't exposed to web apps — choose 12- or 24-hour explicitly to override. (#264)
+- **Accessibility follow-ups** to the v0.29 remediation: keyboard focus now lands inside a dropdown when it opens (arrow keys work); the glyph picker's "More glyphs" button no longer changes the selection on an arrow key, and a glyph chosen from search stays reachable in the quick row; swipe-down-to-dismiss tolerates iOS overscroll; the sidebar status no longer briefly reads "Off the clock" while loading; and the import-result and blocked-notification messages are announced to screen readers more reliably.
+
+---
+
 ## [0.29.7] — 2026-06-10
 
 ### Fixed

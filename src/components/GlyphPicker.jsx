@@ -44,6 +44,12 @@ function rovingIndex(ids, value) {
 export default function GlyphPicker({ value, onChange }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  // Pin a search-chosen (non-quick) glyph into the quick row for the life of the
+  // picker. Without this the row is derived purely from `value`, so arrowing off
+  // the custom glyph onto a stock one drops it from the row entirely — stranding
+  // it off the keyboard path with no way back (issue: destructive arrow key).
+  const [pinnedCustom, setPinnedCustom] = useState(() =>
+    value && !QUICK_IDS.includes(value) ? value : null)
   const wrapRef = useRef(null)
   const triggerRef = useRef(null)   // "More glyphs" — refocus target on select/Escape (WCAG 2.4.3)
 
@@ -71,8 +77,14 @@ export default function GlyphPicker({ value, onChange }) {
     }
   }, [open])
 
-  // Keep a search-chosen glyph visible in the quick row by prepending it.
-  const quick = value && !QUICK_IDS.includes(value) ? [value, ...QUICK_IDS] : QUICK_IDS
+  // Remember the latest search-chosen glyph so it stays pinned in the quick row.
+  useEffect(() => {
+    if (value && !QUICK_IDS.includes(value)) setPinnedCustom(value)
+  }, [value])
+
+  // Keep a search-chosen glyph visible in the quick row by prepending it (the
+  // pinned one stays even after arrowing selects a stock glyph).
+  const quick = pinnedCustom ? [pinnedCustom, ...QUICK_IDS] : QUICK_IDS
   const q = query.trim().toLowerCase()
   const results = q ? LABOR_GLYPH_IDS.filter(id => id.includes(q)) : LABOR_GLYPH_IDS
 
@@ -87,6 +99,11 @@ export default function GlyphPicker({ value, onChange }) {
   // wraps around. Moving the focus also selects (radiogroup semantics), and the
   // moved-to radio is focused by querying the rendered buttons in the group.
   const groupKeyDown = (ids, select) => e => {
+    // Ignore keys from a non-radio descendant. The quick row also contains the
+    // "More glyphs" trigger; arrow/Home/End fired while it's focused must not
+    // change the selection or yank focus onto a radio. Keys bubbling from a radio
+    // (e.target is the radio) or dispatched at the group itself still pass.
+    if (e.target !== e.currentTarget && !e.target.closest?.('[data-glyph-radio]')) return
     const last = ids.length - 1
     if (last < 0) return
     const cur = rovingIndex(ids, value)

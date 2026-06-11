@@ -147,4 +147,18 @@ describe('Layout — md icon-rail status (no colour-only state)', () => {
     expect(railSrText(rail)).toMatch(/^off the clock$/i)
     expect(railDot(rail)).toBeNull()
   })
+
+  it('voices NOTHING while the active-entries query is still loading (undefined)', () => {
+    // useLiveQuery returns undefined until it first resolves; the sr-only status
+    // must stay empty then rather than wrongly announcing "Off the clock" while
+    // timers may in fact be running (issue #135 loading convention).
+    live.activeEntries = undefined
+    const { container } = render(<Layout activeView="timer" onNavigate={vi.fn()}><div /></Layout>)
+    const rail = railContainer(container)
+    expect(railSrText(rail)).toBe('')
+    expect(railDot(rail)).toBeNull()
+    // The lg status card (what a screen reader reads on lg widths, where the md
+    // rail is display:none) must also not present "Off the clock" while loading.
+    expect(screen.queryByText(/off the clock/i)).toBeNull()
+  })
 })

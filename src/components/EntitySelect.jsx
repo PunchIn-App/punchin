@@ -67,6 +67,7 @@ export default function EntitySelect({
   const menuRef = useRef(null)
   const triggerRef = useRef(null)        // refocus target on select/Escape (WCAG 2.4.3)
   const optionRefs = useRef([])          // option DOM nodes, in render order, for roving focus
+  const seededRef = useRef(false)        // have we moved focus into the listbox for this open?
   const uid = useId()
   const labelId = `${uid}-label`
 
@@ -140,18 +141,28 @@ export default function EntitySelect({
 
   // Listbox keyboard model (WAI-ARIA APG): on open, move focus INTO the listbox
   // to the currently-selected option (else the first), and seed the roving
-  // active index there. useLayoutEffect runs after the menu mounts but before
-  // paint so focus lands without a flash. Re-seeds the index every open.
+  // active index there. The menu renders `visibility: hidden` until `pos` is
+  // computed (one commit later), and a hidden element can't take focus — so we
+  // wait for `pos` and seed exactly once per open (guarded by seededRef), not on
+  // the first commit. useLayoutEffect runs before paint so focus lands without a
+  // flash; the seededRef guard means a later resize-driven pos change won't
+  // refocus mid-interaction.
   useLayoutEffect(() => {
-    if (!open) { setActive(0); return }
+    if (!open) { setActive(0); seededRef.current = false; return }
+    if (seededRef.current || !pos) return
     const sel = rows.findIndex(r => r.selected)
     const start = sel >= 0 ? sel : 0
-    setActive(start)
+    // Only update when the index actually changes: a same-value setActive here
+    // would trigger a bail-out re-render that re-runs the render body (clearing
+    // optionRefs) without re-committing the option ref callbacks, leaving the
+    // ref array empty for the arrow-key handler.
+    if (start !== active) setActive(start)
     optionRefs.current[start]?.focus()
-    // rows is derived from value/options/emptyOption; `open` is the trigger we
-    // care about — recomputing on every render would refocus mid-interaction.
+    seededRef.current = true
+    // rows/active are read for seeding only; open+pos are the triggers we care
+    // about — recomputing on every render would refocus mid-interaction.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, pos])
 
   // Move the roving active option: focus it and flip its tabindex to 0 (the
   // rest go to -1 in render). No wrap at the ends — Home/End reach the extremes.

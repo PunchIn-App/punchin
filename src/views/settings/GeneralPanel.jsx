@@ -5,7 +5,7 @@ import EntitySelect from '../../components/EntitySelect'
 import { Panel, SettingsRow, Toggle } from './components'
 
 const TIME_FORMAT_OPTIONS = [
-  { value: 'auto', label: 'Auto (match device)' },
+  { value: 'auto', label: 'Auto (match region)' },
   { value: '12h', label: '12-hour' },
   { value: '24h', label: '24-hour' },
 ]
@@ -29,7 +29,8 @@ export default function GeneralPanel({ onBack }) {
         <SettingsRow
           icon={Layers}
           title="Concurrent timers"
-          subtitle="Run multiple jobs at the same time"
+          subtitle="Run multiple jobs at once"
+          info="Lets timers overlap instead of punching out the previous one. Each entry is tracked and billed independently."
           right={
             <Toggle
               ariaLabel="Allow concurrent timers"
@@ -53,7 +54,8 @@ export default function GeneralPanel({ onBack }) {
         <SettingsRow
           icon={Watch}
           title="Time format"
-          subtitle="How clock times show in timesheets and invoices"
+          subtitle="Clock times in timesheets & invoices"
+          info="Auto follows your region's 12/24-hour convention. On iPhone it can't read the OS clock toggle — pick 12- or 24-hour to force it."
           right={
             <div className="w-44 flex-shrink-0">
               <EntitySelect
@@ -69,7 +71,8 @@ export default function GeneralPanel({ onBack }) {
         <SettingsRow
           icon={Clock}
           title="Decimal hours"
-          subtitle="Show timesheet durations as 1.50 h instead of 1h 30m"
+          subtitle="Show durations as decimals"
+          info="Shows timesheet and invoice durations as 1.50 h instead of 1h 30m."
           right={
             <Toggle
               ariaLabel="Show durations as decimal hours"
@@ -81,7 +84,8 @@ export default function GeneralPanel({ onBack }) {
         <SettingsRow
           icon={Hourglass}
           title="Round billed time"
-          subtitle="Rounds each entry in your favour (start down, end up) in timesheets and invoices"
+          subtitle="Round billed time in your favour"
+          info="Start times round down and end times round up to the chosen increment. Back-to-back tasks round as one continuous session, so a task switch isn't billed on both sides."
           right={
             <div className="w-44 flex-shrink-0">
               <EntitySelect

@@ -57,10 +57,13 @@ export function useSwipeDismiss(onClose, hapticTrigger) {
       if (sc && sc.scrollTop > 0) cancelled.current = true
     }
     const onTouchMove = () => {
-      // If the scroll container under the finger actually moved, the gesture is
-      // a scroll, not a sheet drag — disqualify it from dismissing.
+      // If the scroll container under the finger actually scrolled DOWN (content
+      // moved up), the gesture is a scroll, not a sheet drag — disqualify it.
+      // Use `>`, not `!==`: iOS rubber-band overscroll at the top drives scrollTop
+      // momentarily NEGATIVE, and that must still count as a dismiss (the comment
+      // above promises a top-pinned downward drag dismisses).
       const sc = scroller.current
-      if (sc && sc.scrollTop !== startScrollTop.current) cancelled.current = true
+      if (sc && sc.scrollTop > startScrollTop.current) cancelled.current = true
     }
     const onTouchEnd = e => {
       if (startY.current === null) return

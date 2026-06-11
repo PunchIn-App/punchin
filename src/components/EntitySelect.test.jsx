@@ -253,6 +253,19 @@ describe('EntitySelect', () => {
       expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
     })
 
+    it('seeds focus once per open — a re-render while open does not pull focus back', () => {
+      // Guards the seededRef contract: after arrowing to a later option, a parent-
+      // driven re-render (same props) must not re-seed focus onto the first/selected
+      // option. This is the regression that the optionRefs-cleared bail-out render
+      // and the pos-gated seeding were fixed against.
+      const { rerender } = render(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+      const listbox = (fireEvent.click(screen.getByRole('button', { name: /job/i })), screen.getByRole('listbox'))
+      fireEvent.keyDown(listbox, { key: 'ArrowDown' })
+      expect(document.activeElement).toBe(screen.getByRole('option', { name: /skyline studio/i }))
+      rerender(<EntitySelect label="Job" value="" onChange={() => {}} options={JOB_OPTS} placeholder="Select a job…" />)
+      expect(document.activeElement).toBe(screen.getByRole('option', { name: /skyline studio/i }))
+    })
+
     it('treats the leading emptyOption as the first option in the roving model', () => {
       const onChange = vi.fn()
       render(<EntitySelect label="Job" value="1" onChange={onChange} options={JOB_OPTS} emptyOption={{ label: 'All Jobs' }} />)

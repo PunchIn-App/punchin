@@ -96,7 +96,8 @@ export default function BillingPanel({ onBack }) {
         <SettingsRow
           icon={Hash}
           title="Number invoices"
-          subtitle="Print an invoice number; it advances each time you generate one"
+          subtitle="Auto-number invoices"
+          info="Prints an invoice number that advances each time you generate one. You can override it on any individual invoice."
           right={
             <Toggle
               ariaLabel="Number invoices"

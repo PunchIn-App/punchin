@@ -9,6 +9,7 @@ import { LaborTag } from '../components/LaborGlyph'
 import { PunchMark } from '../components/BrandMark'
 import { DEFAULT_JOB_COLOR } from '../accentPresets'
 import { useSettings } from '../hooks/useSettings'
+import { useNowTicker } from '../hooks/useNowTicker'
 import { formatDurationHM, formatTime, formatDate, getDayRange, getWeekRange, getEntryDurationInRange } from '../utils/time'
 
 // A compact stat tile (TODAY / THIS WEEK / AVG·DAY) under the header.
@@ -47,16 +48,20 @@ export default function TimerView() {
   const getJob = id => jobMap.get(id)
   const getLT  = id => ltMap.get(id)
 
-  // Header stat tiles: today / this-week totals from completed entries (clipped
-  // to each window), and a simple per-day average across the 7-day week.
+  // Header stat tiles: today / this-week totals (clipped to each window) and a
+  // simple per-day average across the 7-day week. Running timers are INCLUDED and
+  // valued at a ticking `now`, so the tiles update live instead of going stale
+  // until punch-out (issue #265). The ticker only runs while a timer is active.
+  const now = useNowTicker((active?.length ?? 0) > 0, 1000)
   const stats = useMemo(() => {
-    if (!completed) return null
+    if (!completed || !active) return null
     const { start: ds, end: de } = getDayRange()
     const { start: ws, end: we } = getWeekRange(new Date(), settings.weekStartsMonday)
-    const today = completed.reduce((s, e) => s + getEntryDurationInRange(e, ds, de), 0)
-    const week  = completed.reduce((s, e) => s + getEntryDurationInRange(e, ws, we), 0)
+    const all = [...completed, ...active]
+    const today = all.reduce((s, e) => s + getEntryDurationInRange(e, ds, de, now), 0)
+    const week  = all.reduce((s, e) => s + getEntryDurationInRange(e, ws, we, now), 0)
     return { today, week, avg: week / 7 }
-  }, [completed, settings.weekStartsMonday])
+  }, [completed, active, settings.weekStartsMonday, now])
 
   // The rail's quick-punch shortcuts are the 3 most recently used jobs (by last
   // punch-in, de-duplicated, active only). A fresh account with no punches yet

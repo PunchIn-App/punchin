@@ -1,5 +1,23 @@
 import { render, screen, fireEvent, within } from '@testing-library/react'
-import { WeekdayPicker, PanelGroup, DangerZone } from './components'
+import { WeekdayPicker, PanelGroup, DangerZone, SettingsRow } from './components'
+
+const DummyIcon = () => <svg data-testid="icon" />
+
+describe('SettingsRow — info (ⓘ) disclosure', () => {
+  it('renders an ⓘ button when `info` is provided, revealing the detail only on demand', () => {
+    render(<SettingsRow icon={DummyIcon} title="Time format" subtitle="Clock times" info="The longer explanation" />)
+    const info = screen.getByRole('button', { name: /about time format/i })
+    expect(info).toBeInTheDocument()
+    expect(screen.queryByText('The longer explanation')).not.toBeInTheDocument() // off-caption until tapped
+    fireEvent.click(info)
+    expect(screen.getByText('The longer explanation')).toBeInTheDocument()
+  })
+
+  it('renders no ⓘ button when `info` is omitted', () => {
+    render(<SettingsRow icon={DummyIcon} title="Week starts Monday" subtitle="Off = Sunday" />)
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+})
 
 describe('WeekdayPicker — display order vs stored value', () => {
   it('rotates the display to Monday-first but stores ABSOLUTE weekday indices', () => {

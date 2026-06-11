@@ -94,11 +94,19 @@ export default function StartTimerModal({ onClose, initialJobId = null }) {
 
   // Listbox keyboard model (WAI-ARIA APG): on open, move focus INTO the listbox,
   // landing on the selected option (else the first). Roving tabindex + focus then
-  // follow activeJobIndex (set by the arrow/Home/End handler below).
+  // follow activeJobIndex (set by the arrow/Home/End handler below). Seed exactly
+  // once per open (guarded by jobSeededRef): `jobs` comes from useLiveQuery, so a
+  // background DB write (cloud sync, another tab) re-emits a fresh array while the
+  // menu is open — without the guard the index would reset and yank the keyboard
+  // user's roving focus mid-navigation. The guard still lets a not-yet-loaded
+  // jobs array seed once it arrives.
+  const jobSeededRef = useRef(false)
   useEffect(() => {
-    if (!jobMenuOpen || !jobs?.length) return
+    if (!jobMenuOpen) { jobSeededRef.current = false; return }
+    if (jobSeededRef.current || !jobs?.length) return
     const selIdx = jobs.findIndex(j => j.id === Number(jobId))
     setActiveJobIndex(selIdx >= 0 ? selIdx : 0)
+    jobSeededRef.current = true
   }, [jobMenuOpen, jobs, jobId])
 
   // Drive focus onto the active option whenever it changes while the menu is open.
