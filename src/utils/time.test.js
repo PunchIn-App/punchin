@@ -657,6 +657,28 @@ describe('billing is subset-stable & guards sub-minute mis-punches (issue #274 r
     expect(sumBilled([A1, A2], now, 30, 'up')).not.toBe(full.get(A1) + full.get(A2))
   })
 
+  it('splits a session across interleaved jobs by time WORKED, not punch order (per-rate fairness)', () => {
+    // A/B/A/B/A — five 9-min tasks in one continuous session (jobs 1 and 2), 15-min
+    // nearest. Session = 45m → 3 increments. They follow worked time (Job A worked
+    // 27m, Job B 18m), so neither job is zeroed — the review's cross-rate bug where
+    // cumulative-offset rounding billed Job A 45m and Job B 0m by punch order.
+    const at = (h, m) => new Date(2024, 0, 15, h, m)
+    const sess = [
+      { jobId: 1, punchIn: at(9, 0),  punchOut: at(9, 9)  },
+      { jobId: 2, punchIn: at(9, 9),  punchOut: at(9, 18) },
+      { jobId: 1, punchIn: at(9, 18), punchOut: at(9, 27) },
+      { jobId: 2, punchIn: at(9, 27), punchOut: at(9, 36) },
+      { jobId: 1, punchIn: at(9, 36), punchOut: at(9, 45) },
+    ]
+    const m = billedDurationMap(sess, now, 15, 'nearest')
+    const jobA = sess.filter(e => e.jobId === 1).reduce((s, e) => s + m.get(e), 0)
+    const jobB = sess.filter(e => e.jobId === 2).reduce((s, e) => s + m.get(e), 0)
+    expect(jobA + jobB).toBe(45 * 60_000)  // session total exact
+    expect(jobB).toBeGreaterThan(0)        // Job B is NOT zeroed out (the review bug)
+    expect(jobA).toBe(30 * 60_000)         // 27m worked → 2 of the 3 increments
+    expect(jobB).toBe(15 * 60_000)         // 18m worked → 1 increment
+  })
+
   it("'up' mode does not inflate an isolated sub-minute mis-punch to a full increment", () => {
     const blip = { id: 1, punchIn: new Date(2024, 0, 15, 11, 0, 0, 0), punchOut: new Date(2024, 0, 15, 11, 0, 20, 0) } // 20s
     expect(billedEntryDuration(blip, now, 15, 'up')).toBe(20_000) // raw ~0, not 15m

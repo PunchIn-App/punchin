@@ -8,7 +8,7 @@ import { useNowTicker } from '../hooks/useNowTicker'
 import {
   formatDuration, formatTime,
   getDayRange, getWeekRange, getWeekDays,
-  isEntryInRange, billedDurationMap, sumBilled,
+  isEntryInRange, billedDurationMap,
 } from '../utils/time'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
 import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'

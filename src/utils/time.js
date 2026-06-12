@@ -202,20 +202,24 @@ const SESSION_GAP_MS = 60_000
  * (each entry bills once, whole, on its start day — never split across the days
  * it spans, so day totals partition a week — issues #274/#136), then into
  * **continuous sessions**: a task joins the running session when it starts within
- * {@link SESSION_GAP_MS} of the session's end. Each session is billed by rounding
- * the **cumulative worked offset** at every task boundary and taking successive
- * differences. That gives three properties at once (the reopened #274 fix):
+ * {@link SESSION_GAP_MS} of the session's end. A session bills `roundOff(whole
+ * worked span)` total — i.e. a whole number of increments — handed out to its
+ * tasks in proportion to time WORKED (Hamilton's largest-remainder method). That
+ * gives four properties at once (the reopened #274 fix + its review):
  *
  *  1. The session total equals the rounded whole span — `round`/`ceil` of the
  *     continuous session, NOT of each piece. Per-task rounding made an N-task day
  *     drift by up to N increments (DOWN in 'nearest' → 9.00 h, UP in 'up' →
  *     9.75 h, for a real 9 h 8 m day); session rounding caps the error at one
  *     increment, so that day bills 9.25 h either way.
- *  2. The per-task rows telescope to exactly that total (no per-row vs total drift).
- *  3. Rounding happens in DURATION space (offsets from the session start), so the
- *     result is independent of where the session sits on the wall clock — the
- *     phase-independence that per-task duration rounding had and endpoint
- *     rounding (v0.30) lost.
+ *  2. The per-task rows are whole increments that sum to exactly that total (no
+ *     per-row vs total drift).
+ *  3. Allocation is by worked DURATION, not wall-clock position, so the result is
+ *     phase-independent — and two jobs at different rates interleaved in one
+ *     session are each billed ~the time they actually worked, not 0 vs the whole
+ *     session depending on punch order (the review's cross-rate-attribution bug).
+ *  4. An entry's billed time is intrinsic to its full-day session — see the
+ *     CONTRACT below.
  *
  * A RUNNING entry is billed live and UNrounded (it's still accruing, so rounding
  * would make it jump in steps — issue #265) and never joins a session. Rounding
@@ -281,17 +285,30 @@ export function billedDurationMap(entries, now = Date.now(), minutes, mode = 'ne
         // matching roundDurationMs's sub-minute guard (issues #208/#274).
         for (let k = i; k <= j; k++) out.set(dayEntries[k], getEntryDuration(dayEntries[k]))
       } else {
-        // Round the cumulative worked offset at each boundary; each task bills the
-        // difference of rounded offsets. The differences telescope to roundOff of
-        // the session's whole worked time (roundOff(0) === 0).
-        let cum = 0
-        let prevRounded = 0
+        // The session bills roundOff(sessionWorked) — i.e. `units` whole increments.
+        // Hand them to the tasks in proportion to time WORKED (Hamilton's
+        // largest-remainder): floor each task's ideal share, then give the leftover
+        // increments to the largest remainders (ties to the longer, then earlier,
+        // task). This keeps the session total exact and every row a clean increment,
+        // while a task's bill tracks the time it actually worked — so two jobs at
+        // different rates interleaved in one session are each billed ~what they did,
+        // not 0 vs the whole session by punch order (issue #274 review). For a
+        // single-rate or single-task session it reduces to the obvious split.
+        const units = Math.round(roundOff(sessionWorked) / inc)
+        const tasks = []
         for (let k = i; k <= j; k++) {
-          cum += getEntryDuration(dayEntries[k])
-          const rounded = roundOff(cum)
-          out.set(dayEntries[k], Math.max(0, rounded - prevRounded))
-          prevRounded = rounded
+          const w = getEntryDuration(dayEntries[k])
+          const ideal = (w / sessionWorked) * units
+          const base = Math.floor(ideal)
+          tasks.push({ entry: dayEntries[k], units: base, rem: ideal - base, w, order: k })
         }
+        let leftover = units - tasks.reduce((s, t) => s + t.units, 0)
+        for (const t of [...tasks].sort((a, b) => b.rem - a.rem || b.w - a.w || a.order - b.order)) {
+          if (leftover <= 0) break
+          t.units += 1
+          leftover -= 1
+        }
+        for (const t of tasks) out.set(t.entry, t.units * inc)
       }
       i = j + 1
     }
