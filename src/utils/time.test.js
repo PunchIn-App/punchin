@@ -679,6 +679,27 @@ describe('billing is subset-stable & guards sub-minute mis-punches (issue #274 r
     expect(jobB).toBe(15 * 60_000)         // 18m worked → 1 increment
   })
 
+  it('bills interleaved jobs at an EXACT split when their worked totals already align to the increment', () => {
+    // Two jobs interleaved; the session = 75m = exactly 5×15m, Job 0 worked 45m
+    // (3×15), Job 1 worked 30m (2×15). No rounding is actually needed, so neither
+    // job may have an increment shifted onto the other (the review's regression where
+    // per-task allocation billed 60/15 instead of 45/30).
+    const at = (h, m) => new Date(2024, 0, 15, h, m)
+    const day = [
+      { jobId: 0, laborTypeId: 1, punchIn: at(9, 0),  punchOut: at(9, 17) },  // 17
+      { jobId: 1, laborTypeId: 1, punchIn: at(9, 17), punchOut: at(9, 37) },  // 20
+      { jobId: 0, laborTypeId: 1, punchIn: at(9, 37), punchOut: at(9, 44) },  // 7
+      { jobId: 1, laborTypeId: 1, punchIn: at(9, 44), punchOut: at(9, 48) },  // 4
+      { jobId: 0, laborTypeId: 1, punchIn: at(9, 48), punchOut: at(10, 9) },  // 21
+      { jobId: 1, laborTypeId: 1, punchIn: at(10, 9), punchOut: at(10, 15) }, // 6
+    ]
+    const m = billedDurationMap(day, now, 15, 'up')
+    const j0 = day.filter(e => e.jobId === 0).reduce((s, e) => s + m.get(e), 0)
+    const j1 = day.filter(e => e.jobId === 1).reduce((s, e) => s + m.get(e), 0)
+    expect(j0).toBe(45 * 60_000) // exact, not 60
+    expect(j1).toBe(30 * 60_000) // exact, not 15
+  })
+
   it("'up' mode does not inflate an isolated sub-minute mis-punch to a full increment", () => {
     const blip = { id: 1, punchIn: new Date(2024, 0, 15, 11, 0, 0, 0), punchOut: new Date(2024, 0, 15, 11, 0, 20, 0) } // 20s
     expect(billedEntryDuration(blip, now, 15, 'up')).toBe(20_000) // raw ~0, not 15m
