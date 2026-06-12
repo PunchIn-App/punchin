@@ -219,7 +219,16 @@ const SESSION_GAP_MS = 60_000
  *
  * A RUNNING entry is billed live and UNrounded (it's still accruing, so rounding
  * would make it jump in steps — issue #265) and never joins a session. Rounding
- * off (`minutes` 0/undefined) bills raw worked durations.
+ * off (`minutes` 0/undefined), or a whole session under a minute, bills raw worked
+ * durations (so a stray sub-minute mis-punch isn't inflated to a full increment).
+ *
+ * **CONTRACT — pass the COMPLETE set of entries for the period (every job/labor
+ * type), then filter for display by looking up `billed.get(entry)`.** Because an
+ * entry's billed time depends on its session neighbours, computing this over a
+ * pre-filtered SUBSET (one job, one client) regroups the sessions and yields a
+ * different, scope-dependent number — so a single-job invoice would disagree with
+ * that job's contribution to the unfiltered timesheet. Build the map once over the
+ * full day/week, then sum/show whatever subset you need; never round a subset.
  * @param {Entry[]} entries @param {number} [now] @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {Map<Entry, number>} entry → billed ms
  */
 export function billedDurationMap(entries, now = Date.now(), minutes, mode = 'nearest') {
@@ -263,7 +272,13 @@ export function billedDurationMap(entries, now = Date.now(), minutes, mode = 'ne
         sessionEnd = Math.max(sessionEnd, new Date(dayEntries[j].punchOut).getTime())
       }
 
-      if (!minutes) {
+      let sessionWorked = 0
+      for (let k = i; k <= j; k++) sessionWorked += getEntryDuration(dayEntries[k])
+
+      if (!minutes || sessionWorked < 60_000) {
+        // Rounding off, or a whole session under a minute (e.g. a stray mis-punch):
+        // bill raw so a ~0-duration entry isn't inflated to a full increment —
+        // matching roundDurationMs's sub-minute guard (issues #208/#274).
         for (let k = i; k <= j; k++) out.set(dayEntries[k], getEntryDuration(dayEntries[k]))
       } else {
         // Round the cumulative worked offset at each boundary; each task bills the

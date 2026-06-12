@@ -633,3 +633,43 @@ describe('billing a continuous workday split into tasks (issue #274)', () => {
     expect(m.get(twoDays[1])).toBe(60 * 60_000)                       // 1h exact, alone
   })
 })
+
+// ---------------------------------------------------------------------------
+// Subset-stability & sub-minute guard (issue #274 review) — billing must be the
+// SAME number whatever subset is in scope, and a stray mis-punch must not inflate.
+// ---------------------------------------------------------------------------
+describe('billing is subset-stable & guards sub-minute mis-punches (issue #274 review)', () => {
+  const now = new Date(2024, 0, 15, 18, 0).getTime()
+  // Continuous day, two jobs interleaved: A 9:00–9:10, B 9:10–9:40, A 9:40–9:50.
+  const A1 = { id: 1, jobId: 1, punchIn: new Date(2024, 0, 15, 9, 0),  punchOut: new Date(2024, 0, 15, 9, 10) }
+  const B  = { id: 2, jobId: 2, punchIn: new Date(2024, 0, 15, 9, 10), punchOut: new Date(2024, 0, 15, 9, 40) }
+  const A2 = { id: 3, jobId: 1, punchIn: new Date(2024, 0, 15, 9, 40), punchOut: new Date(2024, 0, 15, 9, 50) }
+
+  it("a job's billed time is its share of the FULL-day session, not a rounding of its own subset", () => {
+    // 30-min increment, round up. Day session = 50m worked → ceil 60m, allocated
+    // A1=30m, B=30m, A2=0m. Job A's contribution = 30m.
+    const full = billedDurationMap([A1, B, A2], now, 30, 'up')
+    expect(full.get(A1) + full.get(A2)).toBe(30 * 60_000)
+    // The regressed behaviour rounded only Job A's subset [A1,A2] — two 10m tasks
+    // 30m apart → two sessions → 30m+30m = 60m. This is exactly why a consumer must
+    // pass the WHOLE day to billedDurationMap and attribute, never round a subset.
+    expect(sumBilled([A1, A2], now, 30, 'up')).toBe(60 * 60_000)
+    expect(sumBilled([A1, A2], now, 30, 'up')).not.toBe(full.get(A1) + full.get(A2))
+  })
+
+  it("'up' mode does not inflate an isolated sub-minute mis-punch to a full increment", () => {
+    const blip = { id: 1, punchIn: new Date(2024, 0, 15, 11, 0, 0, 0), punchOut: new Date(2024, 0, 15, 11, 0, 20, 0) } // 20s
+    expect(billedEntryDuration(blip, now, 15, 'up')).toBe(20_000) // raw ~0, not 15m
+    expect(billedEntryDuration(blip, now, 30, 'up')).toBe(20_000)
+  })
+
+  it('a sub-minute blip BETWEEN real tasks does not add a whole increment to the session', () => {
+    // 9:00–9:30 (30m), 9:30:00–9:30:20 (20s blip), 9:30:20–9:50:20 (20m). 15m 'up'.
+    // worked = 30m + 20s + 20m = 50m20s → ceil to the ¼h = 60m. Per-task 'up' would
+    // have over-billed (30+15+30 = 75m); the session caps it.
+    const t1   = { punchIn: new Date(2024, 0, 15, 9, 0),         punchOut: new Date(2024, 0, 15, 9, 30) }
+    const blip = { punchIn: new Date(2024, 0, 15, 9, 30, 0, 0),  punchOut: new Date(2024, 0, 15, 9, 30, 20, 0) }
+    const t2   = { punchIn: new Date(2024, 0, 15, 9, 30, 20, 0), punchOut: new Date(2024, 0, 15, 9, 50, 20, 0) }
+    expect(sumBilled([t1, blip, t2], now, 15, 'up')).toBe(60 * 60_000)
+  })
+})

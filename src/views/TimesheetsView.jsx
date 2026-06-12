@@ -76,18 +76,19 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
   const hasRunning = (filteredEntries ?? []).some(e => !e.punchOut)
   const now = useNowTicker(hasRunning, 1000)
 
-  // One billing pass over the day's entries: back-to-back tasks round as one
-  // continuous session, so the per-row hours read from this map sum exactly to
-  // the Total (issue #274).
+  // One billing pass over the WHOLE day (every job/type, unfiltered) so each
+  // entry's billed time is intrinsic — a search/job/labor filter changes which
+  // rows show, never how many minutes an entry bills (issue #274 review). The
+  // Total then sums only the visible rows.
   const billed = useMemo(
-    () => billedDurationMap(filteredEntries ?? [], now, rm, mode),
-    [filteredEntries, now, rm, mode],
+    () => billedDurationMap(entries ?? [], now, rm, mode),
+    [entries, now, rm, mode],
   )
 
   if (!filteredEntries) return null
 
   let dayTotal = 0
-  for (const ms of billed.values()) dayTotal += ms
+  for (const e of filteredEntries) dayTotal += billed.get(e) ?? 0
 
   return (
     <div className="space-y-3">
@@ -209,13 +210,15 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const hasRunning = (allEntries ?? []).some(e => !e.punchOut)
   const now = useNowTicker(hasRunning, 1000)
 
-  // One billing pass over the week. The map buckets by punchIn day internally and
-  // rounds back-to-back tasks as one continuous session (#274), so the week total,
-  // the per-job breakdown, the per-day totals, and the per-row hours are all read
-  // from it and can't disagree — running timers included live (#265).
+  // One billing pass over the WHOLE week (every job/type, unfiltered) — the map
+  // buckets by punchIn day and rounds back-to-back tasks as one continuous session
+  // (#274). Billing is intrinsic to each entry, so a filter changes which rows show
+  // but never an entry's minutes (issue #274 review); the week total, per-job
+  // breakdown, per-day totals, and per-row hours are all read from it and can't
+  // disagree — running timers included live (#265).
   const billed = useMemo(
-    () => billedDurationMap(filteredEntries ?? [], now, rm, mode),
-    [filteredEntries, now, rm, mode],
+    () => billedDurationMap(allEntries ?? [], now, rm, mode),
+    [allEntries, now, rm, mode],
   )
 
   // Week total + per-job breakdown (#138), summed from the billed map.
