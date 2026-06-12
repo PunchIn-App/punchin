@@ -44,8 +44,14 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
           </div>
           <ChevronDown className="w-4 h-4 text-appTextMuted flex-shrink-0 -rotate-90" aria-hidden="true" />
         </button>
+        {/* The two feedback links deliberately keep their opener (no
+            'noopener'): the target is our own worker, and an opener is one of
+            the two conditions under which browsers permit the form's "Close
+            this window" button to window.close() the tab — Firefox honours
+            only this one (punchin-feedback#6). Third-party links elsewhere
+            keep 'noopener,noreferrer'. */}
         <button
-          onClick={() => window.open(buildFeedbackBugUrl(__APP_VERSION__, isStandalone, os, settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
+          onClick={() => window.open(buildFeedbackBugUrl(__APP_VERSION__, isStandalone, os, settings.theme, settings.accentColor), '_blank')}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
           <div className="flex items-center gap-3 min-w-0">
             <Bug className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
@@ -57,7 +63,7 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
           <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
         </button>
         <button
-          onClick={() => window.open(buildFeedbackFeatureUrl(settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
+          onClick={() => window.open(buildFeedbackFeatureUrl(settings.theme, settings.accentColor), '_blank')}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
           <div className="flex items-center gap-3 min-w-0">
             <Lightbulb className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />

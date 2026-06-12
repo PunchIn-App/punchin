@@ -619,10 +619,11 @@ describe('SettingsView — About', () => {
     render(<SettingsView />)
     expand('About')
     fireEvent.click(screen.getByText('Help improve PunchIn'))
+    // No 'noopener': the worker is first-party, and the opener is what lets
+    // the form's Close button window.close() the tab (punchin-feedback#6).
     expect(openSpy).toHaveBeenCalledWith(
       expect.stringContaining('feedback.trackmytime.today/feature'),
       '_blank',
-      'noopener,noreferrer',
     )
     openSpy.mockRestore()
   })
