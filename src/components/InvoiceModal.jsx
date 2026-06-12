@@ -9,7 +9,7 @@ import {
 import { db } from '../db'
 import EntitySelect from './EntitySelect'
 import DatePicker from './pickers/DatePicker'
-import { getEntryDuration, roundDurationMs, formatTime, entryOverlapsRange } from '../utils/time'
+import { billedDurationMap, formatTime, entryOverlapsRange } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, escHtml } from '../utils/printDocument'
 import { LaborTag } from './LaborGlyph'
@@ -89,18 +89,29 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   const selClient = isClientSel ? selectedJobId.slice('client:'.length) : null
   const jobMap = useMemo(() => new Map((jobs ?? []).map(j => [j.id, j])), [jobs])
 
-  const allEntries = useLiveQuery(async () => {
-    if (!start || !end || !selectedJobId) return []
-    const inRange = await db.entries
+  // Every completed entry in the period (ALL jobs) — the session CONTEXT, so an
+  // entry bills the same minutes here as on the timesheet no matter which job or
+  // client is invoiced (issue #274 review: round the full day, then attribute the
+  // scope; never round a pre-filtered subset). selectedJobId/jobs stay in the deps
+  // so the result refreshes when the selection changes.
+  const periodEntries = useLiveQuery(async () => {
+    if (!start || !end) return []
+    return db.entries
       .filter(e => {
         const d = new Date(e.punchIn)
         return d >= start && d <= end && !!e.punchOut
       })
       .toArray()
-    return isClientSel
-      ? inRange.filter(e => jobMap.get(e.jobId)?.clientName === selClient)
-      : inRange.filter(e => e.jobId === Number(selectedJobId))
   }, [start?.getTime(), end?.getTime(), selectedJobId, jobs])
+
+  // The subset actually billed on this invoice: one job, or all of a client's jobs.
+  const scopedEntries = useMemo(() => {
+    if (periodEntries === undefined) return undefined
+    if (!selectedJobId) return []
+    return isClientSel
+      ? periodEntries.filter(e => jobMap.get(e.jobId)?.clientName === selClient)
+      : periodEntries.filter(e => e.jobId === Number(selectedJobId))
+  }, [periodEntries, selectedJobId, isClientSel, selClient, jobMap])
 
   // A running timer is only relevant to THIS invoice if it's for the invoiced
   // job/client and overlaps the period — then the (completed-only) invoice omits
@@ -125,19 +136,22 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
   const previewSub = isClientSel ? 'All jobs' : (job?.clientName || null) // in-modal preview header subtitle
 
   const lineItems = useMemo(() => {
-    if (!allEntries?.length) return []
-    // Bill each entry's rounded DURATION per policy (issues #208/#274). Per-line
-    // rounding keeps the per-job/per-rate amounts correct (hours × that job's rate)
-    // and the line hours sum to the invoice total; the shown Start/End stay actual.
-    return allEntries.map(entry => {
+    if (!scopedEntries?.length || !periodEntries) return []
+    // Bill over the FULL period (all jobs) so an entry's hours match the timesheet
+    // for the same job/period, then keep only the invoiced scope (issue #274). The
+    // shown Start/End stay actual; each line still bills at its OWN job's rate (a
+    // client invoice spans several jobs). scopedEntries are the SAME objects as in
+    // periodEntries, so the `billed` map (keyed by object) resolves them.
+    const billed = billedDurationMap(periodEntries, Date.now(), settings.roundingMinutes, settings.roundingMode)
+    return scopedEntries.map(entry => {
       const eJob = jobMap.get(entry.jobId)   // the entry's OWN job — a client invoice spans several, each at its own rate
       const lt = laborTypes?.find(l => l.id === entry.laborTypeId)
-      const hours = roundDurationMs(getEntryDuration(entry), settings.roundingMinutes, settings.roundingMode) / 3600000
+      const hours = (billed.get(entry) ?? 0) / 3600000
       const rate  = (eJob?.laborRates?.[entry.laborTypeId]) ?? null
       const amount = rate != null ? hours * rate : null
       return { entry, job: eJob, lt, hours, rate, amount }
     }).sort((a, b) => new Date(a.entry.punchIn) - new Date(b.entry.punchIn))
-  }, [allEntries, jobMap, laborTypes, settings.roundingMinutes, settings.roundingMode])
+  }, [periodEntries, scopedEntries, jobMap, laborTypes, settings.roundingMinutes, settings.roundingMode])
 
   const totalHours  = lineItems.reduce((s, li) => s + li.hours, 0)
   const totalAmount = lineItems.every(li => li.amount != null)
@@ -435,7 +449,7 @@ ${totalAmount != null ? `<div class="paperfoot">
           )}
 
           {/* Line items table */}
-          {selectedJobId && allEntries !== undefined && (
+          {selectedJobId && scopedEntries !== undefined && (
             <div>
               {runningAffectsInvoice && (
                 <p role="note" className="mb-3 rounded-lg border border-appBorder bg-appInput/40 px-3 py-2 text-xs text-appTextMuted">

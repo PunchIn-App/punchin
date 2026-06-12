@@ -6,9 +6,9 @@ import { db, deleteEntry } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { useNowTicker } from '../hooks/useNowTicker'
 import {
-  formatDuration, formatTime, roundDurationMs,
+  formatDuration, formatTime,
   getDayRange, getWeekRange, getWeekDays,
-  isEntryInRange, billedEntryDuration, sumBilled,
+  isEntryInRange, billedDurationMap,
 } from '../utils/time'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
 import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
@@ -76,7 +76,19 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
   const hasRunning = (filteredEntries ?? []).some(e => !e.punchOut)
   const now = useNowTicker(hasRunning, 1000)
 
+  // One billing pass over the WHOLE day (every job/type, unfiltered) so each
+  // entry's billed time is intrinsic — a search/job/labor filter changes which
+  // rows show, never how many minutes an entry bills (issue #274 review). The
+  // Total then sums only the visible rows.
+  const billed = useMemo(
+    () => billedDurationMap(entries ?? [], now, rm, mode),
+    [entries, now, rm, mode],
+  )
+
   if (!filteredEntries) return null
+
+  let dayTotal = 0
+  for (const e of filteredEntries) dayTotal += billed.get(e) ?? 0
 
   return (
     <div className="space-y-3">
@@ -87,7 +99,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
           change, which announces more reliably than a node that mounts/unmounts. */}
       <div role="status" aria-live="polite" className="rounded-xl bg-appCard border border-appBorder px-4 py-3 flex items-center justify-between shadow-sm">
         <span className="text-sm text-appTextMuted">Total</span>
-        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(sumBilled(filteredEntries, now, rm, mode), decimal)}</span>
+        <span className="font-mono font-semibold text-appText text-lg">{formatDuration(dayTotal, decimal)}</span>
         <span className="sr-only">{filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} this day</span>
       </div>
 
@@ -100,9 +112,9 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
         filteredEntries.map(entry => {
           const job = getJob(entry.jobId)
           const lt  = getLT(entry.laborTypeId)
-          // Billed duration: the entry's full time rounded per policy (#274), so the
-          // cards sum to the day Total; a running row grows live via `now` (#265).
-          const dur = billedEntryDuration(entry, now, rm, mode)
+          // Billed duration from the session-aware map, so the cards sum to the day
+          // Total (#274); a running row grows live via `now` (#265).
+          const dur = billed.get(entry) ?? 0
           // Leading dot is the JOB's own colour (its identity cue), falling back to
           // its labor type's colour — distinct from the LaborTag's labor colour.
           const jobColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
@@ -198,20 +210,29 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   const hasRunning = (allEntries ?? []).some(e => !e.punchOut)
   const now = useNowTicker(hasRunning, 1000)
 
-  // Week total + per-job breakdown (#138). Each entry's billed duration is rounded
-  // per policy (#274); running timers included live (#265). Per-job rounding keeps
-  // per-rate sums correct.
+  // One billing pass over the WHOLE week (every job/type, unfiltered) — the map
+  // buckets by punchIn day and rounds back-to-back tasks as one continuous session
+  // (#274). Billing is intrinsic to each entry, so a filter changes which rows show
+  // but never an entry's minutes (issue #274 review); the week total, per-job
+  // breakdown, per-day totals, and per-row hours are all read from it and can't
+  // disagree — running timers included live (#265).
+  const billed = useMemo(
+    () => billedDurationMap(allEntries ?? [], now, rm, mode),
+    [allEntries, now, rm, mode],
+  )
+
+  // Week total + per-job breakdown (#138), summed from the billed map.
   const { total, jobTotals } = useMemo(() => {
     if (!filteredEntries) return { total: 0, jobTotals: {} }
-    return {
-      total: sumBilled(filteredEntries, now, rm, mode),
-      jobTotals: filteredEntries.reduce((acc, e) => {
-        const ms = billedEntryDuration(e, now, rm, mode) // whole entry, incl. running (#265)
-        if (ms > 0) acc[e.jobId] = (acc[e.jobId] || 0) + ms
-        return acc
-      }, {}),
+    let total = 0
+    const jobTotals = {}
+    for (const e of filteredEntries) {
+      const ms = billed.get(e) ?? 0
+      total += ms
+      if (ms > 0) jobTotals[e.jobId] = (jobTotals[e.jobId] || 0) + ms
     }
-  }, [filteredEntries, start.getTime(), end.getTime(), now, rm, mode]) // eslint-disable-line react-hooks/exhaustive-deps
+    return { total, jobTotals }
+  }, [filteredEntries, billed]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bucket entries into the seven days by punchIn — each entry lands in exactly
   // one day, so the day totals partition the week and sum to the week total
@@ -222,10 +243,10 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
       const ds = new Date(day); ds.setHours(0,0,0,0)
       const de = new Date(day); de.setHours(23,59,59,999)
       const dayEntries = filteredEntries.filter(e => isEntryInRange(e, ds, de))
-      const dayTotal = sumBilled(dayEntries, now, rm, mode)
+      const dayTotal = dayEntries.reduce((s, e) => s + (billed.get(e) ?? 0), 0)
       return { day, ds, de, dayEntries, dayTotal }
     })
-  }, [filteredEntries, start.getTime(), now, rm, mode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filteredEntries, start.getTime(), billed]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!filteredEntries) return null
 
@@ -321,7 +342,7 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
                         <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="font-mono text-appTextMuted">{formatDuration(billedEntryDuration(e, now, rm, mode), decimal)}</span>
+                        <span className="font-mono text-appTextMuted">{formatDuration(billed.get(e) ?? 0, decimal)}</span>
                         <div className="flex items-center gap-1">
                           <button onClick={() => onEdit(e)} aria-label={`Edit entry for ${job?.name || 'job'}`} className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded hover:bg-appInput text-appTextMuted hover:text-appAccent transition-colors">
                             <Pencil className="w-3 h-3" aria-hidden="true" />
@@ -429,13 +450,16 @@ export default function TimesheetsView() {
     }
 
     const entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
+    // Session-aware billing (issue #274): back-to-back tasks round as one
+    // continuous session, so the exported hours reconcile exactly with the screen.
+    const billed = billedDurationMap(entries.filter(e => !!e.punchOut), Date.now(), rm, mode)
     const rows = [['Date', 'Job', 'Client', 'Labor Type', 'Start', 'End', 'Duration (h)', 'Notes']]
     for (const e of entries) {
       if (!e.punchOut) continue
       const job = jobs?.find(j => j.id === e.jobId)
       const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
-      // Bill the rounded DURATION (issues #208/#274); Start/End stay the actual times.
-      const dur = roundDurationMs(new Date(e.punchOut) - new Date(e.punchIn), rm, mode) / 3600000
+      // Billed duration from the session map; Start/End stay the actual times.
+      const dur = (billed.get(e) ?? 0) / 3600000
       rows.push([
         format(new Date(e.punchIn), 'yyyy-MM-dd'),
         job?.name || '',
@@ -467,11 +491,13 @@ export default function TimesheetsView() {
       titleStr = `Week of ${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
     }
 
-    // Each entry's billed DURATION is rounded per policy (issues #208/#274); the
-    // printed Start/End stay the actual times and the per-row hours sum to the total.
+    // Session-aware billing (issue #274): back-to-back tasks round as one
+    // continuous session, so the printed per-row hours sum to the total and match
+    // the screen; the printed Start/End stay the actual times.
     const entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
     const completed = entries.filter(e => !!e.punchOut)
-    const totalMs = completed.reduce((s, e) => s + roundDurationMs(new Date(e.punchOut) - new Date(e.punchIn), rm, mode), 0)
+    const billed = billedDurationMap(completed, Date.now(), rm, mode)
+    const totalMs = completed.reduce((s, e) => s + (billed.get(e) ?? 0), 0)
     const totalHrs = (totalMs / 3600000).toFixed(2)
 
     const rows = completed
@@ -479,7 +505,7 @@ export default function TimesheetsView() {
       .map(e => {
         const job = jobs?.find(j => j.id === e.jobId)
         const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
-        const hrs = (roundDurationMs(new Date(e.punchOut) - new Date(e.punchIn), rm, mode) / 3600000).toFixed(2)
+        const hrs = ((billed.get(e) ?? 0) / 3600000).toFixed(2)
         return `<tr>
           <td>${format(new Date(e.punchIn), 'EEE, MMM d')}</td>
           <td>${job?.name || '—'}${job?.clientName ? `<br><span class="sub">${job.clientName}</span>` : ''}</td>
