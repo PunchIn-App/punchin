@@ -200,6 +200,8 @@ describe('buildFeedbackBugUrl', () => {
     expect(p.get('os')).toBe('Windows 10 / 11')
     expect(p.get('device')).toMatch(/^Desktop \(\d+×\d+\)$/)
     expect(p.get('template')).toBeNull() // not a GitHub issue form
+    // from=app only in standalone (the in-app-overlay case); here isStandalone=true
+    expect(p.get('from')).toBe('app') // overlay-safe exits on the worker (punchin-feedback#6)
   })
 
   it('carries theme + accent when provided', () => {
@@ -215,14 +217,28 @@ describe('buildFeedbackBugUrl', () => {
     expect(p.get('theme')).toBeNull()
     expect(p.get('accent')).toBeNull()
   })
+
+  it('does NOT mark from=app in a plain browser tab (not standalone)', () => {
+    setUA('Mozilla/5.0')
+    // A browser tab isn't stranded in an overlay, so it gets the worker's normal
+    // back link — and the app keeps noopener,noreferrer with no opener exposure.
+    expect(params(buildFeedbackBugUrl('0.21.0', false, 'web')).get('from')).toBeNull()
+    expect(params(buildFeedbackBugUrl('0.21.0', true, 'web')).get('from')).toBe('app')
+  })
 })
 
 describe('buildFeedbackFeatureUrl', () => {
-  it('points to the feedback feature form (no prefill)', () => {
+  it('points to the feedback feature form (no prefill, no app marker in a browser tab)', () => {
+    expect(buildFeedbackFeatureUrl(false)).toBe('https://feedback.trackmytime.today/feature')
     expect(buildFeedbackFeatureUrl()).toBe('https://feedback.trackmytime.today/feature')
   })
 
+  it('marks from=app only when standalone (the in-app-overlay case)', () => {
+    expect(buildFeedbackFeatureUrl(true)).toBe('https://feedback.trackmytime.today/feature?from=app')
+  })
+
   it('carries theme + accent when provided', () => {
-    expect(buildFeedbackFeatureUrl('light', '#abc')).toBe('https://feedback.trackmytime.today/feature?theme=light&accent=%23abc')
+    expect(buildFeedbackFeatureUrl(false, 'light', '#abc')).toBe('https://feedback.trackmytime.today/feature?theme=light&accent=%23abc')
+    expect(buildFeedbackFeatureUrl(true, 'light', '#abc')).toBe('https://feedback.trackmytime.today/feature?theme=light&accent=%23abc&from=app')
   })
 })

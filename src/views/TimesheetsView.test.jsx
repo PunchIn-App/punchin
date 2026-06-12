@@ -305,15 +305,16 @@ describe('TimesheetsView — daily Total correctness', () => {
     }
   })
 
-  it('counts the in-day portion of an entry that began the night before (#136)', () => {
-    // Yesterday 23:00 → today 01:00: only the 00:00–01:00 hour belongs to today.
-    // The old punchIn-only filter dropped this entry from today entirely.
-    const yStart = new Date(TODAY); yStart.setDate(yStart.getDate() - 1); yStart.setHours(23, 0, 0, 0)
-    const tEnd   = new Date(TODAY); tEnd.setHours(1, 0, 0, 0)
-    const overnight = { id: 10, jobId: 1, laborTypeId: 1, punchIn: yStart, punchOut: tEnd, notes: null }
+  it('bills a cross-midnight entry wholly on its punch-in day (#274)', () => {
+    // Punch-in today 22:30 → out tomorrow 00:30 = 2h. The whole entry bills on the
+    // day it started — never split across days — so the on-screen total matches what
+    // the CSV/print/invoice exports bill for it (they key on punchIn the same way).
+    const tStart = new Date(TODAY); tStart.setHours(22, 30, 0, 0)
+    const tEnd   = new Date(TODAY); tEnd.setDate(tEnd.getDate() + 1); tEnd.setHours(0, 30, 0, 0)
+    const overnight = { id: 10, jobId: 1, laborTypeId: 1, punchIn: tStart, punchOut: tEnd, notes: null }
     setupWithEntries([overnight])
     render(<TimesheetsView />)
-    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent(/^1h$/)
+    expect(screen.getByText('Total').nextElementSibling).toHaveTextContent(/^2h$/)
   })
 })
 

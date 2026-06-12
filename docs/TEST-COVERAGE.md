@@ -58,7 +58,7 @@
 | `src/views/AnalyticsView.test.jsx` | Loading state, period toggle, summary cards, empty state, charts |
 | `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
 | `src/views/SettingsView.test.jsx` | Drill-in root list + sub-pages, device-Back/Settings-tab-reselect returns to root, Data & Sync consolidation, toggles, theme, export/import, sync UI, danger zone, About rows (help-improve, License modal, Support link) |
-| `src/utils/issueUrl.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` + `buildFeedbackBugUrl` + `buildFeedbackFeatureUrl` (template/scope/URL) — browser/OS/device/install-type detection |
+| `src/utils/issueUrl.test.js` | `buildBugReportUrl` + `buildFeatureRequestUrl` + `buildFeedbackBugUrl` + `buildFeedbackFeatureUrl` (template/scope/URL, `from=app` context marker) — browser/OS/device/install-type detection |
 | `src/utils/backup.test.js` | `exportBackup` JSON shape (version + 3 tables); `exportCsv` header + skips running entries |
 | `src/hooks/usePwaUpdate.test.js` | Initial state from window flag, `pwa:update-ready` event, on-mount `reg.waiting` re-surface (#57), apply-when-available, no-registration "latest" path |
 | `src/views/SettingsView.syncUnconfigured.test.jsx` | Sync section with empty client IDs: friendly "not set up" message, no env-var jargon, no provider buttons (issue #59) |

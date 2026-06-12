@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.30.0
+**Version:** 0.31.0
 
 ---
 
@@ -159,7 +159,7 @@ All three data tables also carry a `uuid` (stable cross-device identifier) and a
 
 - **Active timer:** `punchOut = null`
 - **Completed entry:** `punchOut = <Date>`
-- **Live on-screen totals include the running timer.** TimerView tiles, Timesheets totals, and Analytics totals/charts count an active entry's accrued time, valued to a ticking `now` via `useNowTicker` (issue #265). **Exports stay completed-only** — CSV/Print/`InvoiceModal` filter to completed entries (`!!e.punchOut`), so they never bill a moving value; the UI shows a notice when a running timer in scope makes the export total less than the screen. (This intentionally relaxes the old #137 "totals match exports" invariant for live on-screen totals only.)
+- **Live on-screen totals include the running timer.** TimerView tiles, Timesheets totals, and Analytics totals/charts count an active entry's accrued time, valued to a ticking `now` via `useNowTicker` (issue #265). **Exports stay completed-only** — CSV/Print/`InvoiceModal` filter to completed entries (`!!e.punchOut`), so they never bill a moving value; the UI shows a notice when a running timer in scope makes the export total less than the screen. (This intentionally relaxes the old #137 "totals match exports" invariant for the *running timer* only.) For **completed** entries the Timesheets totals now reconcile exactly with the exports: both bill each entry's whole rounded duration, attributed by `punchIn` (see Timesheets billing below), so the numbers can't drift.
 
 ### Soft-Delete / Archive Pattern
 
@@ -314,8 +314,7 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `formatDurationHM(ms)` → `"Xh Ym"` for summaries
 - `formatDecimalHours(ms)` → `"1.50 h"` decimal-hours string for billing display (issue #208)
 - `formatDuration(ms, decimal)` → decimal hours when `decimal` is set, else `"Xh Ym"` (issue #208)
-- `roundEntry(entry, roundingMinutes)` → single-entry copy with punchIn floored / punchOut ceiled to the increment ("in the user's favour"); no-op when off, still running, or under a minute (a "0m" entry must not inflate to a full increment, e.g. 0.25 h) (issue #208)
-- `roundEntriesContiguous(entries, roundingMinutes)` → `Map<id, roundedEntry>` of the rounded entries, treating **back-to-back** entries (`punchOut === next punchIn`) as one continuous session: floor the run's first punchIn / ceil its last punchOut, round each internal shared boundary to NEAREST once. So a task switch isn't billed on both sides and inflated (issue #274). Compute it over the **unfiltered** window; callers look up `map.get(e.id) ?? e`. Isolated entries match `roundEntry`
+- `roundDurationMs(ms, minutes, mode?)` → a worked **duration** (ms) rounded to a billing increment of `minutes`; `mode` is `'nearest'` (default — standard round-to-nearest) or `'up'` (round each task up, so a short task is never lost). No-op when `minutes` is 0/undefined or the duration is under a minute (a "0m" entry must not inflate to a full increment). Rounding the **duration** (not start/end times) means two independent entries can never double-count a shared task-switch boundary, and per-entry rounded hours stay correct when each task bills at its own rate (issues #208/#274 — replaces the old endpoint-rounding `roundEntry`/`roundEntriesContiguous`)
 - `getEntryDuration(entry)` → milliseconds (handles active entries via `Date.now()`)
 - `getEntryDurationInRange(entry, start, end, now?)` → ms of the entry clipped to `[start,end]`; a running entry is valued to `now` (default `Date.now()` — pass a ticking value for a live total, issue #265)
 - `formatTime(date)` → `"h:mm a"` time-only string (date-fns)
@@ -325,13 +324,14 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `isEntryInRange(entry, start, end)` → boolean
 - `sumDurations(entries)` → total ms (all entries)
 - `sumDurationsInRange(entries, start, end)` → completed-only total clipped to the window (the completed-only base; the #137 export semantics — exports currently filter completed inline rather than calling this)
-- `sumDurationsInRangeLive(entries, start, end, now?)` → like the above but **includes** running timers valued to `now`, for live on-screen totals (issue #265)
+- `billedEntryDuration(entry, now?, minutes?, mode?)` → an entry's **billed** ms, window-independent: a completed entry's **full** duration rounded per the policy (`minutes` + `mode`, via `roundDurationMs`); a running entry returned live and **unrounded** so an accruing timer doesn't jump in steps (issues #274/#265). Attribution to a day/week is by `punchIn` (caller filters with `isEntryInRange`), so an entry bills **once, whole, on its start day** — never split across days — which makes on-screen totals reconcile exactly with the CSV/print/invoice exports
+- `sumBilled(entries, now?, minutes?, mode?)` → live on-screen billable total: the sum of `billedEntryDuration` over `entries` already filtered to a window by punchIn. Per-entry rounding (not a rounded total) keeps per-rate sums correct and makes rows sum exactly to the total (issues #274/#265)
 
 ---
 
 ## Known Issues & Pitfalls
 
-- **No cross-day filtering:** `isEntryInRange` checks `punchIn` only. An entry that starts before midnight and ends after midnight will appear on the start day but not the end day in timesheets. Acceptable for now but worth revisiting if users report missing time.
+- **Timesheets bill by punch-in day (#274).** `isEntryInRange` checks `punchIn` only, and the Timesheets sheets, CSV/print, and invoice all attribute each entry **wholly to the day it started** — an entry that crosses midnight bills its full (rounded) duration on its start day, not split across the two days it spans. This is intentional: it's the only model where per-task rounding (which isn't additive across a split) keeps the day rows, the week total, and the exports all reconciling. AnalyticsView/TimerView still clip a long entry across the days it covers via `getEntryDurationInRange` (those are unrounded time-distribution views, not billing).
 
 - **iOS haptic polyfill requires user gesture context:** The WebKit `<input switch>` approach fires the Taptic Engine reliably when invoked in direct response to a touch event (swipe release). It will silently no-op if called outside a user-gesture context (e.g., from a `setTimeout`). Keep haptic calls synchronous within gesture handlers.
 

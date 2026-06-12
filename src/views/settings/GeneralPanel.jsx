@@ -9,10 +9,13 @@ const TIME_FORMAT_OPTIONS = [
   { value: '12h', label: '12-hour' },
   { value: '24h', label: '24-hour' },
 ]
+// One control encoding the increment + direction. 'off', else '<mode>-<minutes>'.
 const ROUNDING_OPTIONS = [
-  { value: 0, label: 'Off' },
-  { value: 15, label: '¼ hour' },
-  { value: 30, label: '½ hour' },
+  { value: 'off',        label: 'Off' },
+  { value: 'nearest-15', label: 'Nearest ¼ hour' },
+  { value: 'nearest-30', label: 'Nearest ½ hour' },
+  { value: 'up-15',      label: 'Round up ¼ hour' },
+  { value: 'up-30',      label: 'Round up ½ hour' },
 ]
 
 export default function GeneralPanel({ onBack }) {
@@ -84,15 +87,20 @@ export default function GeneralPanel({ onBack }) {
         <SettingsRow
           icon={Hourglass}
           title="Round billed time"
-          subtitle="Round billed time in your favour"
-          info="Start times round down and end times round up to the chosen increment. Back-to-back tasks round as one continuous session, so a task switch isn't billed on both sides."
+          subtitle="Round each task's billed time"
+          info="Rounds each task's logged time in timesheets and invoices. 'Nearest' is the standard round-to-the-nearest-increment; 'Round up' rounds each task up so short tasks are never lost. Each task rounds on its own, so a task switch is never double-billed and per-rate amounts stay correct."
           right={
-            <div className="w-44 flex-shrink-0">
+            <div className="w-48 flex-shrink-0">
               <EntitySelect
                 compact plain hideLabel
-                label="Round billed time to the nearest"
-                value={settings.roundingMinutes ?? 0}
-                onChange={v => updateSetting('roundingMinutes', Number(v))}
+                label="Round billed time"
+                value={settings.roundingMinutes ? `${settings.roundingMode}-${settings.roundingMinutes}` : 'off'}
+                onChange={v => {
+                  if (v === 'off') { updateSetting('roundingMinutes', 0); return }
+                  const [m, mins] = v.split('-')
+                  updateSetting('roundingMinutes', Number(mins))
+                  updateSetting('roundingMode', m)
+                }}
                 options={ROUNDING_OPTIONS}
               />
             </div>

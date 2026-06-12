@@ -12,7 +12,8 @@
 | `accentColor` | hex string | `"#2D5BF5"` (PunchIn Blue; light theme renders the default as the darker `#2348DB`) |
 | `hapticFeedback` | boolean | `true` — vibration on navigation/punch actions; toggle shown only on phones |
 | `decimalHours` | boolean | `false` — show timesheet durations as decimal hours (`1.50 h`) instead of `1h 30m` (issue #208) |
-| `roundingMinutes` | number (`0` \| `15` \| `30`) | `0` — round each billable entry in the user's favour (start floored, end ceiled) for timesheets & invoices; `0` = off (issue #208) |
+| `roundingMinutes` | number (`0` \| `15` \| `30`) | `0` — round each task's billed **duration** to this increment for timesheets & invoices; `0` = off. Per-task duration rounding (not endpoint rounding) so a task switch is never double-billed and per-rate amounts stay correct (issues #208/#274) |
+| `roundingMode` | `"nearest"` \| `"up"` | `"nearest"` — how `roundingMinutes` rounds each task: `nearest` is standard round-to-nearest; `up` rounds each task up so short tasks are never lost. The General-panel control encodes both keys as one `"<mode>-<minutes>"` selection (issue #274) |
 | `timeFormat` | `"auto"` \| `"12h"` \| `"24h"` | `"auto"` follows the device locale's 12/24h convention (resolved via `Intl` `hourCycle`; on Android Chrome this also picks up the OS 24-hour toggle via a `-u-hc-` locale extension, but iOS Safari doesn't expose that toggle to the web — pick `12h`/`24h` to force it). Clock-time rendering in timers, timesheets & invoices (`formatTime(date, fmt)`) |
 | `defaultCurrency` | ISO 4217 string | `"USD"` — formats invoice/CSV amounts via `Intl.NumberFormat` (`utils/format.js`) |
 | `billingName` | string | `""` — Billing profile: your name (the invoice "Billed from" identity) |

@@ -187,12 +187,15 @@ export const DEFAULT_SETTINGS = {
   theme: 'auto',
   accentColor: '#2D5BF5',
   hapticFeedback: true,
-  // Time display & billing (issue #208). decimalHours shows durations as decimal
-  // hours ("1.50 h") instead of "1h 30m" in timesheets. roundingMinutes rounds
-  // each billable entry in the user's favour (start down, end up) for timesheets
-  // and invoices: 0 = off, 15 = nearest quarter hour, 30 = nearest half hour.
+  // Time display & billing (issues #208/#274). decimalHours shows durations as
+  // decimal hours ("1.50 h") instead of "1h 30m". roundingMinutes rounds each
+  // entry's billed DURATION for timesheets and invoices (0 = off, 15 = quarter
+  // hour, 30 = half hour); roundingMode is 'nearest' (standard) or 'up' (round
+  // each task up, so a short task is never lost). Per-task rounding keeps per-rate
+  // sums correct and never double-bills a task switch.
   decimalHours: false,
   roundingMinutes: 0,
+  roundingMode: 'nearest',
   // Time display + invoice formatting. timeFormat drives clock-time rendering
   // (in-app default is 12h); defaultCurrency is an ISO 4217 code formatted via
   // Intl.NumberFormat in invoices/CSV.

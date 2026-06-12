@@ -94,19 +94,31 @@ export function useSwipeDismiss(onClose, hapticTrigger) {
 // Android hardware back-button dismiss. Pushes a history entry on open and pops
 // it on close so the back gesture dismisses the sheet; fires hapticTrigger when
 // the popstate is caught so the dismiss is felt even before the thumb lifts.
+//
+// The push/pop is a MOUNT/UNMOUNT concern, so the effect runs once (empty deps)
+// and reads the latest onClose/hapticTrigger through refs. If it instead
+// re-subscribed whenever those callbacks changed identity (e.g. a parent that
+// re-renders every second behind the open sheet, like TimerView's live #265
+// ticker, passing an unmemoised onClose), the cleanup's `history.back()` — which
+// fires `popstate` ASYNCHRONOUSLY — would land on the freshly-reattached listener
+// and dismiss the sheet on its own a beat after opening (issue #276).
 export function useAndroidBackDismiss(onClose, hapticTrigger) {
+  const onCloseRef = useRef(onClose)
+  const hapticRef = useRef(hapticTrigger)
+  onCloseRef.current = onClose
+  hapticRef.current = hapticTrigger
   useEffect(() => {
     history.pushState({ modal: true }, '')
     const handler = () => {
-      hapticTrigger()
-      onClose()
+      hapticRef.current?.()
+      onCloseRef.current?.()
     }
     window.addEventListener('popstate', handler)
     return () => {
       window.removeEventListener('popstate', handler)
       if (history.state?.modal) history.back()
     }
-  }, [onClose, hapticTrigger])
+  }, [])
 }
 
 // Platform-aware scrim / sheet classes + the drag handle element.

@@ -24,10 +24,10 @@ describe('db — schema', () => {
 })
 
 describe('db — populate seed', () => {
-  it('seeds exactly the DEFAULT_SETTINGS keys (43, incl. the sync + billing keys) on fresh install', async () => {
+  it('seeds exactly the DEFAULT_SETTINGS keys (44, incl. the sync + billing keys) on fresh install', async () => {
     const all = await db.settings.toArray()
     expect(all).toHaveLength(Object.keys(DEFAULT_SETTINGS).length)
-    expect(all).toHaveLength(43)
+    expect(all).toHaveLength(44)
     // Single source of truth (issue #131): the seeded rows match DEFAULT_SETTINGS exactly.
     const seeded = Object.fromEntries(all.map(({ key, value }) => [key, value]))
     expect(seeded).toEqual(DEFAULT_SETTINGS)

@@ -100,12 +100,28 @@ function withTheme(params, theme, accent) {
 // Self-hosted feedback forms (no GitHub account required). The bug form gets the
 // same prefilled environment metadata as the GitHub form; the feature form
 // carries no environment fields. Both also carry the app's theme + accent.
+//
+// `from=app` is added ONLY when the app is an installed PWA (display-mode
+// standalone) — the in-app browser overlay context (Android Custom Tab / iOS
+// in-app Safari) navigation can't escape, where the worker must drop its
+// escape-to-root links and offer an overlay-safe close. A plain browser tab
+// isn't stranded (its normal "← PunchIn" link works), so it doesn't get the
+// marker. The worker's overlay close uses a fetch-submitted, single-history-entry
+// window.close() (plus a native-✕ hint where the platform blocks it), so it needs
+// NO window.opener — which is why these links keep noopener,noreferrer in the app
+// (no reverse-tabnabbing surface, no Referer leak). (#277, punchin-feedback#6)
+function withAppContext(params, isStandalone) {
+  if (isStandalone) params.set('from', 'app')
+  return params
+}
+
 export function buildFeedbackBugUrl(appVersion, isStandalone, os, theme, accent) {
-  const params = withTheme(new URLSearchParams(bugMetadata(appVersion, isStandalone, os)), theme, accent)
+  const params = withAppContext(withTheme(new URLSearchParams(bugMetadata(appVersion, isStandalone, os)), theme, accent), isStandalone)
   return `${FEEDBACK_BASE}/bug?${params.toString()}`
 }
 
-export function buildFeedbackFeatureUrl(theme, accent) {
-  const qs = withTheme(new URLSearchParams(), theme, accent).toString()
+export function buildFeedbackFeatureUrl(isStandalone, theme, accent) {
+  const params = withAppContext(withTheme(new URLSearchParams(), theme, accent), isStandalone)
+  const qs = params.toString()
   return qs ? `${FEEDBACK_BASE}/feature?${qs}` : `${FEEDBACK_BASE}/feature`
 }

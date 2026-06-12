@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { useSwipeDismiss } from './useBottomSheet'
+import { useState } from 'react'
+import { useSwipeDismiss, useAndroidBackDismiss } from './useBottomSheet'
 
 // Tiny harness: a sheet whose ref comes from useSwipeDismiss, containing a plain
 // body region and a scrollable list (overflow-y-auto). We drive the gesture with
@@ -127,5 +128,46 @@ describe('useSwipeDismiss', () => {
     fireEvent.touchEnd(body, touch(150)) // +50px < 80px
 
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('useAndroidBackDismiss', () => {
+  // The hook lives in a child that wraps the onClose prop in a FRESH closure each
+  // render — exactly the unmemoised-handler shape that caused #276 (TimerView's
+  // per-second #265 ticker re-renders behind the open sheet, handing it a new
+  // onClose every tick). The button bumps local state to force those re-renders.
+  function Parent({ onClose, haptic = () => {} }) {
+    const [n, setN] = useState(0)
+    useAndroidBackDismiss(() => onClose(), haptic)
+    return <button onClick={() => setN(v => v + 1)}>bump {n}</button>
+  }
+
+  it('does not re-subscribe or self-dismiss when the parent re-renders with a new onClose (#276)', () => {
+    const onClose = vi.fn()
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    render(<Parent onClose={onClose} />)
+    const popListeners = () => addSpy.mock.calls.filter(c => c[0] === 'popstate').length
+    expect(popListeners()).toBe(1)
+
+    fireEvent.click(screen.getByRole('button')) // re-render with a fresh onClose closure
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(popListeners()).toBe(1)        // still one listener — the effect didn't re-run
+    expect(onClose).not.toHaveBeenCalled() // and the sheet never dismissed itself
+    addSpy.mockRestore()
+  })
+
+  it('calls the latest onClose + haptic on a real back-gesture popstate', () => {
+    const close1 = vi.fn()
+    const haptic = vi.fn()
+    const { rerender } = render(<Parent onClose={close1} haptic={haptic} />)
+
+    const close2 = vi.fn()
+    rerender(<Parent onClose={close2} haptic={haptic} />)
+    fireEvent(window, new PopStateEvent('popstate', { state: { modal: true } }))
+
+    expect(close2).toHaveBeenCalledTimes(1) // latest handler, via the ref
+    expect(close1).not.toHaveBeenCalled()
+    expect(haptic).toHaveBeenCalledTimes(1)
   })
 })

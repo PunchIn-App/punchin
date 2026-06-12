@@ -44,6 +44,13 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
           </div>
           <ChevronDown className="w-4 h-4 text-appTextMuted flex-shrink-0 -rotate-90" aria-hidden="true" />
         </button>
+        {/* The feedback links keep noopener,noreferrer like every external link.
+            The worker's overlay close (its "Close this window" button) works via a
+            fetch-submitted single-history-entry window.close() plus a native-✕
+            hint, so it never needs window.opener — there's no reverse-tabnabbing
+            surface to accept here. buildFeedback*Url marks the links from=app only
+            when standalone (the in-app-overlay case), so the worker shows that
+            overlay-safe exit instead of an escape-to-root link (#277). */}
         <button
           onClick={() => window.open(buildFeedbackBugUrl(__APP_VERSION__, isStandalone, os, settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
@@ -57,7 +64,7 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
           <ExternalLink className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
         </button>
         <button
-          onClick={() => window.open(buildFeedbackFeatureUrl(settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
+          onClick={() => window.open(buildFeedbackFeatureUrl(isStandalone, settings.theme, settings.accentColor), '_blank', 'noopener,noreferrer')}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-appInput transition-colors text-left">
           <div className="flex items-center gap-3 min-w-0">
             <Lightbulb className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />

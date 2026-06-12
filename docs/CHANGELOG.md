@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.31.0] — 2026-06-11
+
+### Changed
+- **Round billed time — rebuilt as per-task duration rounding (#274).** "Round billed time" now rounds each task's logged **duration** on its own, and the control offers two modes: **Nearest** (the new default — standard round-to-the-nearest ¼ or ½ hour) and **Round up** (rounds each task up so short, real-world minutes are never dropped to zero). This replaces the previous endpoint "in your favour" rounding, whose continuous-session detection relied on tasks being bit-exact back-to-back and so misfired on a normal hard cut between timers — inflating a short task's neighbours or leaving totals that didn't reconcile. Because each task rounds independently, a task switch is never double-billed, per-row hours sum exactly to the day/week total, and per-rate invoice amounts stay correct. Existing installs keep their current increment and default to **Nearest**; pick **Round up** in Settings → General if you'd rather never lose a short task.
+- **Timesheets reconcile with exports for overnight shifts.** A time entry that crosses midnight is now billed wholly on the day it started — its full (rounded) duration counts on its start day rather than being split across the two days it spans. This makes the daily total, the weekly total, and the CSV / print / invoice exports all agree on the same number for that entry (previously the weekly view's total and its per-day rows could disagree by a rounding increment).
+
+### Fixed
+- **Feedback forms no longer strand you in the in-app browser (#277).** On an installed PWA the "Send feedback" links open in an in-app browser overlay; the form's "Done"/back links used to load a second copy of the app inside that overlay instead of returning you to PunchIn. When installed, the app now marks those links as app-opened (`from=app`) so the feedback worker shows an overlay-safe "close this window to get back to PunchIn" exit; in a normal browser tab the links are left alone (the regular back link works there). The links keep their full `noopener,noreferrer` isolation — the worker's close never needs a window handle back to the app.
+- **Android — the Start Timer sheet no longer dismisses itself (#276).** On an installed Android PWA with a timer already running, the punch-in sheet would close on its own a second or two after opening, making it impossible to start (or switch) a timer. The live "stats while running" ticker (v0.30.0) was re-rendering the screen behind the open sheet, which made its back-button handler re-arm each second and trip its own dismiss. The sheet now sets up its back-button handling once, so it stays open until you act on it.
+- **Settings → Reminders — removed the duplicate ⓘ.** The Reminders row's info (ⓘ) popover repeated the permanent "checked on your device while PunchIn is open" notice already shown beneath it, so it's been dropped — the standing notice is the single source of that explanation.
+
+---
+
 ## [0.30.0] — 2026-06-11
 
 ### Added
