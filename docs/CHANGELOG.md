@@ -12,6 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Timesheets reconcile with exports for overnight shifts.** A time entry that crosses midnight is now billed wholly on the day it started — its full (rounded) duration counts on its start day rather than being split across the two days it spans. This makes the daily total, the weekly total, and the CSV / print / invoice exports all agree on the same number for that entry (previously the weekly view's total and its per-day rows could disagree by a rounding increment).
 
 ### Fixed
+- **Android — the Start Timer sheet no longer dismisses itself (#276).** On an installed Android PWA with a timer already running, the punch-in sheet would close on its own a second or two after opening, making it impossible to start (or switch) a timer. The live "stats while running" ticker (v0.30.0) was re-rendering the screen behind the open sheet, which made its back-button handler re-arm each second and trip its own dismiss. The sheet now sets up its back-button handling once, so it stays open until you act on it.
 - **Settings → Reminders — removed the duplicate ⓘ.** The Reminders row's info (ⓘ) popover repeated the permanent "checked on your device while PunchIn is open" notice already shown beneath it, so it's been dropped — the standing notice is the single source of that explanation.
 
 ---

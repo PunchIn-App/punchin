@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Play } from 'lucide-react'
 import { db } from '../db'
@@ -86,7 +86,10 @@ export default function TimerView() {
   // chosen, so the user picks the labor type before punching in.
   const handleQuickPunch = (job) => setQuickJobId(job.id)
 
-  const closeModal = () => { setShowModal(false); setQuickJobId(null) }
+  // Stable identity: the live #265 ticker re-renders this view every second while
+  // a timer runs, and the open Start Timer sheet subscribes to onClose — an
+  // unmemoised handler would re-subscribe its listeners each tick (issue #276).
+  const closeModal = useCallback(() => { setShowModal(false); setQuickJobId(null) }, [])
 
   return (
     <div className="h-full flex flex-col xl:flex-row">
