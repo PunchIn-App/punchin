@@ -182,31 +182,129 @@ export function sumDurationsInRange(entries, start, end) {
 }
 
 /**
- * An entry's BILLED duration (ms), independent of any window: a COMPLETED entry's
- * FULL duration rounded per the billing policy (`minutes` increment + `mode`,
- * issue #274); a RUNNING entry's live elapsed time, UNrounded (it's still
- * accruing, so rounding it would make it jump in steps — issue #265).
- *
- * Attribution to a day/week is by `punchIn` (the caller filters with
- * {@link isEntryInRange}), so an entry bills ONCE, whole, on the day it started —
- * it is never split across the days it spans. That makes on-screen day/week
- * totals reconcile exactly with the CSV / print / invoice exports, which bill the
- * same way (whole rounded duration, keyed on punchIn). A daily timesheet rounding
- * each task on its own also keeps per-job/per-rate amounts correct.
- * @param {Entry} entry @param {number} [now] @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
+ * Sub-minute hand-off gap (ms) below which two adjacent tasks count as ONE
+ * continuous session. `startTimer` punches the running task out and the new one
+ * in on two separate `new Date()` calls, leaving a few-hundred-ms gap (a manual
+ * re-punch, a few seconds) — well under a minute, which the billing increment
+ * already treats as noise. A gap of a minute or more is a real break, so it
+ * starts a fresh session. (This tolerance is why the reopened-#274 fix works
+ * where v0.30's bit-exact contiguity test silently failed on the punch jitter.)
  */
-export function billedEntryDuration(entry, now = Date.now(), minutes, mode) {
-  if (!entry.punchOut) return Math.max(0, now - new Date(entry.punchIn).getTime())
-  return roundDurationMs(getEntryDuration(entry), minutes, mode)
+const SESSION_GAP_MS = 60_000
+
+/**
+ * BILLED duration (ms) for every entry in `entries`, keyed by the entry object.
+ * This is the single source of truth for billing — the daily/weekly totals, the
+ * per-row hours, and the CSV / print / invoice exports all read from this map, so
+ * they can never disagree.
+ *
+ * Completed entries are grouped by the local calendar day of their `punchIn`
+ * (each entry bills once, whole, on its start day — never split across the days
+ * it spans, so day totals partition a week — issues #274/#136), then into
+ * **continuous sessions**: a task joins the running session when it starts within
+ * {@link SESSION_GAP_MS} of the session's end. Each session is billed by rounding
+ * the **cumulative worked offset** at every task boundary and taking successive
+ * differences. That gives three properties at once (the reopened #274 fix):
+ *
+ *  1. The session total equals the rounded whole span — `round`/`ceil` of the
+ *     continuous session, NOT of each piece. Per-task rounding made an N-task day
+ *     drift by up to N increments (DOWN in 'nearest' → 9.00 h, UP in 'up' →
+ *     9.75 h, for a real 9 h 8 m day); session rounding caps the error at one
+ *     increment, so that day bills 9.25 h either way.
+ *  2. The per-task rows telescope to exactly that total (no per-row vs total drift).
+ *  3. Rounding happens in DURATION space (offsets from the session start), so the
+ *     result is independent of where the session sits on the wall clock — the
+ *     phase-independence that per-task duration rounding had and endpoint
+ *     rounding (v0.30) lost.
+ *
+ * A RUNNING entry is billed live and UNrounded (it's still accruing, so rounding
+ * would make it jump in steps — issue #265) and never joins a session. Rounding
+ * off (`minutes` 0/undefined) bills raw worked durations.
+ * @param {Entry[]} entries @param {number} [now] @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {Map<Entry, number>} entry → billed ms
+ */
+export function billedDurationMap(entries, now = Date.now(), minutes, mode = 'nearest') {
+  const out = new Map()
+  if (!entries?.length) return out
+
+  // Running entries bill live + unrounded (#265); completed ones go into sessions.
+  const completed = []
+  for (const e of entries) {
+    if (e.punchOut) completed.push(e)
+    else out.set(e, Math.max(0, now - new Date(e.punchIn).getTime()))
+  }
+
+  // Bucket completed entries by the local calendar day of punchIn.
+  const byDay = new Map()
+  for (const e of completed) {
+    const d = new Date(e.punchIn)
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+    const bucket = byDay.get(key)
+    if (bucket) bucket.push(e)
+    else byDay.set(key, [e])
+  }
+
+  const inc = minutes * 60_000
+  const roundOff = ms => (mode === 'up' ? Math.ceil(ms / inc) : Math.round(ms / inc)) * inc
+
+  for (const dayEntries of byDay.values()) {
+    dayEntries.sort((a, b) =>
+      new Date(a.punchIn) - new Date(b.punchIn) || new Date(a.punchOut) - new Date(b.punchOut))
+
+    let i = 0
+    while (i < dayEntries.length) {
+      // Grow the session while the next task starts within the hand-off gap.
+      let j = i
+      let sessionEnd = new Date(dayEntries[i].punchOut).getTime()
+      while (
+        j + 1 < dayEntries.length &&
+        new Date(dayEntries[j + 1].punchIn).getTime() - sessionEnd < SESSION_GAP_MS
+      ) {
+        j++
+        sessionEnd = Math.max(sessionEnd, new Date(dayEntries[j].punchOut).getTime())
+      }
+
+      if (!minutes) {
+        for (let k = i; k <= j; k++) out.set(dayEntries[k], getEntryDuration(dayEntries[k]))
+      } else {
+        // Round the cumulative worked offset at each boundary; each task bills the
+        // difference of rounded offsets. The differences telescope to roundOff of
+        // the session's whole worked time (roundOff(0) === 0).
+        let cum = 0
+        let prevRounded = 0
+        for (let k = i; k <= j; k++) {
+          cum += getEntryDuration(dayEntries[k])
+          const rounded = roundOff(cum)
+          out.set(dayEntries[k], Math.max(0, rounded - prevRounded))
+          prevRounded = rounded
+        }
+      }
+      i = j + 1
+    }
+  }
+
+  return out
 }
 
 /**
- * Billable on-screen total: the sum of {@link billedEntryDuration} over `entries`
- * already filtered to a window by punchIn. Per-entry rounding (not a rounded
- * total) keeps per-job/per-rate sums correct, and the rows sum exactly to this
- * (issues #274/#265).
+ * An entry's BILLED duration (ms) treated as its own session — a COMPLETED entry's
+ * full duration rounded per policy, a RUNNING entry's live unrounded time (#265).
+ * Convenience wrapper over {@link billedDurationMap}; callers that render or total
+ * a *set* of entries must use the map directly so back-to-back tasks round as one
+ * continuous session (issue #274) instead of each in isolation.
+ * @param {Entry} entry @param {number} [now] @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
+ */
+export function billedEntryDuration(entry, now = Date.now(), minutes, mode) {
+  return billedDurationMap([entry], now, minutes, mode).get(entry) ?? 0
+}
+
+/**
+ * Billable total (ms) for `entries` already filtered to a window by punchIn — the
+ * sum of {@link billedDurationMap}, so back-to-back tasks bill as one continuous
+ * session and the rows sum exactly to this total (issues #274/#265).
  * @param {Entry[]} entries @param {number} [now] @param {number} [minutes] @param {'nearest'|'up'} [mode] @returns {number} milliseconds
  */
 export function sumBilled(entries, now = Date.now(), minutes, mode) {
-  return entries.reduce((acc, e) => acc + billedEntryDuration(e, now, minutes, mode), 0)
+  let total = 0
+  for (const ms of billedDurationMap(entries, now, minutes, mode).values()) total += ms
+  return total
 }

@@ -5,6 +5,7 @@ import {
   formatDuration,
   roundDurationMs,
   billedEntryDuration,
+  billedDurationMap,
   sumBilled,
   getEntryDuration,
   formatTime,
@@ -574,36 +575,61 @@ describe('roundDurationMs', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Continuous-workday billing (issue #274) — duration rounding doesn't double-bill
-// a task switch and is robust to the millisecond punch gap startTimer leaves.
+// Continuous-workday billing (issue #274, reopened) — back-to-back tasks round as
+// ONE continuous session, so an N-task day bills the rounded WHOLE span (capping
+// the error at a single increment) instead of drifting by up to N increments. The
+// hand-offs carry the few-ms gap startTimer leaves; the session tolerance bridges
+// it where v0.30's bit-exact contiguity test silently failed.
 // ---------------------------------------------------------------------------
 describe('billing a continuous workday split into tasks (issue #274)', () => {
   const now   = new Date(2024, 0, 15, 18, 0).getTime()
-  // 8:00→17:08 split Admin/Install/Travel/Admin. The hand-offs carry a few-ms gap
-  // (as real punches do) — bit-exact contiguity would NOT hold; duration rounding
-  // doesn't care.
+  // 8:00→17:08 = 9h 8m of real work (9.13 h) split Admin/Install/Travel/Admin,
+  // with a few-hundred-ms gap at each hand-off (as real punches have).
   const day = [
     { id: 1, jobId: 1, punchIn: new Date(2024, 0, 15, 8, 0, 0, 0),    punchOut: new Date(2024, 0, 15, 9, 32, 0, 0) },
     { id: 2, jobId: 2, punchIn: new Date(2024, 0, 15, 9, 32, 0, 250), punchOut: new Date(2024, 0, 15, 10, 6, 0, 0) },
     { id: 3, jobId: 3, punchIn: new Date(2024, 0, 15, 10, 6, 0, 400), punchOut: new Date(2024, 0, 15, 10, 27, 0, 0) },
     { id: 4, jobId: 1, punchIn: new Date(2024, 0, 15, 10, 27, 0, 600), punchOut: new Date(2024, 0, 15, 17, 8, 0, 0) },
   ]
-  const h = (e, mode) => billedEntryDuration(e, now, 15, mode) / 3_600_000
+  const hrs = (map, e) => (map.get(e) ?? 0) / 3_600_000
 
-  it('nearest: rounds each task independently — no inflation from the switches', () => {
-    expect(h(day[0], 'nearest')).toBeCloseTo(1.5, 5)   // 92m → 90m (was 1.75 under the old bug)
-    expect(h(day[1], 'nearest')).toBeCloseTo(0.5, 5)   // ~34m → 30m
-    expect(h(day[2], 'nearest')).toBeCloseTo(0.25, 5)  // ~21m → 15m
-    expect(h(day[3], 'nearest')).toBeCloseTo(6.75, 5)  // ~401m → 405m
-    expect(sumBilled(day, now, 15, 'nearest') / 3_600_000).toBeCloseTo(9.0, 5) // was 10.0
+  it('nearest: the whole 9h08m session rounds to 9.25 h, not 9.00 (the per-task drift)', () => {
+    const m = billedDurationMap(day, now, 15, 'nearest')
+    expect(hrs(m, day[0])).toBeCloseTo(1.5, 5)
+    expect(hrs(m, day[1])).toBeCloseTo(0.5, 5)
+    expect(hrs(m, day[2])).toBeCloseTo(0.5, 5)   // the Travel task is no longer rounded away in isolation
+    expect(hrs(m, day[3])).toBeCloseTo(6.75, 5)
+    expect(sumBilled(day, now, 15, 'nearest') / 3_600_000).toBeCloseTo(9.25, 5)
   })
 
-  it('round up: each task rounds up so nothing short is lost', () => {
-    expect(sumBilled(day, now, 15, 'up') / 3_600_000).toBeCloseTo(9.75, 5)
+  it("round up: the session rounds UP once to 9.25 h, not 9.75 (4× per-task padding)", () => {
+    expect(sumBilled(day, now, 15, 'up') / 3_600_000).toBeCloseTo(9.25, 5)
   })
 
-  it('rows sum exactly to the total (no per-entry vs total drift)', () => {
-    const rows = day.reduce((s, e) => s + billedEntryDuration(e, now, 15, 'nearest'), 0)
+  it('rows sum exactly to the total (telescoping — no per-row vs total drift)', () => {
+    const m = billedDurationMap(day, now, 15, 'nearest')
+    const rows = day.reduce((s, e) => s + m.get(e), 0)
     expect(rows).toBe(sumBilled(day, now, 15, 'nearest'))
+  })
+
+  it('a real break (gap ≥ 1 min) starts a fresh session, rounded on its own', () => {
+    // Two 8-minute tasks an hour apart: NOT one session, so each rounds alone.
+    // 8m → 15m nearest, twice = 30m total (not merged to one 16m → 15m session).
+    const split = [
+      { id: 1, punchIn: new Date(2024, 0, 15, 9, 0),  punchOut: new Date(2024, 0, 15, 9, 8) },
+      { id: 2, punchIn: new Date(2024, 0, 15, 10, 0), punchOut: new Date(2024, 0, 15, 10, 8) },
+    ]
+    expect(sumBilled(split, now, 15, 'nearest')).toBe(30 * 60_000)
+  })
+
+  it('attributes each session to its own punchIn day (no cross-day merge)', () => {
+    // Same clock-adjacent times but on different days never form one session.
+    const twoDays = [
+      { id: 1, punchIn: new Date(2024, 0, 15, 16, 0), punchOut: new Date(2024, 0, 15, 17, 8) },
+      { id: 2, punchIn: new Date(2024, 0, 16,  8, 0), punchOut: new Date(2024, 0, 16,  9, 0) },
+    ]
+    const m = billedDurationMap(twoDays, now, 15, 'nearest')
+    expect(m.get(twoDays[0])).toBe(roundDurationMs(68 * 60_000, 15)) // 1h08m → 1h15m, alone
+    expect(m.get(twoDays[1])).toBe(60 * 60_000)                       // 1h exact, alone
   })
 })

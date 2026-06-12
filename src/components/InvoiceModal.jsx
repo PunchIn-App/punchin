@@ -9,7 +9,7 @@ import {
 import { db } from '../db'
 import EntitySelect from './EntitySelect'
 import DatePicker from './pickers/DatePicker'
-import { getEntryDuration, roundDurationMs, formatTime, entryOverlapsRange } from '../utils/time'
+import { billedDurationMap, formatTime, entryOverlapsRange } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, escHtml } from '../utils/printDocument'
 import { LaborTag } from './LaborGlyph'
@@ -126,13 +126,15 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
 
   const lineItems = useMemo(() => {
     if (!allEntries?.length) return []
-    // Bill each entry's rounded DURATION per policy (issues #208/#274). Per-line
-    // rounding keeps the per-job/per-rate amounts correct (hours × that job's rate)
-    // and the line hours sum to the invoice total; the shown Start/End stay actual.
+    // Session-aware billing (issue #274): back-to-back tasks within the invoice
+    // scope round as one continuous session, so the line hours sum to the invoice
+    // total and match the timesheet; the shown Start/End stay actual. Each line
+    // still bills at its OWN job's rate (a client invoice spans several jobs).
+    const billed = billedDurationMap(allEntries, Date.now(), settings.roundingMinutes, settings.roundingMode)
     return allEntries.map(entry => {
       const eJob = jobMap.get(entry.jobId)   // the entry's OWN job — a client invoice spans several, each at its own rate
       const lt = laborTypes?.find(l => l.id === entry.laborTypeId)
-      const hours = roundDurationMs(getEntryDuration(entry), settings.roundingMinutes, settings.roundingMode) / 3600000
+      const hours = (billed.get(entry) ?? 0) / 3600000
       const rate  = (eJob?.laborRates?.[entry.laborTypeId]) ?? null
       const amount = rate != null ? hours * rate : null
       return { entry, job: eJob, lt, hours, rate, amount }

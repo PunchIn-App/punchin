@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.31.1] — 2026-06-12
+
+### Fixed
+- **Rounding — a continuous workday split into tasks now bills the right total (#274, reopened).** With "Round billed time" on, back-to-back tasks are again rounded as **one continuous session** instead of each task on its own. Per-task rounding (v0.31.0) made the error grow with the number of tasks: a real 9 h 08 m day rounded to **9.00 h** on *Nearest* (15 minutes lost) and **9.75 h** on *Round up* (padded four times, once per task) — when the correct quarter-hour answer is **9.25 h** either way. The fix rounds the session's whole worked span once and allocates it across the tasks so the per-row hours still sum exactly to the total, and the day/week totals, CSV, print, and invoices all agree. A gap of a minute or more between tasks starts a fresh session; the sub-minute hand-off gap left between switched timers no longer breaks session detection (the flaw behind both the v0.30.0 over-billing and the v0.31.0 under-billing). Existing installs keep their current increment and mode.
+
+---
+
 ## [0.31.0] — 2026-06-11
 
 ### Changed
