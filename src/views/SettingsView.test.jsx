@@ -619,6 +619,9 @@ describe('SettingsView — About', () => {
     render(<SettingsView />)
     expand('About')
     fireEvent.click(screen.getByText('Help improve PunchIn'))
+    // Keeps noopener,noreferrer like every external link — the worker's overlay
+    // close never needs window.opener, so there's no reverse-tabnabbing surface
+    // (#277). Not standalone in jsdom, so no from=app marker either.
     expect(openSpy).toHaveBeenCalledWith(
       expect.stringContaining('feedback.trackmytime.today/feature'),
       '_blank',
