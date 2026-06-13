@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.31.2] — 2026-06-12
+
+### Added
+- **Link-share preview card (Open Graph).** Sharing `trackmytime.today` now shows a rich preview — the PunchIn mark, the "Precision time tracking for freelancers" tagline, and a shot of the live timer screen — on Slack, iMessage, Facebook, X, LinkedIn, and anywhere else that reads Open Graph / Twitter Card tags. Previously a shared link rendered as a bare URL with no image or description.
+
+---
+
 ## [0.31.1] — 2026-06-12
 
 ### Fixed
