@@ -30,6 +30,7 @@ The script downloads the Noto variable fonts on first run (cached under the
 font dir) and shells out to `sharp` via Node for the PNG rasterization.
 """
 
+import base64
 import os
 import subprocess
 import sys
@@ -103,7 +104,7 @@ def ensure_fonts():
     return paths
 
 
-def text_to_paths(font_path, text, font_size, weight, cx, baseline, letter_spacing=0.0, tint=None):
+def text_to_paths(font_path, text, font_size, weight, cx, baseline, letter_spacing=0.0, tint=None, anchor="middle"):
     """Return an SVG <g> of outlined glyphs, centered horizontally on cx,
     sitting on the given baseline (SVG y-down coordinates). `tint`, if given, is
     a (set_of_char_indices, color) pair that fills those glyphs in `color`
@@ -134,7 +135,10 @@ def text_to_paths(font_path, text, font_size, weight, cx, baseline, letter_spaci
             glyph_paths.append(f'<path transform="translate({pen_x:.2f},0)" d="{d}"{fill_attr}/>')
         pen_x += hmtx[gname][0] + ls_fu
     total_fu = pen_x - ls_fu  # drop trailing letter-spacing
-    origin_x = cx - (total_fu * scale) / 2
+    if anchor == "start":
+        origin_x = cx                                  # cx is the left edge
+    else:
+        origin_x = cx - (total_fu * scale) / 2         # cx is the center
     # scale(scale,-scale) flips the font's y-up outlines into SVG's y-down space.
     return (
         f'<g transform="translate({origin_x:.2f},{baseline}) scale({scale:.5f},{-scale:.5f})">'
@@ -172,7 +176,50 @@ def build_svg(fonts, wordmark_fill, glow_opacity):
 '''
 
 
-def rasterize_png(svg_path, png_path):
+def build_web_card(fonts, shot_b64):
+    """The web Open Graph card (1200x630): brand lockup + tagline on the left,
+    the real dark phone timer screenshot bleeding off the right edge."""
+    # Phone screenshot rect: left edge at 768 (right third of the 1200 canvas),
+    # 34px top inset, 360 wide, 644 tall — intentionally 14px taller than the 630
+    # canvas so it bleeds off the bottom, lifted/sized so the first active timer
+    # (running time + earnings) sits fully in frame. rx = rounded-corner radius.
+    px, py, pw, ph, rx = 768, 34, 360, 644, 34
+
+    tile_x, tile_y, tile_side = 72, 56, 60
+    wordmark = text_to_paths(
+        fonts["display"], "PunchIn", 40, 700,
+        tile_x + tile_side + 22, 100, letter_spacing=-1, tint=({5}, ACCENT), anchor="start",
+    )
+    head1 = text_to_paths(fonts["display"], "Precision time tracking", 56, 700, 72, 255, anchor="start")
+    head2 = text_to_paths(fonts["display"], "for freelancers", 56, 700, 72, 320, anchor="start")
+    subline = text_to_paths(fonts["sans"], "Free · offline · no account", 26, 400, 72, 388, anchor="start")
+    url = text_to_paths(fonts["sans"], "trackmytime.today", 26, 600, 72, 432, anchor="start")
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="glow" cx="78%" cy="50%" r="45%">
+      <stop offset="0%" stop-color="{ACCENT}" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="{ACCENT}" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="phoneClip"><rect x="{px}" y="{py}" width="{pw}" height="{ph}" rx="{rx}" ry="{rx}"/></clipPath>
+  </defs>
+  <rect width="1200" height="630" fill="{DARK}"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <image xlink:href="data:image/png;base64,{shot_b64}" x="{px}" y="{py}" width="{pw}" height="{ph}"
+         preserveAspectRatio="xMidYMin slice" clip-path="url(#phoneClip)"/>
+  <rect x="{px}" y="{py}" width="{pw}" height="{ph}" rx="{rx}" ry="{rx}" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
+  <rect x="{tile_x}" y="{tile_y}" width="{tile_side}" height="{tile_side}" rx="14" fill="{ACCENT}"/>
+  {stopwatch_group(tile_x, tile_y, tile_side, readable_ink(ACCENT))}
+  <g fill="{WORDMARK_DARK_BG}">{wordmark}</g>
+  <g fill="#FFFFFF">{head1}{head2}</g>
+  <g fill="{MUTED}">{subline}</g>
+  <g fill="{ACCENT}">{url}</g>
+  <rect x="0" y="626" width="1200" height="4" fill="{ACCENT}" opacity="0.65"/>
+</svg>
+'''
+
+
+def rasterize_png(svg_path, png_path, width=1280, height=640):
     """Flatten the (transparent) dark SVG onto the brand navy and write a PNG
     via Node + sharp — the same rasterizer scripts/icons.mjs uses."""
     node_script = f'''
@@ -180,7 +227,7 @@ const sharp = require('sharp');
 const fs = require('fs');
 const svg = fs.readFileSync({svg_path!r});
 sharp(svg, {{ density: 144 }})
-  .resize(1280, 640)
+  .resize({width}, {height})
   .flatten({{ background: '{DARK}' }})
   .png()
   .toFile({png_path!r})
@@ -204,6 +251,23 @@ def main():
     print("wrote", light_path)
     try:
         rasterize_png(dark_path, os.path.join(DOCS, "social-preview.png"))
+        shot_path = os.path.join(DOCS, "screenshots", "phone-dark", "timer.png")
+        if not os.path.exists(shot_path):
+            print(f"\nweb card skipped — screenshot not found: {shot_path}", file=sys.stderr)
+            sys.exit(1)
+        with open(shot_path, "rb") as fh:
+            shot_b64 = base64.b64encode(fh.read()).decode("ascii")
+        web_svg = build_web_card(fonts, shot_b64)
+        app_public = os.path.join(ROOT, "app", "public")
+        web_png = os.path.join(app_public, "social-card.png")
+        with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as tf:
+            tf.write(web_svg)            # the base64 image makes this SVG large — temp only, not committed
+            web_svg_tmp = tf.name
+        try:
+            rasterize_png(web_svg_tmp, web_png, 1200, 630)
+        finally:
+            os.remove(web_svg_tmp)
+        print("wrote", web_png)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(
             "\nPNG step skipped — install Node + sharp first:\n"
