@@ -54,7 +54,7 @@
 | `src/components/InvoiceModal.test.jsx` | Line-item calc, period presets, CSV export, print, empty state, billable rounding (issue #208) |
 | `src/components/Layout.test.jsx` | Logo button, nav items, `aria-current`, tab callbacks |
 | `src/components/StartTimerModal.test.jsx` | Render, form validation, concurrent-timer guard |
-| `src/components/TimerCard.test.jsx` | Job/labor-type display, colour accent, stop timer, open/close EditEntryModal, background tick pause, overnight (>12h) calm-motion rule |
+| `src/components/TimerCard.test.jsx` | Job/labor-type display (incl. frozen-ref shaped objects), colour accent, stop timer, open/close EditEntryModal, background tick pause, overnight (>12h) calm-motion rule |
 | `src/views/AnalyticsView.test.jsx` | Loading state, period toggle, summary cards, empty state, charts |
 | `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
 | `src/views/SettingsView.test.jsx` | Drill-in root list + sub-pages, device-Back/Settings-tab-reselect returns to root, Data & Sync consolidation, toggles, theme, export/import, sync UI, danger zone, About rows (help-improve, License modal, Support link) |

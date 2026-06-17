@@ -160,6 +160,23 @@ describe('TimerCard — stop timer', () => {
   })
 })
 
+describe('TimerCard — frozen-ref rendering', () => {
+  // TimerCard receives already-resolved job/laborType props (resolution happens in
+  // TimerView via entryJob/entryLabor). These tests confirm the card renders any
+  // {name,color,…}-shaped object — live or frozen snapshot — identically.
+  it('renders a frozen job name passed as the job prop', () => {
+    const frozenJob = { name: 'FrozenJob', color: '#f00' }
+    render(<TimerCard entry={ENTRY} job={frozenJob} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('FrozenJob')).toBeInTheDocument()
+  })
+
+  it('renders a frozen labor type name passed as the laborType prop', () => {
+    const frozenLabor = { name: 'OldDev', color: '#5FD08A', glyph: 'code' }
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={frozenLabor} />)
+    expect(screen.getByText('OldDev')).toBeInTheDocument()
+  })
+})
+
 describe('TimerCard — edit modal', () => {
   it('opens EditEntryModal when the edit start time button is clicked', () => {
     render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)

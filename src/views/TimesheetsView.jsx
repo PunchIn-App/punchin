@@ -11,6 +11,7 @@ import {
   isEntryInRange, billedDurationMap,
 } from '../utils/time'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
+import { entryJob, entryLabor } from '../utils/entryRefs'
 import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
 import EntitySelect from '../components/EntitySelect'
 import EditEntryModal from '../components/EditEntryModal'
@@ -110,14 +111,14 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
         </div>
       ) : (
         filteredEntries.map(entry => {
-          const job = getJob(entry.jobId)
-          const lt  = getLT(entry.laborTypeId)
+          const { job, frozen: jobFrozen } = entryJob(entry, getJob(entry.jobId))
+          const { laborType: lt } = entryLabor(entry, getLT(entry.laborTypeId))
           // Billed duration from the session-aware map, so the cards sum to the day
           // Total (#274); a running row grows live via `now` (#265).
           const dur = billed.get(entry) ?? 0
           // Leading dot is the JOB's own colour (its identity cue), falling back to
           // its labor type's colour — distinct from the LaborTag's labor colour.
-          const jobColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
+          const jobColor = job?.color || lt?.color || 'var(--accent)'
           return (
             // Compact entry row (design-system pcts-entry): job dot · name + tag +
             // time, with the duration and actions pinned right. The tag/time pair
@@ -126,7 +127,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
               <div className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: jobColor }} aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || '—'}</p>
+                  <p className={`font-display font-semibold text-appText text-sm truncate${jobFrozen ? ' italic' : ''}`}>{job?.name || '—'}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {lt && <LaborTag laborType={lt} />}
                     <span className="font-mono text-xs text-appTextMuted whitespace-nowrap">
@@ -270,13 +271,15 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
             <h2 className="text-[10px] uppercase tracking-widest text-appTextMuted mb-3">By job</h2>
             <div className="space-y-3">
               {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
-                const job = getJob(Number(jid))
-                const barColor = getLT(job?.laborTypeId)?.color || 'var(--accent)'
+                // Look up the representative entry for this jobId to resolve frozen refs.
+                const repEntry = (filteredEntries ?? []).find(e => e.jobId === Number(jid))
+                const { job, frozen: jobFrozen } = entryJob(repEntry ?? {}, getJob(Number(jid)))
+                const barColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
                 const pct = total > 0 ? (ms / total) * 100 : 0
                 return (
                   <div key={jid}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm text-appText font-medium truncate">{job?.name || '—'}</span>
+                      <span className={`text-sm text-appText font-medium truncate${jobFrozen ? ' italic' : ''}`}>{job?.name || '—'}</span>
                       <span className="font-mono text-sm text-appTextMuted flex-shrink-0 ml-2">{formatDuration(ms, decimal)}</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-appBg">
@@ -333,13 +336,13 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
             {hasEntries && isOpen && (
               <div className="px-4 pb-3 space-y-1 divide-y divide-appBorderLight/30 bg-appBg/20">
                 {dayEntries.map(e => {
-                  const lt = getLT(e.laborTypeId)
-                  const job = getJob(e.jobId)
+                  const { laborType: lt } = entryLabor(e, getLT(e.laborTypeId))
+                  const { job, frozen: entryFrozen } = entryJob(e, getJob(e.jobId))
                   return (
                     <div key={e.id} className="flex items-center justify-between text-xs py-2">
                       <div className="flex items-center gap-1.5 min-w-0">
                         {lt && <LaborGlyphChip laborType={lt} className="w-4 h-4" />}
-                        <span className="text-appTextMuted truncate">{job?.name || '—'}</span>
+                        <span className={`text-appTextMuted truncate${entryFrozen ? ' italic' : ''}`}>{job?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                         <span className="font-mono text-appTextMuted">{formatDuration(billed.get(e) ?? 0, decimal)}</span>
@@ -456,8 +459,8 @@ export default function TimesheetsView() {
     const rows = [['Date', 'Job', 'Client', 'Labor Type', 'Start', 'End', 'Duration (h)', 'Notes']]
     for (const e of entries) {
       if (!e.punchOut) continue
-      const job = jobs?.find(j => j.id === e.jobId)
-      const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
+      const { job } = entryJob(e, jobs?.find(j => j.id === e.jobId))
+      const { laborType: lt } = entryLabor(e, laborTypes?.find(l => l.id === e.laborTypeId))
       // Billed duration from the session map; Start/End stay the actual times.
       const dur = (billed.get(e) ?? 0) / 3600000
       rows.push([
@@ -503,8 +506,8 @@ export default function TimesheetsView() {
     const rows = completed
       .sort((a, b) => new Date(a.punchIn) - new Date(b.punchIn))
       .map(e => {
-        const job = jobs?.find(j => j.id === e.jobId)
-        const lt  = laborTypes?.find(l => l.id === e.laborTypeId)
+        const { job } = entryJob(e, jobs?.find(j => j.id === e.jobId))
+        const { laborType: lt } = entryLabor(e, laborTypes?.find(l => l.id === e.laborTypeId))
         const hrs = ((billed.get(e) ?? 0) / 3600000).toFixed(2)
         return `<tr>
           <td>${format(new Date(e.punchIn), 'EEE, MMM d')}</td>
