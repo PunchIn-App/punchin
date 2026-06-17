@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.31.3
+**Version:** 0.32.0
 
 ---
 
@@ -149,8 +149,8 @@ All schema and seed logic lives in `src/db.js`. The database is named `PunchInDB
 | `settings` | `key` | KV store for app preferences |
 | `laborTypes` | `id, name, uuid` | Billable categories with `color` + `glyph` (an icon id — Lucide ids plus `punchin` for the brand mark; unindexed, render-time fallback to the PunchIn brand mark so existing rows need no migration — see `src/components/LaborGlyph.jsx`); soft-archived via `isArchived` |
 | `jobs` | `id, name, laborTypeId, isActive, uuid` | Client work items (`laborTypeId` is a legacy index — per-job rates now live in `laborRates`); optional `clientName` field; optional `color` field (the job's own colour for its card left-rail — unindexed, no migration; falls back to its labor type's colour when unset) |
-| `entries` | `id, jobId, laborTypeId, punchIn, punchOut, uuid` | Time records; optional `notes` (string) field |
-| `deletions` | `uuid, deletedAt` | Delete **tombstones**: when an entry is removed it is hard-deleted from `entries` (so every view/analytics/export query is unaffected) and its `uuid` is recorded here with a `deletedAt` timestamp, so cloud merge propagates the deletion across devices instead of the entry resurrecting from a peer's snapshot. Use `deleteEntry(id)` (in `db.js`) to delete an entry — never `db.entries.delete` directly. |
+| `entries` | `id, jobId, laborTypeId, punchIn, punchOut, uuid` | Time records; optional `notes` (string) field; optional `frozenRefs` field (a `{job?,laborType?}` display snapshot — name, colour, glyph — written when a referenced job or labor type is permanently deleted, so the entry can still render its provenance after the live record is gone) |
+| `deletions` | `uuid, deletedAt` | Delete **tombstones**: when a record is hard-deleted a tombstone is written here with a `deletedAt` timestamp so cloud merge propagates the deletion across devices instead of the record resurrecting from a peer's snapshot. Covers three record types: **entries** (hard-deleted from `entries` immediately — views/analytics/exports are unaffected); **jobs** (hard-deleted from `jobs` after freezing refs onto all affected entries); **labor types** (hard-deleted from `laborTypes` after freezing refs). Use `deleteEntry(id)` / `deleteJob(id)` / `deleteLaborType(id)` (all in `db.js`) — never call `db.*.delete()` directly. |
 | `secrets` | `name` | At-rest-encrypted sync credentials (issues #126, #243): a non-extractable AES-GCM `CryptoKey`, the encrypted access token, and the encrypted OAuth **refresh** token (Google/OneDrive). Neither token is **ever** stored in plaintext IndexedDB. Access only through `src/sync/tokenStore.js` (`setSyncToken`/`getSyncToken`/`clearSyncToken` and `setRefreshToken`/`getRefreshToken`) — never read/write the tokens directly. |
 
 All three data tables also carry a `uuid` (stable cross-device identifier) and an `updatedAt` (ms epoch) field, stamped automatically by Dexie `creating`/`updating` hooks in `db.js`. `uuid` survives sync/transfer so cloud merge can identify the *same* record across devices (independent of the local-only auto-increment `id`); `updatedAt` is the basis for last-write-wins conflict resolution. The `creating` hook only fills in missing values, so a record merged in from another device keeps its remote `uuid`/`updatedAt`.
@@ -163,7 +163,7 @@ All three data tables also carry a `uuid` (stable cross-device identifier) and a
 
 ### Soft-Delete / Archive Pattern
 
-Both `jobs` and `laborTypes` use soft-deletion — records are never hard-deleted so historical entries always retain their references.
+`jobs` and `laborTypes` use a two-stage lifecycle: **archive** (soft, reversible) then optionally **permanent delete** (hard, irreversible — archived items only).
 
 | Table | Field | Meaning |
 |-------|-------|---------|
@@ -173,10 +173,22 @@ Both `jobs` and `laborTypes` use soft-deletion — records are never hard-delete
 
 Dropdowns in `StartTimerModal`, `EditEntryModal`, and `JobForm` filter out archived records. `EditEntryModal` still includes a record's own archived labor type so existing entries can be saved without data loss.
 
-#### Archive UX (v0.3.0+, unchanged in v0.5.0)
-- Active jobs show in the main list with **Edit** and **Archive** buttons only — there is no Delete button in the UI.
+#### Archive UX (v0.3.0+)
+- Active jobs show in the main list with **Edit** and **Archive** buttons only — there is no Delete button for active items.
 - Archived items appear under a collapsible **"Archived (N)"** row at the bottom of each tab. The folder is collapsed by default and has a live search input when expanded.
-- Archived items show only a **Restore** button.
+- Archived items show a **Restore** button and a **Delete** button (permanent delete, since v0.32.0).
+
+#### Permanent Delete (v0.32.0+)
+Archived jobs and labor types can be permanently deleted. The delete flow:
+
+1. **Guard (labor types only):** `jobsUsingLaborType(id)` checks for any active (non-archived) job still referencing the labor type. If any exist, the delete is blocked until those jobs are archived or relinked.
+2. **Freeze refs onto entries:** every time entry referencing the record gets an `entry.frozenRefs` snapshot — `{job?: {name, color}}` or `{laborType?: {name, color, glyph}}` — written in the same transaction as the hard delete.
+3. **Hard delete:** the record is removed from `jobs` / `laborTypes`.
+4. **Tombstone:** a `deletions` row is written so the deletion propagates via cloud sync and the record won't resurrect from a peer's snapshot.
+
+Use `deleteJob(id)` / `deleteLaborType(id)` (in `db.js`) — never call `db.jobs.delete()` / `db.laborTypes.delete()` directly, as that skips the freeze-and-tombstone logic. Both are the hard-delete siblings of `deleteEntry(id)`.
+
+**Frozen-ref rendering:** `src/utils/entryRefs.js` exports `entryJob(entry, liveJob)` and `entryLabor(entry, liveLabor)`. Each returns `{job/laborType, frozen: bool}`. When `frozen` is true, the caller renders the ref as inert "unlinked" plaintext (a dashed chip with a broken-link icon) instead of a live, interactive record. Timesheets, Timer, Invoice, Analytics, and EditEntry all resolve refs through these helpers so deleted items display consistently.
 
 ### Settings Keys
 

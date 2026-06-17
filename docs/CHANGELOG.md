@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.32.0] — 2026-06-17
+
+### Added
+- **Permanently delete archived jobs and labor types.** Archived items now have a delete action (beside Restore) that removes them for good. Past time entries are kept and shown as "unlinked" — the deleted job/labor type's name, colour, and glyph are frozen onto them — so timesheets, invoices, analytics, and totals stay intact. Deleting a labor type still used by an active job is blocked until those jobs are archived or relinked. Deletions sync across devices and won't reappear from another device.
+
+---
+
 ## [0.31.3] — 2026-06-17
 
 ### Fixed
