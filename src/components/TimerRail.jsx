@@ -4,6 +4,7 @@ import { Play } from 'lucide-react'
 import { db } from '../db'
 import { formatDurationHM, formatTime, getWeekRange, isEntryInRange, getEntryDuration } from '../utils/time'
 import { DEFAULT_JOB_COLOR } from '../accentPresets'
+import { entryJob, entryLabor } from '../utils/entryRefs'
 
 // The Timer screen's desktop-only right rail (xl+): Last session · Quick punch ·
 // This week. Co-located with the Timer view (not the Layout shell) since its
@@ -58,8 +59,8 @@ export default function TimerRail({ jobMap, ltMap, recentJobs, lastEntry, weekSt
       <div className="p-5 space-y-7">
         {/* Last session — lead with the big duration, "<labor> · ended <time>" */}
         {lastEntry && (() => {
-          const job = jobMap.get(lastEntry.jobId)
-          const lt = ltMap.get(lastEntry.laborTypeId)
+          const { job, frozen: jobFrozen } = entryJob(lastEntry, jobMap.get(lastEntry.jobId))
+          const { laborType: lt } = entryLabor(lastEntry, ltMap.get(lastEntry.laborTypeId))
           const color = lt?.color || DEFAULT_JOB_COLOR
           return (
             <section>
@@ -67,7 +68,7 @@ export default function TimerRail({ jobMap, ltMap, recentJobs, lastEntry, weekSt
               <div className="rounded-xl border border-appBorder bg-appCard p-4">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} aria-hidden="true" />
-                  <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || 'Unknown Job'}</p>
+                  <p className={`font-display font-semibold text-appText text-sm truncate${jobFrozen ? ' italic' : ''}`}>{job?.name || 'Unknown Job'}</p>
                 </div>
                 <p className="font-mono text-2xl text-appText mt-1.5">{formatDurationHM(getEntryDuration(lastEntry))}</p>
                 <p className="text-xs text-appTextMuted mt-0.5 truncate">

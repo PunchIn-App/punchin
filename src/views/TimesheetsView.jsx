@@ -118,7 +118,7 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
           const dur = billed.get(entry) ?? 0
           // Leading dot is the JOB's own colour (its identity cue), falling back to
           // its labor type's colour — distinct from the LaborTag's labor colour.
-          const jobColor = job?.color || lt?.color || 'var(--accent)'
+          const jobColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
           return (
             // Compact entry row (design-system pcts-entry): job dot · name + tag +
             // time, with the duration and actions pinned right. The tag/time pair
