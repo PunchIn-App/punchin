@@ -92,10 +92,10 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
     // last-write-wins (updatedAt; ties broken deterministically by uuid).
 
     // Tombstones (issue #118): the union of local + remote deletions, keyed by
-    // entry uuid. A tombstone deletes a local entry and suppresses re-importing
-    // it — unless a strictly newer local edit exists (delete-wins by timestamp,
-    // an edit after the delete "undeletes"). Remote tombstones are persisted
-    // locally so the deletion keeps propagating onward.
+    // record uuid. A tombstone deletes the matching local record (entry, job, or
+    // labor type) and suppresses re-importing it — unless a strictly newer local
+    // edit exists (delete-wins by timestamp, an edit after the delete "undeletes").
+    // Remote tombstones are persisted locally so the deletion keeps propagating onward.
     const tomb = new Map()
     for (const d of await db.deletions.toArray()) tomb.set(d.uuid, d.deletedAt)
     for (const d of remote.deletions ?? []) {
