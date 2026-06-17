@@ -90,9 +90,40 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
     // stop splitting on every sync. Records without a uuid (legacy v1 snapshots)
     // still match by name. Appearance/field conflicts are resolved by
     // last-write-wins (updatedAt; ties broken deterministically by uuid).
+
+    // Tombstones (issue #118): the union of local + remote deletions, keyed by
+    // entry uuid. A tombstone deletes a local entry and suppresses re-importing
+    // it — unless a strictly newer local edit exists (delete-wins by timestamp,
+    // an edit after the delete "undeletes"). Remote tombstones are persisted
+    // locally so the deletion keeps propagating onward.
+    const tomb = new Map()
+    for (const d of await db.deletions.toArray()) tomb.set(d.uuid, d.deletedAt)
+    for (const d of remote.deletions ?? []) {
+      if (!d?.uuid) continue
+      if (d.deletedAt > (tomb.get(d.uuid) ?? 0)) {
+        tomb.set(d.uuid, d.deletedAt)
+        await db.deletions.put({ uuid: d.uuid, deletedAt: d.deletedAt })
+      }
+    }
+    // A remote record is suppressed (not re-added) when a tombstone covers its
+    // uuid and no strictly-newer edit exists — the same delete-wins-by-timestamp
+    // rule used for entries. Applied to jobs and labor types (permanent delete).
+    const tombstoned = (rec) => {
+      const at = rec.uuid ? tomb.get(rec.uuid) : undefined
+      return at != null && at >= (rec.updatedAt ?? 0)
+    }
+    // Delete local jobs / labor types covered by a (local or remote) tombstone.
+    for (const lt of await db.laborTypes.toArray()) {
+      if (tombstoned(lt)) await db.laborTypes.delete(lt.id)
+    }
+    for (const j of await db.jobs.toArray()) {
+      if (tombstoned(j)) await db.jobs.delete(j.id)
+    }
+
     const ltMap = {}
     const existingLts = await db.laborTypes.toArray()
     for (const lt of remote.laborTypes ?? []) {
+      if (tombstoned(lt)) continue
       const match =
         (lt.uuid && existingLts.find(e => e.uuid === lt.uuid)) ||
         existingLts.find(e => e.name.toLowerCase() === lt.name.toLowerCase())
@@ -124,6 +155,7 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
     const jobMap = {}
     const existingJobs = await db.jobs.toArray()
     for (const job of remote.jobs ?? []) {
+      if (tombstoned(job)) continue
       const match =
         (job.uuid && existingJobs.find(j => j.uuid === job.uuid)) ||
         existingJobs.find(j => j.name.toLowerCase() === job.name.toLowerCase())
@@ -149,21 +181,6 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
         const newId = await db.jobs.add({ ...jobFields, uuid: job.uuid, updatedAt: job.updatedAt })
         jobMap[job.id] = newId
         existingJobs.push({ id: newId, name: job.name, uuid: job.uuid, updatedAt: job.updatedAt })
-      }
-    }
-
-    // Tombstones (issue #118): the union of local + remote deletions, keyed by
-    // entry uuid. A tombstone deletes a local entry and suppresses re-importing
-    // it — unless a strictly newer local edit exists (delete-wins by timestamp,
-    // an edit after the delete "undeletes"). Remote tombstones are persisted
-    // locally so the deletion keeps propagating onward.
-    const tomb = new Map()
-    for (const d of await db.deletions.toArray()) tomb.set(d.uuid, d.deletedAt)
-    for (const d of remote.deletions ?? []) {
-      if (!d?.uuid) continue
-      if (d.deletedAt > (tomb.get(d.uuid) ?? 0)) {
-        tomb.set(d.uuid, d.deletedAt)
-        await db.deletions.put({ uuid: d.uuid, deletedAt: d.deletedAt })
       }
     }
 

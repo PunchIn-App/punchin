@@ -1270,3 +1270,74 @@ describe('runSync — frozen entry references', () => {
     expect(await db.entries.toArray()).toHaveLength(0)
   })
 })
+
+describe('runSync — job/labor-type tombstones', () => {
+  it('does not resurrect a locally-deleted job from a peer snapshot', async () => {
+    await seedSyncSettings()
+    const jobId = await db.jobs.add({ name: 'Gone', isActive: false, laborRates: {}, updatedAt: 1000 })
+    const job = await db.jobs.get(jobId)
+    await db.deletions.put({ uuid: job.uuid, deletedAt: 2000 })
+    await db.jobs.delete(jobId)
+
+    const remoteSnapshot = {
+      version: 1, laborTypes: [],
+      jobs: [{ id: 200, uuid: job.uuid, name: 'Gone', laborTypeId: null, isActive: false, updatedAt: 1000 }],
+      entries: [], deletions: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    expect(await db.jobs.toArray()).toHaveLength(0)
+  })
+
+  it('applies a remote job tombstone, deleting the matching local job', async () => {
+    await seedSyncSettings()
+    const jobId = await db.jobs.add({ name: 'DeleteMe', isActive: false, laborRates: {}, updatedAt: 1000 })
+    const job = await db.jobs.get(jobId)
+
+    const remoteSnapshot = {
+      version: 1, laborTypes: [], jobs: [], entries: [],
+      deletions: [{ uuid: job.uuid, deletedAt: 2000 }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    expect(await db.jobs.toArray()).toHaveLength(0)
+    expect(await db.deletions.get(job.uuid)).toBeTruthy()
+  })
+
+  it('does not resurrect a locally-deleted labor type from a peer snapshot', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({ name: 'Gone', color: '#111', isArchived: true, updatedAt: 1000 })
+    const lt = await db.laborTypes.get(ltId)
+    await db.deletions.put({ uuid: lt.uuid, deletedAt: 2000 })
+    await db.laborTypes.delete(ltId)
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Gone', color: '#111', isArchived: true, updatedAt: 1000 }],
+      jobs: [], entries: [], deletions: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    expect(await db.laborTypes.toArray()).toHaveLength(0)
+  })
+
+  it('keeps a labor type edited after the tombstone (newer edit undeletes)', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({ name: 'Kept', color: '#111', isArchived: false, updatedAt: 5000 })
+    const lt = await db.laborTypes.get(ltId)
+    const remoteSnapshot = {
+      version: 1, laborTypes: [], jobs: [], entries: [],
+      deletions: [{ uuid: lt.uuid, deletedAt: 3000 }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+    expect(await db.laborTypes.toArray()).toHaveLength(1)
+  })
+})
