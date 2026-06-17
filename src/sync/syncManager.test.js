@@ -1154,3 +1154,63 @@ describe('runSync — failure isolation and retry safety', () => {
     expect(await db.laborTypes.toArray()).toHaveLength(1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// runSync — job color sync + convergence
+// ---------------------------------------------------------------------------
+
+describe('runSync — job color sync', () => {
+  it('imports a job\'s own color from a remote device (create path)', async () => {
+    await seedSyncSettings()
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [],
+      jobs: [{ id: 9, uuid: 'job-uuid-x', name: 'Imported', laborTypeId: null, isActive: true, color: '#ABCDEF', updatedAt: 1000 }],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [job] = await db.jobs.toArray()
+    expect(job.color).toBe('#ABCDEF')
+  })
+
+  it('propagates a newer remote job color to a uuid-matched job (LWW)', async () => {
+    await seedSyncSettings()
+    const jobId = await db.jobs.add({ name: 'Client', isActive: true, laborRates: {}, color: '#111111', updatedAt: 1000 })
+    const job = await db.jobs.get(jobId)
+
+    const remoteSnapshot = {
+      version: 1, laborTypes: [],
+      jobs: [{ id: 200, uuid: job.uuid, name: 'Client', laborTypeId: null, isActive: true, color: '#222222', updatedAt: 5000 }],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [out] = await db.jobs.toArray()
+    expect(out.color).toBe('#222222')
+  })
+
+  it('converges a same-named job created independently on each device (color + uuid)', async () => {
+    await seedSyncSettings()
+    const jobId = await db.jobs.add({ name: 'Client', isActive: true, laborRates: {}, color: '#111111', updatedAt: 1000 })
+    const local = await db.jobs.get(jobId)
+
+    const remoteSnapshot = {
+      version: 1, laborTypes: [],
+      jobs: [{ id: 200, uuid: 'remote-job-zzz', name: 'Client', laborTypeId: null, isActive: true, color: '#222222', updatedAt: 5000 }],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const jobs = await db.jobs.toArray()
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0].color).toBe('#222222')
+    expect(jobs[0].uuid).toBe(['remote-job-zzz', local.uuid].sort()[0])
+  })
+})

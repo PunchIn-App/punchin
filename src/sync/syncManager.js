@@ -130,14 +130,17 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
         laborTypeId: job.laborTypeId ? ltMap[job.laborTypeId] : null,
         isActive: job.isActive !== false,
         laborRates: remapLaborRates(job.laborRates, ltMap),
+        color: job.color ?? null,
       }
       if (match) {
         jobMap[job.id] = match.id
-        // Last-write-wins for mutable fields (issue #120): name, client, active,
-        // labor type, and per-type rates (which were previously dropped entirely).
-        if (job.uuid && (job.updatedAt ?? 0) > (match.updatedAt ?? 0)) {
-          await db.jobs.update(match.id, { ...jobFields, updatedAt: job.updatedAt })
-          Object.assign(match, jobFields, { updatedAt: job.updatedAt })
+        const canon = canonicalUuid(match.uuid, job.uuid)
+        const takeRemote = remoteIsNewer(job, match)
+        if (takeRemote || canon !== match.uuid) {
+          const fields = takeRemote ? jobFields : {}
+          const updatedAt = takeRemote ? job.updatedAt : match.updatedAt
+          await db.jobs.update(match.id, { ...fields, uuid: canon, updatedAt })
+          Object.assign(match, fields, { uuid: canon, updatedAt })
         }
       } else {
         const newId = await db.jobs.add({ ...jobFields, uuid: job.uuid, updatedAt: job.updatedAt })
