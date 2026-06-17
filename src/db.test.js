@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { db, deleteEntry, startTimer, DEFAULT_SETTINGS } from './db'
+import { db, deleteEntry, startTimer, DEFAULT_SETTINGS, deleteJob, deleteLaborType, jobsUsingLaborType } from './db'
 
 afterAll(async () => {
   await db.close()
@@ -214,6 +214,100 @@ describe('db — deleteEntry tombstones (issue #118)', () => {
   it('is a no-op for a missing entry (no tombstone written)', async () => {
     await expect(deleteEntry(99999)).resolves.toBeUndefined()
     expect(await db.deletions.toArray()).toHaveLength(0)
+  })
+})
+
+describe('deleteJob', () => {
+  afterEach(async () => {
+    await db.jobs.clear()
+    await db.laborTypes.clear()
+    await db.entries.clear()
+    await db.deletions.clear()
+  })
+
+  it('freezes job name+colour onto referencing entries, tombstones, and deletes the job', async () => {
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6FA8FF', isArchived: false })
+    const jobId = await db.jobs.add({ name: 'Acme', isActive: false, laborRates: {}, color: '#FF8FA3' })
+    const job = await db.jobs.get(jobId)
+    const eId = await db.entries.add({ jobId, laborTypeId: ltId, punchIn: new Date('2025-01-01T09:00:00Z'), punchOut: new Date('2025-01-01T10:00:00Z') })
+
+    await deleteJob(jobId)
+
+    expect(await db.jobs.get(jobId)).toBeUndefined()
+    expect(await db.deletions.get(job.uuid)).toBeTruthy()
+    const e = await db.entries.get(eId)
+    expect(e.frozenRefs.job).toEqual({ name: 'Acme', color: '#FF8FA3' })
+  })
+
+  it('freezes the labor-type colour when the job has no own colour', async () => {
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6FA8FF', isArchived: false })
+    const jobId = await db.jobs.add({ name: 'Acme', isActive: false, laborRates: {}, laborTypeId: ltId })
+    const eId = await db.entries.add({ jobId, laborTypeId: ltId, punchIn: new Date('2025-01-01T09:00:00Z'), punchOut: null })
+
+    await deleteJob(jobId)
+
+    expect((await db.entries.get(eId)).frozenRefs.job).toEqual({ name: 'Acme', color: '#6FA8FF' })
+  })
+})
+
+describe('jobsUsingLaborType', () => {
+  afterEach(async () => {
+    await db.jobs.clear()
+    await db.laborTypes.clear()
+  })
+
+  it('finds live jobs referencing a labor type by default type or per-type rate', async () => {
+    const ltId = await db.laborTypes.add({ name: 'Dev', color: '#111', isArchived: false })
+    await db.jobs.add({ name: 'ByDefault', isActive: true, laborRates: {}, laborTypeId: ltId })
+    await db.jobs.add({ name: 'ByRate', isActive: true, laborRates: { [ltId]: 90 } })
+    await db.jobs.add({ name: 'Archived', isActive: false, laborRates: { [ltId]: 90 } })
+    await db.jobs.add({ name: 'Unrelated', isActive: true, laborRates: {} })
+
+    const live = await jobsUsingLaborType(ltId, { liveOnly: true })
+    expect(live.map(j => j.name).sort()).toEqual(['ByDefault', 'ByRate'])
+    const all = await jobsUsingLaborType(ltId)
+    expect(all.map(j => j.name).sort()).toEqual(['Archived', 'ByDefault', 'ByRate'])
+  })
+})
+
+describe('deleteLaborType', () => {
+  afterEach(async () => {
+    await db.jobs.clear()
+    await db.laborTypes.clear()
+    await db.entries.clear()
+    await db.deletions.clear()
+  })
+
+  it('blocks deletion while a live job references it', async () => {
+    const ltId = await db.laborTypes.add({ name: 'Dev', color: '#111', isArchived: true })
+    await db.jobs.add({ name: 'LiveUser', isActive: true, laborRates: { [ltId]: 90 } })
+
+    await expect(deleteLaborType(ltId)).rejects.toThrow('LABOR_TYPE_IN_USE')
+    expect(await db.laborTypes.get(ltId)).toBeTruthy()
+  })
+
+  it('freezes name+colour+glyph onto entries, tombstones, and deletes when no live job uses it', async () => {
+    const ltId = await db.laborTypes.add({ name: 'Dev', color: '#5FD08A', glyph: 'code', isArchived: true })
+    const lt = await db.laborTypes.get(ltId)
+    const jobId = await db.jobs.add({ name: 'Archived', isActive: false, laborRates: { [ltId]: 90 } })
+    const eId = await db.entries.add({ jobId, laborTypeId: ltId, punchIn: new Date('2025-01-01T09:00:00Z'), punchOut: null })
+
+    await deleteLaborType(ltId)
+
+    expect(await db.laborTypes.get(ltId)).toBeUndefined()
+    expect(await db.deletions.get(lt.uuid)).toBeTruthy()
+    expect((await db.entries.get(eId)).frozenRefs.laborType).toEqual({ name: 'Dev', color: '#5FD08A', glyph: 'code' })
+  })
+
+  it('merges with an existing frozenRefs.job (an entry whose job was already deleted)', async () => {
+    const ltId = await db.laborTypes.add({ name: 'Dev', color: '#5FD08A', glyph: 'code', isArchived: true })
+    const eId = await db.entries.add({ jobId: 999, laborTypeId: ltId, punchIn: new Date('2025-01-01T09:00:00Z'), punchOut: null, frozenRefs: { job: { name: 'Gone', color: '#abc' } } })
+
+    await deleteLaborType(ltId)
+
+    const e = await db.entries.get(eId)
+    expect(e.frozenRefs.job).toEqual({ name: 'Gone', color: '#abc' })
+    expect(e.frozenRefs.laborType.name).toBe('Dev')
   })
 })
 
