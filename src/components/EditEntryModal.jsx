@@ -120,9 +120,13 @@ export default function EditEntryModal({ entry, onClose }) {
       }
     }
 
+    // Guard against non-numeric values (e.g. "null" from a synced frozen entry's
+    // synthetic dropdown option) so we never write NaN to the FK fields.
+    const toIdOrNull = v => { const n = Number(v); return Number.isFinite(n) ? n : null }
+
     const payload = {
-      jobId: Number(jobId),
-      laborTypeId: Number(laborTypeId),
+      jobId: toIdOrNull(jobId),
+      laborTypeId: toIdOrNull(laborTypeId),
       punchIn: punchInDate,
       punchOut: punchOutDate,
       notes: notes.trim() || null,

@@ -697,3 +697,58 @@ describe('TimesheetsView — clientName search match', () => {
     expect(screen.getByRole('button', { name: /edit entry for acme corp/i })).toBeInTheDocument()
   })
 })
+
+// ─── WeeklySheet frozen-job breakdown (synced-device shape, Fix #1) ───────────
+// On a synced device a permanently-deleted job's entry arrives with jobId=null
+// and frozenRefs.job.{name,color}.  Two such entries from *different* deleted jobs
+// must appear as two distinct rows (not merged under one null key), and each row
+// must show the frozen job name rather than "—".
+
+describe('TimesheetsView — WeeklySheet frozen-job breakdown', () => {
+  // Two frozen entries with jobId=null but different frozenRefs job names.
+  const frozenEntry1 = {
+    id: 101,
+    jobId: null,
+    laborTypeId: 1,
+    punchIn:  new Date(TODAY.getTime() - 3 * 3600000), // 3 h before noon
+    punchOut: new Date(TODAY.getTime() - 2 * 3600000), // 2 h before noon → 1 h
+    notes: null,
+    frozenRefs: { job: { name: 'Ghost Job A', color: '#aabbcc' } },
+  }
+  const frozenEntry2 = {
+    id: 102,
+    jobId: null,
+    laborTypeId: 1,
+    punchIn:  new Date(TODAY.getTime() - 2 * 3600000), // 2 h before noon
+    punchOut: new Date(TODAY.getTime() - 1 * 3600000), // 1 h before noon → 1 h
+    notes: null,
+    frozenRefs: { job: { name: 'Ghost Job B', color: '#336699' } },
+  }
+
+  function setupFrozen(entries) {
+    // No live jobs — both entries are fully frozen (deleted job, synced-device shape)
+    useLiveQuery.mockImplementation((fn) => routeQuery(fn, entries, [], LABOR_TYPES))
+  }
+
+  it('shows a frozen job name instead of "—" in the weekly by-job breakdown', () => {
+    setupFrozen([frozenEntry1])
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
+    // The frozen job name must appear in the By-job section.
+    expect(screen.getByText('Ghost Job A')).toBeInTheDocument()
+    // "—" would appear if the frozen key was not resolved correctly.
+    // We assert that no bare "—" label shows up in the breakdown
+    // (the fallback for an unresolvable entry).
+    const byJobSection = screen.getByRole('heading', { name: 'By job' }).closest('div')
+    expect(byJobSection).not.toHaveTextContent('—')
+  })
+
+  it('shows two distinct rows for two different deleted jobs (no merging under null)', () => {
+    setupFrozen([frozenEntry1, frozenEntry2])
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
+    // Both frozen job names must appear as separate rows.
+    expect(screen.getByText('Ghost Job A')).toBeInTheDocument()
+    expect(screen.getByText('Ghost Job B')).toBeInTheDocument()
+  })
+})

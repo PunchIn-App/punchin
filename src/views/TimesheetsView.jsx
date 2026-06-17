@@ -223,6 +223,9 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   )
 
   // Week total + per-job breakdown (#138), summed from the billed map.
+  // Frozen entries (synced devices: jobId=null, frozenRefs.job set) are keyed by
+  // "frozen:<name>" so each permanently-deleted job is its own distinct row instead
+  // of all collapsing under a single null key.
   const { total, jobTotals } = useMemo(() => {
     if (!filteredEntries) return { total: 0, jobTotals: {} }
     let total = 0
@@ -230,7 +233,15 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
     for (const e of filteredEntries) {
       const ms = billed.get(e) ?? 0
       total += ms
-      if (ms > 0) jobTotals[e.jobId] = (jobTotals[e.jobId] || 0) + ms
+      if (ms > 0) {
+        const liveJob = getJob(e.jobId)
+        const key = liveJob
+          ? e.jobId
+          : e.frozenRefs?.job
+          ? `frozen:${e.frozenRefs.job.name}`
+          : e.jobId // null — no live job and no frozen snapshot
+        jobTotals[key] = (jobTotals[key] || 0) + ms
+      }
     }
     return { total, jobTotals }
   }, [filteredEntries, billed]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -271,9 +282,13 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
             <h2 className="text-[10px] uppercase tracking-widest text-appTextMuted mb-3">By job</h2>
             <div className="space-y-3">
               {Object.entries(jobTotals).sort((a,b) => b[1]-a[1]).map(([jid, ms]) => {
-                // Look up the representative entry for this jobId to resolve frozen refs.
-                const repEntry = (filteredEntries ?? []).find(e => e.jobId === Number(jid))
-                const { job, frozen: jobFrozen } = entryJob(repEntry ?? {}, getJob(Number(jid)))
+                // Resolve display for this bucket. Live-job keys are numeric jobIds;
+                // frozen-job keys are "frozen:<name>" (synced-device shape: jobId=null).
+                const isFrozenKey = String(jid).startsWith('frozen:')
+                const repEntry = isFrozenKey
+                  ? (filteredEntries ?? []).find(e => e.frozenRefs?.job?.name === jid.slice('frozen:'.length))
+                  : (filteredEntries ?? []).find(e => e.jobId === Number(jid))
+                const { job, frozen: jobFrozen } = entryJob(repEntry ?? {}, isFrozenKey ? null : getJob(Number(jid)))
                 const barColor = job?.color || getLT(job?.laborTypeId)?.color || 'var(--accent)'
                 const pct = total > 0 ? (ms / total) * 100 : 0
                 return (
