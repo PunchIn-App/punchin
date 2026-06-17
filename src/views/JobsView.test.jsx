@@ -6,6 +6,9 @@ const mockJobsUpdate = vi.fn().mockResolvedValue(1)
 const mockJobsAdd    = vi.fn().mockResolvedValue(1)
 const mockLaborTypesUpdate = vi.fn().mockResolvedValue(1)
 const mockLaborTypesAdd    = vi.fn().mockResolvedValue(1)
+const mockDeleteJob         = vi.fn().mockResolvedValue(undefined)
+const mockDeleteLaborType   = vi.fn().mockResolvedValue(undefined)
+const mockJobsUsingLaborType = vi.fn().mockResolvedValue([])
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({
@@ -19,6 +22,9 @@ vi.mock('../db', () => ({
       get add()    { return mockLaborTypesAdd },
     },
   },
+  get deleteJob()           { return mockDeleteJob },
+  get deleteLaborType()     { return mockDeleteLaborType },
+  get jobsUsingLaborType()  { return mockJobsUsingLaborType },
 }))
 vi.mock('../components/ColorPicker', () => ({
   default: ({ value, onChange }) => (
@@ -462,5 +468,90 @@ describe('JobsView — section switcher ARIA (WCAG 4.1.2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
     expect(screen.getByRole('button', { name: 'Jobs' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('button', { name: 'Labor Types' })).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+describe('JobsView — permanent delete: archived jobs', () => {
+  it('shows a Delete button for archived jobs after expanding the archived section', () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    expect(screen.getByRole('button', { name: /delete old client permanently/i })).toBeInTheDocument()
+  })
+
+  it('opens a confirm modal when the Delete button is clicked', async () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    fireEvent.click(screen.getByRole('button', { name: /delete old client permanently/i }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText(/permanently delete "old client"/i)).toBeInTheDocument()
+  })
+
+  it('calls deleteJob and closes the modal when Delete permanently is confirmed', async () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    fireEvent.click(screen.getByRole('button', { name: /delete old client permanently/i }))
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: /delete permanently/i }))
+    await waitFor(() => expect(mockDeleteJob).toHaveBeenCalledWith(2))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('closes the modal without deleting when Cancel is clicked', async () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    fireEvent.click(screen.getByRole('button', { name: /delete old client permanently/i }))
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(mockDeleteJob).not.toHaveBeenCalled()
+  })
+})
+
+describe('JobsView — permanent delete: archived labor types', () => {
+  it('shows a Delete button for archived labor types after expanding the archived section', () => {
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    expect(screen.getByRole('button', { name: /delete dev permanently/i })).toBeInTheDocument()
+  })
+
+  it('opens a confirm modal when no live jobs use the labor type', async () => {
+    mockJobsUsingLaborType.mockResolvedValueOnce([])
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    fireEvent.click(screen.getByRole('button', { name: /delete dev permanently/i }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText(/permanently delete "dev"/i)).toBeInTheDocument()
+  })
+
+  it('calls deleteLaborType and closes the modal when Delete permanently is confirmed', async () => {
+    mockJobsUsingLaborType.mockResolvedValueOnce([])
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    fireEvent.click(screen.getByRole('button', { name: /delete dev permanently/i }))
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: /delete permanently/i }))
+    await waitFor(() => expect(mockDeleteLaborType).toHaveBeenCalledWith(2))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows a block modal listing the live jobs when the labor type is still in use', async () => {
+    mockJobsUsingLaborType.mockResolvedValueOnce([{ id: 1, name: 'BlockerJob' }])
+    setupMocks()
+    render(<JobsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'Labor Types' }))
+    fireEvent.click(screen.getByText(/archived \(1\)/i))
+    fireEvent.click(screen.getByRole('button', { name: /delete dev permanently/i }))
+    expect(await screen.findByText(/BlockerJob/)).toBeInTheDocument()
+    expect(mockDeleteLaborType).not.toHaveBeenCalled()
   })
 })
