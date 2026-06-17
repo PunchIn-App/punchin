@@ -82,11 +82,14 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
   if (!remote?.version || !Array.isArray(remote.jobs)) return 0
 
   const imported = await db.transaction('rw', [db.laborTypes, db.jobs, db.entries, db.deletions], async () => {
-    // Identity is resolved per-record: a record that carries a `uuid` (written
-    // by current app versions) is matched to the local record with the same
-    // uuid — stable across renames and edits. Records without a uuid (legacy
-    // v1 snapshots from older app versions) fall back to the original
-    // name/value matching, so old and new snapshots both merge correctly.
+    // Identity is resolved per-record: a record carrying a `uuid` is matched to
+    // the local record with the same uuid. Failing that, records match by name
+    // (case-insensitive) — and when a name match spans two DIFFERENT uuids
+    // (the same labor type/job created independently on each device), the two
+    // converge onto a canonical uuid (the lexicographically smaller) so they
+    // stop splitting on every sync. Records without a uuid (legacy v1 snapshots)
+    // still match by name. Appearance/field conflicts are resolved by
+    // last-write-wins (updatedAt; ties broken deterministically by uuid).
     const ltMap = {}
     const existingLts = await db.laborTypes.toArray()
     for (const lt of remote.laborTypes ?? []) {
