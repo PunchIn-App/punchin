@@ -47,3 +47,18 @@ it('renders the last session when one is provided', () => {
   render(<TimerRail jobMap={jobMap} ltMap={ltMap} jobs={jobs} lastEntry={lastEntry} weekStartsMonday onPunch={vi.fn()} />)
   expect(screen.getByText('Last session')).toBeInTheDocument()
 })
+
+it('shows frozen job name instead of "Unknown Job" for a permanently-deleted last-session job', () => {
+  useLiveQuery.mockReturnValue([])
+  // jobId 99 is not in jobMap — simulates a permanently-deleted job
+  const lastEntry = {
+    jobId: 99,
+    laborTypeId: 1,
+    punchIn: hoursAgo(1),
+    punchOut: now,
+    frozenRefs: { job: { name: 'Deleted Client', color: '#ff0' } },
+  }
+  render(<TimerRail jobMap={jobMap} ltMap={ltMap} jobs={jobs} lastEntry={lastEntry} weekStartsMonday onPunch={vi.fn()} />)
+  expect(screen.getByText('Deleted Client')).toBeInTheDocument()
+  expect(screen.queryByText('Unknown Job')).toBeNull()
+})

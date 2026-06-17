@@ -120,9 +120,13 @@ export default function EditEntryModal({ entry, onClose }) {
       }
     }
 
+    // Guard against non-numeric values (e.g. "null" from a synced frozen entry's
+    // synthetic dropdown option) so we never write NaN to the FK fields.
+    const toIdOrNull = v => { const n = Number(v); return Number.isFinite(n) ? n : null }
+
     const payload = {
-      jobId: Number(jobId),
-      laborTypeId: Number(laborTypeId),
+      jobId: toIdOrNull(jobId),
+      laborTypeId: toIdOrNull(laborTypeId),
       punchIn: punchInDate,
       punchOut: punchOutDate,
       notes: notes.trim() || null,
@@ -159,19 +163,35 @@ export default function EditEntryModal({ entry, onClose }) {
   // A job's dot colour is its own colour, else its labor type's. Both lists
   // already include the entry's own (possibly archived) job/type from the
   // queries above, so editing an old entry never drops its reference.
+  // When the job/labor type was permanently deleted, a frozen snapshot remains on
+  // the entry (entry.frozenRefs). Prepend a synthetic "(deleted)" option so the
+  // user can see what they're editing; selecting a live option re-links the entry.
+  // EntitySelect has no per-option disabled flag, so the synthetic row is selectable
+  // (re-selecting it keeps the existing frozenRef on save, since jobId/laborTypeId
+  // still point to the original ids).
   const laborColorOf = (id) => laborTypes?.find(lt => lt.id === Number(id))?.color
-  const jobOptions = (jobs ?? []).map(j => ({
-    value: String(j.id),
-    label: j.name,
-    sublabel: j.clientName || undefined,
-    color: j.color || laborColorOf(j.laborTypeId),
-  }))
-  const laborOptions = (laborTypes ?? []).map(lt => ({
-    value: String(lt.id),
-    label: lt.name,
-    color: lt.color,
-    glyph: lt.glyph,
-  }))
+  const jobOptions = [
+    ...((entry?.frozenRefs?.job && !(jobs ?? []).some(j => j.id === entry.jobId))
+      ? [{ value: String(entry.jobId), label: `${entry.frozenRefs.job.name} (deleted)`, color: entry.frozenRefs.job.color }]
+      : []),
+    ...(jobs ?? []).map(j => ({
+      value: String(j.id),
+      label: j.name,
+      sublabel: j.clientName || undefined,
+      color: j.color || laborColorOf(j.laborTypeId),
+    })),
+  ]
+  const laborOptions = [
+    ...((entry?.frozenRefs?.laborType && !(laborTypes ?? []).some(lt => lt.id === entry.laborTypeId))
+      ? [{ value: String(entry.laborTypeId), label: `${entry.frozenRefs.laborType.name} (deleted)`, color: entry.frozenRefs.laborType.color, glyph: entry.frozenRefs.laborType.glyph }]
+      : []),
+    ...(laborTypes ?? []).map(lt => ({
+      value: String(lt.id),
+      label: lt.name,
+      color: lt.color,
+      glyph: lt.glyph,
+    })),
+  ]
 
   return (
     <>

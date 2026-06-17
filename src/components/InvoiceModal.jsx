@@ -12,6 +12,7 @@ import DatePicker from './pickers/DatePicker'
 import { billedDurationMap, formatTime, entryOverlapsRange } from '../utils/time'
 import { formatMoney, currencySymbol } from '../utils/format'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, escHtml } from '../utils/printDocument'
+import { entryJob, entryLabor } from '../utils/entryRefs'
 import { LaborTag } from './LaborGlyph'
 import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
@@ -144,8 +145,8 @@ export default function InvoiceModal({ jobs, laborTypes, currentDate, currentTab
     // periodEntries, so the `billed` map (keyed by object) resolves them.
     const billed = billedDurationMap(periodEntries, Date.now(), settings.roundingMinutes, settings.roundingMode)
     return scopedEntries.map(entry => {
-      const eJob = jobMap.get(entry.jobId)   // the entry's OWN job — a client invoice spans several, each at its own rate
-      const lt = laborTypes?.find(l => l.id === entry.laborTypeId)
+      const { job: eJob } = entryJob(entry, jobMap.get(entry.jobId))   // the entry's OWN job — a client invoice spans several, each at its own rate
+      const { laborType: lt } = entryLabor(entry, laborTypes?.find(l => l.id === entry.laborTypeId))
       const hours = (billed.get(entry) ?? 0) / 3600000
       const rate  = (eJob?.laborRates?.[entry.laborTypeId]) ?? null
       const amount = rate != null ? hours * rate : null

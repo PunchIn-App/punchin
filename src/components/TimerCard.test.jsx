@@ -160,6 +160,33 @@ describe('TimerCard — stop timer', () => {
   })
 })
 
+describe('TimerCard — frozen-ref rendering', () => {
+  // TimerCard receives already-resolved job/laborType props (resolution happens in
+  // TimerView via entryJob/entryLabor). These tests confirm the card renders any
+  // {name,color,…}-shaped object — live or frozen snapshot — identically.
+  it('renders a frozen job name passed as the job prop', () => {
+    const frozenJob = { name: 'FrozenJob', color: '#f00' }
+    render(<TimerCard entry={ENTRY} job={frozenJob} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('FrozenJob')).toBeInTheDocument()
+  })
+
+  it('renders a frozen labor type name passed as the laborType prop', () => {
+    const frozenLabor = { name: 'OldDev', color: '#5FD08A', glyph: 'code' }
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={frozenLabor} />)
+    expect(screen.getByText('OldDev')).toBeInTheDocument()
+  })
+
+  it('italicises the job name when jobFrozen is set (inert "unlinked" cue)', () => {
+    render(<TimerCard entry={ENTRY} job={{ name: 'FrozenJob', color: '#f00' }} laborType={LABOR_TYPE} jobFrozen />)
+    expect(screen.getByText('FrozenJob')).toHaveClass('italic')
+  })
+
+  it('does not italicise a live job name', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('Acme Corp')).not.toHaveClass('italic')
+  })
+})
+
 describe('TimerCard — edit modal', () => {
   it('opens EditEntryModal when the edit start time button is clicked', () => {
     render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)

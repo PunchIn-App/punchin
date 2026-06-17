@@ -86,6 +86,23 @@ export default function AnalyticsView() {
       color: j.color || ltColor(j.laborTypeId) || 'rgb(var(--accent-rgb))',
     })).filter(d => d.hours > 0).sort((a, b) => b.hours - a.hours)
 
+    // Append frozen-job contributions so permanently-deleted jobs still appear in
+    // the breakdown. Entries whose jobId is still live are already counted above;
+    // only orphaned entries with a frozenRefs.job snapshot are aggregated here.
+    const liveJobIds = new Set(jobs.map(j => j.id))
+    const frozenJobAgg = new Map() // name → { name, hours, color }
+    for (const e of entries) {
+      if (liveJobIds.has(e.jobId) || !e.frozenRefs?.job) continue
+      const f = e.frozenRefs.job
+      const cur = frozenJobAgg.get(f.name) ?? { name: f.name, hours: 0, color: f.color || 'rgb(var(--accent-rgb))' }
+      cur.hours += getEntryDuration(e) / 3600000
+      frozenJobAgg.set(f.name, cur)
+    }
+    const jobDataAll = [
+      ...jobData,
+      ...[...frozenJobAgg.values()].map(d => ({ ...d, hours: parseFloat(d.hours.toFixed(2)) })),
+    ].filter(d => d.hours > 0).sort((a, b) => b.hours - a.hours) // re-sort so frozen jobs interleave by hours (keeps "Top job" accurate)
+
     // Labor type pie
     const ltData = laborTypes.map(lt => ({
       name: lt.name,
@@ -94,7 +111,19 @@ export default function AnalyticsView() {
       glyph: lt.glyph,
     })).filter(d => d.value > 0)
 
-    return { total, dailyData, jobData, ltData, earnings, ratedCount }
+    // Append frozen labor-type contributions (same pattern as frozen jobs above).
+    const liveLtIds = new Set(laborTypes.map(lt => lt.id))
+    const frozenLtAgg = new Map() // name → { name, value (ms), color, glyph }
+    for (const e of entries) {
+      if (liveLtIds.has(e.laborTypeId) || !e.frozenRefs?.laborType) continue
+      const f = e.frozenRefs.laborType
+      const cur = frozenLtAgg.get(f.name) ?? { name: f.name, value: 0, color: f.color, glyph: f.glyph }
+      cur.value += getEntryDuration(e)
+      frozenLtAgg.set(f.name, cur)
+    }
+    const ltDataAll = [...ltData, ...[...frozenLtAgg.values()]].filter(d => d.value > 0)
+
+    return { total, dailyData, jobData: jobDataAll, ltData: ltDataAll, earnings, ratedCount }
   }, [entries, jobs, laborTypes, days, now])
 
   if (!entries || !jobs || !laborTypes) {

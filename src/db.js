@@ -55,6 +55,7 @@ export function genUuid() {
  *   punchIn: Date,
  *   punchOut: Date|null,
  *   notes?: string,
+ *   frozenRefs?: { job?: { name: string, color: string|null }, laborType?: { name: string, color: string, glyph: string|null } },
  *   updatedAt?: number,
  * }} Entry
  */
@@ -138,6 +139,60 @@ export async function deleteEntry(id) {
       await db.deletions.put({ uuid: entry.uuid, deletedAt: Date.now() })
     }
     await db.entries.delete(id)
+  })
+}
+
+// Jobs that reference a labor type — by their default `laborTypeId` or by a
+// per-type rate keyed under it (laborRates keys are strings, so `in` matches).
+// `liveOnly` restricts to non-archived jobs — used to BLOCK deleting a labor
+// type a live job still bills against.
+export async function jobsUsingLaborType(laborTypeId, { liveOnly = false } = {}) {
+  const jobs = await db.jobs.toArray()
+  return jobs.filter(j =>
+    (!liveOnly || j.isActive !== false) &&
+    (j.laborTypeId === laborTypeId || (j.laborRates && laborTypeId in j.laborRates)))
+}
+
+// Permanently delete a job: freeze its display identity onto every referencing
+// entry (so those entries stay self-describing once the job is gone), record a
+// tombstone (so the deletion propagates via sync instead of the job resurrecting
+// from a peer), and hard-delete the job — all in one transaction. The frozen
+// colour resolves the job's own colour or, when unset, its labor type's, mirroring
+// how the job renders today.
+export async function deleteJob(id) {
+  return db.transaction('rw', [db.jobs, db.laborTypes, db.entries, db.deletions], async () => {
+    const job = await db.jobs.get(id)
+    if (!job) return
+    const ltColor = job.laborTypeId ? (await db.laborTypes.get(job.laborTypeId))?.color ?? null : null
+    const frozen = { name: job.name, color: job.color || ltColor || null }
+    const refEntries = await db.entries.where('jobId').equals(id).toArray()
+    for (const e of refEntries) {
+      await db.entries.update(e.id, { frozenRefs: { ...(e.frozenRefs ?? {}), job: frozen } })
+    }
+    if (job.uuid) await db.deletions.put({ uuid: job.uuid, deletedAt: Date.now() })
+    await db.jobs.delete(id)
+  })
+}
+
+// Permanently delete a labor type. Throws 'LABOR_TYPE_IN_USE' if any live
+// (non-archived) job still references it — the unbypassable form of the block
+// rule (callers should pre-check with jobsUsingLaborType(id, { liveOnly: true })
+// to surface the offending jobs). Otherwise freezes name+colour+glyph onto
+// referencing entries, tombstones, and hard-deletes — atomically.
+export async function deleteLaborType(id) {
+  return db.transaction('rw', [db.laborTypes, db.jobs, db.entries, db.deletions], async () => {
+    const lt = await db.laborTypes.get(id)
+    if (!lt) return
+    const blocked = (await db.jobs.toArray()).some(j =>
+      j.isActive !== false && (j.laborTypeId === id || (j.laborRates && id in j.laborRates)))
+    if (blocked) throw new Error('LABOR_TYPE_IN_USE')
+    const frozen = { name: lt.name, color: lt.color, glyph: lt.glyph ?? null }
+    const refEntries = await db.entries.where('laborTypeId').equals(id).toArray()
+    for (const e of refEntries) {
+      await db.entries.update(e.id, { frozenRefs: { ...(e.frozenRefs ?? {}), laborType: frozen } })
+    }
+    if (lt.uuid) await db.deletions.put({ uuid: lt.uuid, deletedAt: Date.now() })
+    await db.laborTypes.delete(id)
   })
 }
 

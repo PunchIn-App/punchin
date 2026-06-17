@@ -11,6 +11,7 @@ import { DEFAULT_JOB_COLOR } from '../accentPresets'
 import { useSettings } from '../hooks/useSettings'
 import { useNowTicker } from '../hooks/useNowTicker'
 import { formatDurationHM, formatTime, formatDate, getDayRange, getWeekRange, getEntryDurationInRange } from '../utils/time'
+import { entryJob, entryLabor } from '../utils/entryRefs'
 
 // A compact stat tile (TODAY / THIS WEEK / AVG·DAY) under the header.
 function StatTile({ label, value, className = '' }) {
@@ -179,21 +180,26 @@ export default function TimerView() {
           <p className="ds-overline text-appTextMuted mb-2">Active · {active.length}</p>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {active?.map(entry => (
-            <TimerCard
-              key={entry.id}
-              entry={entry}
-              job={getJob(entry.jobId)}
-              laborType={getLT(entry.laborTypeId)}
-            />
-          ))}
+          {active?.map(entry => {
+            const { job, frozen: jobFrozen } = entryJob(entry, getJob(entry.jobId))
+            const { laborType } = entryLabor(entry, getLT(entry.laborTypeId))
+            return (
+              <TimerCard
+                key={entry.id}
+                entry={entry}
+                job={job}
+                laborType={laborType}
+                jobFrozen={jobFrozen}
+              />
+            )
+          })}
         </div>
 
         {/* Last completed session (phone/tablet; the xl rail shows it on desktop) */}
         {lastEntry && (() => {
-          const job = getJob(lastEntry.jobId)
-          const lt  = getLT(lastEntry.laborTypeId)
-          const color = lt?.color || DEFAULT_JOB_COLOR
+          const { job, frozen: lastJobFrozen } = entryJob(lastEntry, getJob(lastEntry.jobId))
+          const { laborType: lt } = entryLabor(lastEntry, getLT(lastEntry.laborTypeId))
+          const color = job?.color || lt?.color || DEFAULT_JOB_COLOR
           const duration = new Date(lastEntry.punchOut) - new Date(lastEntry.punchIn)
           return (
             <div className="mt-8 xl:hidden">
@@ -202,7 +208,7 @@ export default function TimerView() {
                 <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
                 <div className="pl-5 pr-4 py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-display font-semibold text-appText text-sm truncate">{job?.name || 'Unknown Job'}</p>
+                    <p className={`font-display font-semibold text-appText text-sm truncate${lastJobFrozen ? ' italic' : ''}`}>{job?.name || 'Unknown Job'}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <LaborTag laborType={lt} />
                       <span className="text-xs text-appTextMuted font-mono">

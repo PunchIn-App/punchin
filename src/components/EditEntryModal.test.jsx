@@ -314,3 +314,87 @@ describe('EditEntryModal — delete flow', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 })
+
+// ─── NaN guard: synced-device frozen entry saves null, not NaN (#Fix2) ─────────
+// On a synced device a permanently-deleted job's entry arrives with jobId=null.
+// The synthetic "(deleted)" option's value is String(null) = "null", so
+// Number("null") = NaN without the guard.  The fix must write null instead.
+
+describe('EditEntryModal — NaN guard: synced-device frozen entry (jobId=null)', () => {
+  // Synced-device shape: jobId is null (NOT the original numeric id)
+  const SYNCED_FROZEN_ENTRY = {
+    id: 30,
+    jobId: null,
+    laborTypeId: null,
+    punchIn: new Date('2025-06-01T09:00:00'),
+    punchOut: new Date('2025-06-01T10:00:00'),
+    notes: null,
+    frozenRefs: {
+      job:       { name: 'Synced Ghost Job', color: '#ccbbaa' },
+      laborType: { name: 'Synced Lost Labor', color: '#009966', glyph: 'pen-line' },
+    },
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Return empty arrays — both the job and labor type are gone from live lists
+    useLiveQuery.mockImplementation(() => [])
+  })
+
+  it('saves jobId as null (not NaN) when the synced frozen entry is saved as-is', async () => {
+    const onClose = vi.fn()
+    render(<EditEntryModal entry={SYNCED_FROZEN_ENTRY} onClose={onClose} />)
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(mockEntriesUpdate).toHaveBeenCalled())
+    const [, payload] = mockEntriesUpdate.mock.calls[0]
+    // Must be null — not NaN — so the DB write is valid
+    expect(payload.jobId).toBeNull()
+    expect(payload.laborTypeId).toBeNull()
+    // Sanity: NaN would have slipped through the old code
+    expect(Number.isNaN(payload.jobId)).toBe(false)
+    expect(Number.isNaN(payload.laborTypeId)).toBe(false)
+  })
+})
+
+describe('EditEntryModal — frozen-ref synthetic options (#permanent-delete)', () => {
+  const FROZEN_ENTRY = {
+    id: 20,
+    jobId: 99,    // no longer in live jobs
+    laborTypeId: 88, // no longer in live labor types
+    punchIn: new Date('2025-06-01T09:00:00'),
+    punchOut: new Date('2025-06-01T10:00:00'),
+    notes: null,
+    frozenRefs: {
+      job:       { name: 'Ghost Job', color: '#aabbcc' },
+      laborType: { name: 'Lost Labor', color: '#ff9900', glyph: 'pen-line' },
+    },
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Return empty arrays — the deleted job/labor type are not in the live lists
+    useLiveQuery.mockImplementation(() => [])
+  })
+
+  it('shows a "(deleted)" synthetic option in the Job picker when the job is gone', () => {
+    render(<EditEntryModal entry={FROZEN_ENTRY} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    expect(screen.getByRole('option', { name: /ghost job.*deleted/i })).toBeInTheDocument()
+  })
+
+  it('shows a "(deleted)" synthetic option in the Labor type picker when the labor type is gone', () => {
+    render(<EditEntryModal entry={FROZEN_ENTRY} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^labor type/i }))
+    expect(screen.getByRole('option', { name: /lost labor.*deleted/i })).toBeInTheDocument()
+  })
+
+  it('does NOT show a "(deleted)" synthetic job option when the job is still live', () => {
+    // The entry's job IS in the live list — no synthetic option should appear
+    const liveEntry = { ...FROZEN_ENTRY, jobId: 1, frozenRefs: { job: { name: 'Acme Corp', color: '#aabbcc' }, laborType: FROZEN_ENTRY.frozenRefs.laborType } }
+    let n = 0
+    useLiveQuery.mockImplementation(() => (++n % 2 === 1 ? JOBS : []))
+    render(<EditEntryModal entry={liveEntry} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /^job/i }))
+    expect(screen.queryByRole('option', { name: /deleted/i })).not.toBeInTheDocument()
+  })
+})

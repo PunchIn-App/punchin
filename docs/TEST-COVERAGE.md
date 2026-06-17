@@ -19,6 +19,7 @@
 | `src/utils/printDocument.test.js` | `PRINT_FONT_HEAD` (loads the three Noto webfonts); `openPrintWindow` — waits for `document.fonts.ready` before printing, falls back to a timed print when `document.fonts` is absent, returns `false` without throwing when the popup is blocked |
 | `src/utils/inkOnAccent.test.js` | `readableInk` — white on dark/saturated accents, dark ink (`#0F1117`) on light/pastel accents (matches the design reference tiles), `#`/case tolerant |
 | `src/utils/color.test.js` | `normalizeHex` (6-digit passthrough/case, add `#`, expand 3-digit, fallback on garbage), `hexToRgb` (→ `"r g b"`, no `NaN` on short/invalid), `withAlpha` (→ `#rrggbbaa`) |
+| `src/utils/entryRefs.test.js` | `entryJob` — returns live job (not frozen), falls back to `frozenRefs.job` when live is absent (frozen), returns null when neither exists; `entryLabor` — same three cases for labor type |
 | `src/iconSvg.test.js` | `iconSvg` — draws the stopwatch body + crown (not the old clock polyline), tints the glyph via the contrast guard (white on dark accent, ink on light), fills the tile with the accent |
 | `src/stopwatchGeometry.test.js` | Locks both stopwatch renderers to the shared `STOPWATCH_ELEMENTS` source (4 stroked paths + body circle + filled centre dot): `iconSvg` (SVG-string) and `PunchGlyph` (React) each draw every shared element so the brand mark can't drift |
 | `src/components/TimerRail.test.jsx` | Desktop Timer rail — renders "This week" once entries load, lists only active jobs for quick punch + calls `onPunch` on click, renders the last session when provided |
@@ -54,7 +55,7 @@
 | `src/components/InvoiceModal.test.jsx` | Line-item calc, period presets, CSV export, print, empty state, billable rounding (issue #208) |
 | `src/components/Layout.test.jsx` | Logo button, nav items, `aria-current`, tab callbacks |
 | `src/components/StartTimerModal.test.jsx` | Render, form validation, concurrent-timer guard |
-| `src/components/TimerCard.test.jsx` | Job/labor-type display, colour accent, stop timer, open/close EditEntryModal, background tick pause, overnight (>12h) calm-motion rule |
+| `src/components/TimerCard.test.jsx` | Job/labor-type display (incl. frozen-ref shaped objects), colour accent, stop timer, open/close EditEntryModal, background tick pause, overnight (>12h) calm-motion rule |
 | `src/views/AnalyticsView.test.jsx` | Loading state, period toggle, summary cards, empty state, charts |
 | `src/views/JobsView.test.jsx` | Jobs and labor types tabs, full CRUD, archive/restore |
 | `src/views/SettingsView.test.jsx` | Drill-in root list + sub-pages, device-Back/Settings-tab-reselect returns to root, Data & Sync consolidation, toggles, theme, export/import, sync UI, danger zone, About rows (help-improve, License modal, Support link) |

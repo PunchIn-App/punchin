@@ -1,7 +1,8 @@
 import { useState, useId } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search, DollarSign } from 'lucide-react'
-import { db } from '../db'
+import { Plus, Pencil, Archive, ArchiveRestore, Tag, Briefcase, ChevronDown, ChevronRight, Search, DollarSign, Trash2 } from 'lucide-react'
+import { db, deleteJob, deleteLaborType, jobsUsingLaborType } from '../db'
+import ConfirmModal from '../components/ConfirmModal'
 import ColorPicker from '../components/ColorPicker'
 import GlyphPicker from '../components/GlyphPicker'
 import EntitySelect from '../components/EntitySelect'
@@ -241,6 +242,9 @@ export default function JobsView() {
   const [showArchivedLT, setShowArchivedLT]     = useState(false)
   const [archiveJobSearch, setArchiveJobSearch] = useState('')
   const [archiveLTSearch, setArchiveLTSearch]   = useState('')
+  const [confirmJob, setConfirmJob] = useState(null)
+  const [confirmLT, setConfirmLT] = useState(null)
+  const [blockedLT, setBlockedLT] = useState(null)
 
   const jobs       = useLiveQuery(async () => {
     const all = await db.jobs.toArray()
@@ -254,6 +258,12 @@ export default function JobsView() {
 
   const toggleArchive = async (job) => {
     await db.jobs.update(job.id, { isActive: job.isActive === false ? true : false })
+  }
+
+  const askDeleteLaborType = async (lt) => {
+    const live = await jobsUsingLaborType(lt.id, { liveOnly: true })
+    if (live.length) setBlockedLT({ lt, jobs: live })
+    else setConfirmLT(lt)
   }
 
   const activeJobCount = jobs?.filter(j => j.isActive !== false).length ?? 0
@@ -408,6 +418,11 @@ export default function JobsView() {
                               className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
                               <ArchiveRestore className="w-4 h-4" aria-hidden="true" />
                             </button>
+                            <button onClick={() => setConfirmJob(job)}
+                              aria-label={`Delete ${job.name} permanently`}
+                              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
+                              <Trash2 className="w-4 h-4" aria-hidden="true" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -516,6 +531,11 @@ export default function JobsView() {
                             className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-appText transition-colors">
                             <ArchiveRestore className="w-4 h-4" aria-hidden="true" />
                           </button>
+                          <button onClick={() => askDeleteLaborType(lt)}
+                            aria-label={`Delete ${lt.name} permanently`}
+                            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-appInput text-appTextMuted hover:text-red-400 transition-colors">
+                            <Trash2 className="w-4 h-4" aria-hidden="true" />
+                          </button>
                         </div>
                       </div>
                     )
@@ -526,6 +546,48 @@ export default function JobsView() {
           </>
         )}
       </div>
+
+      {confirmJob && (
+        <ConfirmModal
+          title={`Permanently delete "${confirmJob.name}"?`}
+          message="The job is removed for good. Its time entries are kept but shown as unlinked (the job's name and colour are frozen onto them). This can't be undone."
+          confirmLabel="Delete permanently"
+          onConfirm={async () => {
+            const job = confirmJob
+            setConfirmJob(null)
+            try { await deleteJob(job.id) } catch { /* infra failure: job remains, list unchanged */ }
+          }}
+          onCancel={() => setConfirmJob(null)}
+        />
+      )}
+      {confirmLT && (
+        <ConfirmModal
+          title={`Permanently delete "${confirmLT.name}"?`}
+          message="The labor type is removed for good. Its time entries are kept but shown as unlinked (its name, colour, and glyph are frozen onto them). This can't be undone."
+          confirmLabel="Delete permanently"
+          onConfirm={async () => {
+            const lt = confirmLT
+            setConfirmLT(null)
+            try {
+              await deleteLaborType(lt.id)
+            } catch {
+              // Raced into use since the pre-check — re-surface the block instead of failing silently.
+              const live = await jobsUsingLaborType(lt.id, { liveOnly: true })
+              setBlockedLT({ lt, jobs: live })
+            }
+          }}
+          onCancel={() => setConfirmLT(null)}
+        />
+      )}
+      {blockedLT && (
+        <ConfirmModal
+          title={`Can't delete "${blockedLT.lt.name}" yet`}
+          message={`It's still used by an active job: ${blockedLT.jobs.map(j => j.name).join(', ')}. Archive or relink those jobs first, then delete it.`}
+          confirmLabel="OK"
+          onConfirm={() => setBlockedLT(null)}
+          onCancel={() => setBlockedLT(null)}
+        />
+      )}
     </div>
   )
 }

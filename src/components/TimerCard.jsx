@@ -10,7 +10,7 @@ import { usePlatformContext } from '../hooks/usePlatformContext'
 import { useSettings } from '../hooks/useSettings'
 import { useHapticFeedback } from '../hooks/useHapticFeedback.jsx'
 
-export default function TimerCard({ entry, job, laborType }) {
+export default function TimerCard({ entry, job, laborType, jobFrozen = false }) {
   const [elapsed, setElapsed] = useState(Date.now() - new Date(entry.punchIn).getTime())
   const [showEditModal, setShowEditModal] = useState(false)
 
@@ -59,7 +59,7 @@ export default function TimerCard({ entry, job, laborType }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-display font-extrabold text-appText truncate">{job?.name || 'Unknown Job'}</p>
+              <p className={`font-display font-extrabold text-appText truncate${jobFrozen ? ' italic' : ''}`}>{job?.name || 'Unknown Job'}</p>
               {isOvernight && (
                 <div className="text-appAccent text-[10px] font-bold uppercase tracking-wider bg-appAccent/10 px-2 py-0.5 rounded-full">
                   Still running · 12h+
