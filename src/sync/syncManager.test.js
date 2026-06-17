@@ -993,6 +993,110 @@ describe('runSync — merge job / labor-type fields (last-write-wins)', () => {
 })
 
 // ---------------------------------------------------------------------------
+// runSync — labor-type appearance convergence (deterministic LWW + identity)
+// ---------------------------------------------------------------------------
+
+describe('runSync — labor-type appearance convergence', () => {
+  it('converges a same-named labor type created independently on each device (color + glyph + uuid)', async () => {
+    await seedSyncSettings()
+    // Local "Design": its own (hook-stamped) uuid + an OLDER edit.
+    const ltId = await db.laborTypes.add({
+      name: 'Design', color: '#111111', glyph: 'palette', isArchived: false, updatedAt: 1000,
+    })
+    const local = await db.laborTypes.get(ltId)
+
+    // Remote "Design": a DIFFERENT uuid (independent create) + a NEWER edit.
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{
+        id: 100, uuid: 'remote-uuid-zzz', name: 'Design',
+        color: '#22AA44', glyph: 'code', isArchived: false, updatedAt: 5000,
+      }],
+      jobs: [], entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const lts = await db.laborTypes.toArray()
+    expect(lts).toHaveLength(1)                 // name-matched, not split into two
+    expect(lts[0].color).toBe('#22AA44')        // newer remote appearance adopted
+    expect(lts[0].glyph).toBe('code')
+    expect(lts[0].uuid).toBe(['remote-uuid-zzz', local.uuid].sort()[0]) // unified to smaller
+  })
+
+  it('breaks an updatedAt tie deterministically (larger uuid wins) so devices converge', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({
+      name: 'Design', color: '#111111', glyph: 'palette', isArchived: false, updatedAt: 3000,
+    })
+    const local = await db.laborTypes.get(ltId)
+    const remoteUuid = 'zzzz-larger-than-any-v4-uuid'
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{
+        id: 100, uuid: remoteUuid, name: 'Design',
+        color: '#22AA44', glyph: 'code', isArchived: false, updatedAt: 3000, // TIE
+      }],
+      jobs: [], entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [out] = await db.laborTypes.toArray()
+    expect(remoteUuid > local.uuid).toBe(true)  // fixture sanity: remote uuid is larger
+    expect(out.color).toBe('#22AA44')           // tie → larger uuid wins the fields
+    expect(out.glyph).toBe('code')
+    expect(out.uuid).toBe([remoteUuid, local.uuid].sort()[0]) // canonical = smaller uuid
+  })
+
+  it('adopts a newer remote color + glyph for a uuid-matched labor type', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({
+      name: 'Design', color: '#111111', glyph: 'palette', isArchived: false, updatedAt: 1000,
+    })
+    const lt = await db.laborTypes.get(ltId)
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Design', color: '#999999', glyph: 'wrench', isArchived: false, updatedAt: 5000 }],
+      jobs: [], entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [out] = await db.laborTypes.toArray()
+    expect(out.color).toBe('#999999')
+    expect(out.glyph).toBe('wrench')
+  })
+
+  it('does not let a uuid-less legacy remote overwrite a local labor type', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({
+      name: 'Design', color: '#111111', glyph: 'palette', isArchived: false, updatedAt: 1000,
+    })
+    const local = await db.laborTypes.get(ltId)
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, name: 'Design', color: '#999999', glyph: 'wrench' }], // no uuid, no updatedAt
+      jobs: [], entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [out] = await db.laborTypes.toArray()
+    expect(out.color).toBe('#111111')  // local kept (remote has no timestamp/uuid to win)
+    expect(out.glyph).toBe('palette')
+    expect(out.uuid).toBe(local.uuid)  // uuid unchanged
+  })
+})
+
+// ---------------------------------------------------------------------------
 // runSync — token expiry handling (issue #121)
 // ---------------------------------------------------------------------------
 
@@ -1048,5 +1152,65 @@ describe('runSync — failure isolation and retry safety', () => {
     expect(await db.entries.toArray()).toHaveLength(1)
     expect(await db.jobs.toArray()).toHaveLength(1)
     expect(await db.laborTypes.toArray()).toHaveLength(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// runSync — job color sync + convergence
+// ---------------------------------------------------------------------------
+
+describe('runSync — job color sync', () => {
+  it('imports a job\'s own color from a remote device (create path)', async () => {
+    await seedSyncSettings()
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [],
+      jobs: [{ id: 9, uuid: 'job-uuid-x', name: 'Imported', laborTypeId: null, isActive: true, color: '#ABCDEF', updatedAt: 1000 }],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [job] = await db.jobs.toArray()
+    expect(job.color).toBe('#ABCDEF')
+  })
+
+  it('propagates a newer remote job color to a uuid-matched job (LWW)', async () => {
+    await seedSyncSettings()
+    const jobId = await db.jobs.add({ name: 'Client', isActive: true, laborRates: {}, color: '#111111', updatedAt: 1000 })
+    const job = await db.jobs.get(jobId)
+
+    const remoteSnapshot = {
+      version: 1, laborTypes: [],
+      jobs: [{ id: 200, uuid: job.uuid, name: 'Client', laborTypeId: null, isActive: true, color: '#222222', updatedAt: 5000 }],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [out] = await db.jobs.toArray()
+    expect(out.color).toBe('#222222')
+  })
+
+  it('converges a same-named job created independently on each device (color + uuid)', async () => {
+    await seedSyncSettings()
+    const jobId = await db.jobs.add({ name: 'Client', isActive: true, laborRates: {}, color: '#111111', updatedAt: 1000 })
+    const local = await db.jobs.get(jobId)
+
+    const remoteSnapshot = {
+      version: 1, laborTypes: [],
+      jobs: [{ id: 200, uuid: 'remote-job-zzz', name: 'Client', laborTypeId: null, isActive: true, color: '#222222', updatedAt: 5000 }],
+      entries: [],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const jobs = await db.jobs.toArray()
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0].color).toBe('#222222')
+    expect(jobs[0].uuid).toBe(['remote-job-zzz', local.uuid].sort()[0])
   })
 })

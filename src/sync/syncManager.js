@@ -56,15 +56,40 @@ function remapLaborRates(rates, ltMap) {
   return out
 }
 
+// Deterministic, symmetric across devices: pick the lexicographically smaller
+// uuid as the canonical identity, so two independently-created same-named
+// records converge onto ONE uuid instead of name-matching forever with split
+// ids. If only one side has a uuid (legacy), that one is canonical.
+function canonicalUuid(a, b) {
+  if (!a) return b
+  if (!b) return a
+  return a < b ? a : b
+}
+
+// Last-write-wins by updatedAt; ties (equal or both-missing timestamps) are
+// broken deterministically by uuid (larger uuid wins) so BOTH devices
+// independently pick the same winner and converge, rather than each keeping its
+// own copy. `?? 0` means a uuid-less / timestamp-less legacy remote never wins
+// over a stamped local record.
+function remoteIsNewer(remote, local) {
+  const rt = remote.updatedAt ?? 0
+  const lt = local.updatedAt ?? 0
+  if (rt !== lt) return rt > lt
+  return String(remote.uuid) > String(local.uuid)
+}
+
 async function mergeSnapshot(remote, { applySettings = false } = {}) {
   if (!remote?.version || !Array.isArray(remote.jobs)) return 0
 
   const imported = await db.transaction('rw', [db.laborTypes, db.jobs, db.entries, db.deletions], async () => {
-    // Identity is resolved per-record: a record that carries a `uuid` (written
-    // by current app versions) is matched to the local record with the same
-    // uuid — stable across renames and edits. Records without a uuid (legacy
-    // v1 snapshots from older app versions) fall back to the original
-    // name/value matching, so old and new snapshots both merge correctly.
+    // Identity is resolved per-record: a record carrying a `uuid` is matched to
+    // the local record with the same uuid. Failing that, records match by name
+    // (case-insensitive) — and when a name match spans two DIFFERENT uuids
+    // (the same labor type/job created independently on each device), the two
+    // converge onto a canonical uuid (the lexicographically smaller) so they
+    // stop splitting on every sync. Records without a uuid (legacy v1 snapshots)
+    // still match by name. Appearance/field conflicts are resolved by
+    // last-write-wins (updatedAt; ties broken deterministically by uuid).
     const ltMap = {}
     const existingLts = await db.laborTypes.toArray()
     for (const lt of remote.laborTypes ?? []) {
@@ -73,11 +98,18 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
         existingLts.find(e => e.name.toLowerCase() === lt.name.toLowerCase())
       if (match) {
         ltMap[lt.id] = match.id
-        // Last-write-wins for mutable fields (issue #120): name, color, archive.
-        if (lt.uuid && (lt.updatedAt ?? 0) > (match.updatedAt ?? 0)) {
-          const fields = { name: lt.name, color: lt.color, glyph: lt.glyph ?? null, isArchived: lt.isArchived ?? false }
-          await db.laborTypes.update(match.id, { ...fields, updatedAt: lt.updatedAt })
-          Object.assign(match, fields, { updatedAt: lt.updatedAt })
+        // Converge identity (adopt the canonical uuid so independently-created
+        // same-name copies stop splitting) and resolve appearance by LWW. Either
+        // may require a write; skip when neither does.
+        const canon = canonicalUuid(match.uuid, lt.uuid)
+        const takeRemote = remoteIsNewer(lt, match)
+        if (takeRemote || canon !== match.uuid) {
+          const fields = takeRemote
+            ? { name: lt.name, color: lt.color, glyph: lt.glyph ?? null, isArchived: lt.isArchived ?? false }
+            : {}
+          const updatedAt = takeRemote ? lt.updatedAt : match.updatedAt
+          await db.laborTypes.update(match.id, { ...fields, uuid: canon, updatedAt })
+          Object.assign(match, fields, { uuid: canon, updatedAt })
         }
       } else {
         const newId = await db.laborTypes.add({
@@ -101,14 +133,17 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
         laborTypeId: job.laborTypeId ? ltMap[job.laborTypeId] : null,
         isActive: job.isActive !== false,
         laborRates: remapLaborRates(job.laborRates, ltMap),
+        color: job.color ?? null,
       }
       if (match) {
         jobMap[job.id] = match.id
-        // Last-write-wins for mutable fields (issue #120): name, client, active,
-        // labor type, and per-type rates (which were previously dropped entirely).
-        if (job.uuid && (job.updatedAt ?? 0) > (match.updatedAt ?? 0)) {
-          await db.jobs.update(match.id, { ...jobFields, updatedAt: job.updatedAt })
-          Object.assign(match, jobFields, { updatedAt: job.updatedAt })
+        const canon = canonicalUuid(match.uuid, job.uuid)
+        const takeRemote = remoteIsNewer(job, match)
+        if (takeRemote || canon !== match.uuid) {
+          const fields = takeRemote ? jobFields : {}
+          const updatedAt = takeRemote ? job.updatedAt : match.updatedAt
+          await db.jobs.update(match.id, { ...fields, uuid: canon, updatedAt })
+          Object.assign(match, fields, { uuid: canon, updatedAt })
         }
       } else {
         const newId = await db.jobs.add({ ...jobFields, uuid: job.uuid, updatedAt: job.updatedAt })

@@ -23,7 +23,8 @@ export function genUuid() {
  * Dexie `creating` hook below). Unlike the auto-increment `id` (local-only), it
  * survives sync/transfer and lets cloud merge identify the *same* record across
  * devices. `updatedAt` (ms epoch) is bumped on every write and is the basis for
- * last-write-wins conflict resolution.
+ * last-write-wins conflict resolution; ties (equal timestamps) are broken
+ * deterministically by `uuid` in the sync merge so two devices converge.
  *
  * @typedef {{
  *   id?: number,
