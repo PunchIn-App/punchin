@@ -9,7 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - **Sync — a job's color now carries to other devices.** Previously a job's color was silently dropped when a remote device merged a snapshot: the sync merge path did not carry the `color` field, so the receiving device always fell back to the labor type's color instead of the job's own. The field is now merged like any other job attribute with last-write-wins + deterministic tie-break.
-- **Sync — labor type color and glyph now converge across devices (#appearance-sync).** When the same labor type was created independently on two devices (identical name, different internal UUIDs), the two records never reconciled their appearance — whichever device "won" kept its own color/glyph, and edits on one device never reached the other. The fix applies two-stage identity unification: records with matching names are merged onto a single canonical UUID before LWW conflict resolution runs, so appearance edits on either device land on the same record and propagate everywhere.
+- **Sync — labor type color and glyph now converge across devices.** When the same labor type was created independently on two devices (identical name, different internal UUIDs), the two records never reconciled their appearance — whichever device "won" kept its own color/glyph, and edits on one device never reached the other. The fix applies two-stage identity unification: records with matching names are merged onto a single canonical UUID before LWW conflict resolution runs, so appearance edits on either device land on the same record and propagate everywhere.
 
 ---
 
