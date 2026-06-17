@@ -101,7 +101,7 @@ export default function AnalyticsView() {
     const jobDataAll = [
       ...jobData,
       ...[...frozenJobAgg.values()].map(d => ({ ...d, hours: parseFloat(d.hours.toFixed(2)) })),
-    ].filter(d => d.hours > 0)
+    ].filter(d => d.hours > 0).sort((a, b) => b.hours - a.hours) // re-sort so frozen jobs interleave by hours (keeps "Top job" accurate)
 
     // Labor type pie
     const ltData = laborTypes.map(lt => ({

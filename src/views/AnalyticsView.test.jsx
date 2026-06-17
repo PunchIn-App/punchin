@@ -361,4 +361,24 @@ describe('AnalyticsView — frozen job / labor-type breakdown (#permanent-delete
     // Only one "Acme Corp" row, not two
     expect(table.getAllByText('Acme Corp').length).toBe(1)
   })
+
+  it('orders a high-hours frozen job above a low-hours live job (Top job stays accurate)', () => {
+    const entries = [
+      { id: 20, jobId: 1,  laborTypeId: 1, punchIn: hoursAgo(1), punchOut: hoursAgo(0) },                 // ~1h, live
+      { id: 21, jobId: 99, laborTypeId: 1, punchIn: hoursAgo(6), punchOut: hoursAgo(1),                   // ~5h, frozen
+        frozenRefs: { job: { name: 'BigGhost', color: '#aabbcc' } } },
+    ]
+    setupMocksByDeps({
+      entries,
+      jobs: [{ id: 1, name: 'LiveSmall', color: '#123456' }],
+      laborTypes: [{ id: 1, name: 'Design', color: '#6366F1' }],
+    })
+    render(<AnalyticsView />)
+    const caption = screen.getAllByText('Hours by job').find(el => el.tagName.toLowerCase() === 'caption')
+    const txt = caption.closest('table').textContent
+    expect(txt.indexOf('BigGhost')).toBeGreaterThan(-1)
+    expect(txt.indexOf('LiveSmall')).toBeGreaterThan(-1)
+    // Frozen job (5h) must sort above the live job (1h) — bar order + "Top job" aria-label.
+    expect(txt.indexOf('BigGhost')).toBeLessThan(txt.indexOf('LiveSmall'))
+  })
 })
