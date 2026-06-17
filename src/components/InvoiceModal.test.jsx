@@ -416,6 +416,48 @@ describe('InvoiceModal — export and print', () => {
   })
 })
 
+describe('InvoiceModal — frozen-ref rendering (#permanent-delete)', () => {
+  it('shows frozen labor-type name in the print HTML when the labor type has been deleted', async () => {
+    // Entry belongs to the live job (id 1) but its labor type (id 99) is gone.
+    // entryLabor falls back to frozenRefs.laborType → the frozen name must appear.
+    const entryFrozenLt = [{
+      id: 5, jobId: 1, laborTypeId: 99,
+      punchIn:  new Date('2025-06-01T09:00:00'),
+      punchOut: new Date('2025-06-01T10:00:00'),
+      frozenRefs: { laborType: { name: 'Old Strategy', color: '#ff9900', glyph: 'pen-line' } },
+    }]
+    useLiveQuery.mockImplementation((_fn, deps) => deps?.[2] ? entryFrozenLt : [])
+    // laborTypes passed to the modal does NOT include id 99 — it was deleted
+    renderModal({ laborTypes: [] })
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    const html = openPrintWindow.mock.calls[0][0]
+    // The frozen labor type name must flow through laborBadgeHTML into the print HTML
+    expect(html).toContain('Old Strategy')
+  })
+
+  it('shows frozen labor-type name in the CSV when the labor type has been deleted', async () => {
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+    global.URL.revokeObjectURL = vi.fn()
+    const entryFrozenLt = [{
+      id: 6, jobId: 1, laborTypeId: 99,
+      punchIn:  new Date('2025-06-01T11:00:00'),
+      punchOut: new Date('2025-06-01T12:00:00'),
+      frozenRefs: { laborType: { name: 'Archived Dev', color: '#3b82f6', glyph: 'code' } },
+    }]
+    useLiveQuery.mockImplementation((_fn, deps) => deps?.[2] ? entryFrozenLt : [])
+    renderModal({ laborTypes: [] })
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /export csv/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /export csv/i }))
+    // The Blob created for CSV should contain the frozen labor type name
+    const blobArg = global.URL.createObjectURL.mock.calls[0][0]
+    const csvText = await blobArg.text()
+    expect(csvText).toContain('Archived Dev')
+  })
+})
+
 describe('InvoiceModal — backdrop and label', () => {
   it('calls onClose when clicking the backdrop', () => {
     const onClose = vi.fn()

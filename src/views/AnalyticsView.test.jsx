@@ -297,3 +297,68 @@ describe('AnalyticsView — chart ARIA semantics (#1.1.1)', () => {
     expect(caption.closest('table').closest('[role="img"]')).toBeNull()
   })
 })
+
+// --------------------------------------------------------------------------
+// Frozen-ref rendering — permanently-deleted jobs / labor types still show
+// --------------------------------------------------------------------------
+describe('AnalyticsView — frozen job / labor-type breakdown (#permanent-delete)', () => {
+  const NOW = Date.now()
+  const hoursAgo = h => new Date(NOW - h * 3600000)
+
+  it('includes a frozen-job entry in the Hours-by-job sr-only table', () => {
+    // The live jobs list has no job with id 99; the entry carries a frozenRefs.job
+    // snapshot. The deleted job's name must appear in the breakdown.
+    const entries = [{
+      id: 10, jobId: 99, laborTypeId: 1,
+      punchIn: hoursAgo(2), punchOut: hoursAgo(1),
+      frozenRefs: { job: { name: 'Ghost Job', color: '#aabbcc' } },
+    }]
+    setupMocksByDeps({ entries, jobs: [], laborTypes: [{ id: 1, name: 'Design', color: '#6366F1' }] })
+    render(<AnalyticsView />)
+    // The sr-only jobs table should contain the frozen job name.
+    // "Hours by job" appears in both the visible <p> heading and the sr-only <caption>.
+    const captions = screen.getAllByText('Hours by job')
+    const caption = captions.find(el => el.tagName.toLowerCase() === 'caption')
+    const table = within(caption.closest('table'))
+    expect(table.getByText('Ghost Job')).toBeInTheDocument()
+    expect(table.getByText('1h')).toBeInTheDocument() // ~1 h
+  })
+
+  it('includes a frozen-labor-type entry in the By-labor-type sr-only table', () => {
+    // The live labor types list has no lt with id 77; the entry has frozenRefs.laborType.
+    const entries = [{
+      id: 11, jobId: 1, laborTypeId: 77,
+      punchIn: hoursAgo(3), punchOut: hoursAgo(1),
+      frozenRefs: { laborType: { name: 'Old Design', color: '#ff9900', glyph: 'pen-line' } },
+    }]
+    setupMocksByDeps({ entries, jobs: [{ id: 1, name: 'Acme' }], laborTypes: [] })
+    render(<AnalyticsView />)
+    // "By labor type" is the visible heading; "Hours by labor type" is the sr-only caption.
+    const captions = screen.getAllByText('Hours by labor type')
+    const caption = captions.find(el => el.tagName.toLowerCase() === 'caption')
+    const table = within(caption.closest('table'))
+    expect(table.getByText('Old Design')).toBeInTheDocument()
+    expect(table.getByText('2h')).toBeInTheDocument() // ~2 h
+  })
+
+  it('does NOT double-count an entry whose job is still live', () => {
+    // A live job entry should only appear once (in the live jobData), not also via frozen.
+    const entries = [{
+      id: 12, jobId: 1, laborTypeId: 1,
+      punchIn: hoursAgo(2), punchOut: hoursAgo(1),
+      frozenRefs: { job: { name: 'Acme Corp', color: '#aabbcc' } }, // ignored — job is live
+    }]
+    setupMocksByDeps({
+      entries,
+      jobs: [{ id: 1, name: 'Acme Corp', color: '#aabbcc' }],
+      laborTypes: [{ id: 1, name: 'Design', color: '#6366F1' }],
+    })
+    render(<AnalyticsView />)
+    // "Hours by job" appears in both the visible <p> heading and the sr-only <caption>.
+    const captions = screen.getAllByText('Hours by job')
+    const caption = captions.find(el => el.tagName.toLowerCase() === 'caption')
+    const table = within(caption.closest('table'))
+    // Only one "Acme Corp" row, not two
+    expect(table.getAllByText('Acme Corp').length).toBe(1)
+  })
+})
