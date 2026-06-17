@@ -56,6 +56,28 @@ function remapLaborRates(rates, ltMap) {
   return out
 }
 
+// Deterministic, symmetric across devices: pick the lexicographically smaller
+// uuid as the canonical identity, so two independently-created same-named
+// records converge onto ONE uuid instead of name-matching forever with split
+// ids. If only one side has a uuid (legacy), that one is canonical.
+function canonicalUuid(a, b) {
+  if (!a) return b
+  if (!b) return a
+  return a < b ? a : b
+}
+
+// Last-write-wins by updatedAt; ties (equal or both-missing timestamps) are
+// broken deterministically by uuid (larger uuid wins) so BOTH devices
+// independently pick the same winner and converge, rather than each keeping its
+// own copy. `?? 0` means a uuid-less / timestamp-less legacy remote never wins
+// over a stamped local record.
+function remoteIsNewer(remote, local) {
+  const rt = remote.updatedAt ?? 0
+  const lt = local.updatedAt ?? 0
+  if (rt !== lt) return rt > lt
+  return String(remote.uuid) > String(local.uuid)
+}
+
 async function mergeSnapshot(remote, { applySettings = false } = {}) {
   if (!remote?.version || !Array.isArray(remote.jobs)) return 0
 
@@ -73,11 +95,18 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
         existingLts.find(e => e.name.toLowerCase() === lt.name.toLowerCase())
       if (match) {
         ltMap[lt.id] = match.id
-        // Last-write-wins for mutable fields (issue #120): name, color, archive.
-        if (lt.uuid && (lt.updatedAt ?? 0) > (match.updatedAt ?? 0)) {
-          const fields = { name: lt.name, color: lt.color, glyph: lt.glyph ?? null, isArchived: lt.isArchived ?? false }
-          await db.laborTypes.update(match.id, { ...fields, updatedAt: lt.updatedAt })
-          Object.assign(match, fields, { updatedAt: lt.updatedAt })
+        // Converge identity (adopt the canonical uuid so independently-created
+        // same-name copies stop splitting) and resolve appearance by LWW. Either
+        // may require a write; skip when neither does.
+        const canon = canonicalUuid(match.uuid, lt.uuid)
+        const takeRemote = remoteIsNewer(lt, match)
+        if (takeRemote || canon !== match.uuid) {
+          const fields = takeRemote
+            ? { name: lt.name, color: lt.color, glyph: lt.glyph ?? null, isArchived: lt.isArchived ?? false }
+            : {}
+          const updatedAt = takeRemote ? lt.updatedAt : match.updatedAt
+          await db.laborTypes.update(match.id, { ...fields, uuid: canon, updatedAt })
+          Object.assign(match, fields, { uuid: canon, updatedAt })
         }
       } else {
         const newId = await db.laborTypes.add({
