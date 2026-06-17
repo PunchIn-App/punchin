@@ -552,7 +552,11 @@ export default function JobsView() {
           title={`Permanently delete "${confirmJob.name}"?`}
           message="The job is removed for good. Its time entries are kept but shown as unlinked (the job's name and colour are frozen onto them). This can't be undone."
           confirmLabel="Delete permanently"
-          onConfirm={async () => { await deleteJob(confirmJob.id); setConfirmJob(null) }}
+          onConfirm={async () => {
+            const job = confirmJob
+            setConfirmJob(null)
+            try { await deleteJob(job.id) } catch { /* infra failure: job remains, list unchanged */ }
+          }}
           onCancel={() => setConfirmJob(null)}
         />
       )}
@@ -561,7 +565,17 @@ export default function JobsView() {
           title={`Permanently delete "${confirmLT.name}"?`}
           message="The labor type is removed for good. Its time entries are kept but shown as unlinked (its name, colour, and glyph are frozen onto them). This can't be undone."
           confirmLabel="Delete permanently"
-          onConfirm={async () => { await deleteLaborType(confirmLT.id); setConfirmLT(null) }}
+          onConfirm={async () => {
+            const lt = confirmLT
+            setConfirmLT(null)
+            try {
+              await deleteLaborType(lt.id)
+            } catch {
+              // Raced into use since the pre-check — re-surface the block instead of failing silently.
+              const live = await jobsUsingLaborType(lt.id, { liveOnly: true })
+              setBlockedLT({ lt, jobs: live })
+            }
+          }}
           onCancel={() => setConfirmLT(null)}
         />
       )}
