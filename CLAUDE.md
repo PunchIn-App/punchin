@@ -188,7 +188,7 @@ Archived jobs and labor types can be permanently deleted. The delete flow:
 
 Use `deleteJob(id)` / `deleteLaborType(id)` (in `db.js`) — never call `db.jobs.delete()` / `db.laborTypes.delete()` directly, as that skips the freeze-and-tombstone logic. Both are the hard-delete siblings of `deleteEntry(id)`.
 
-**Frozen-ref rendering:** `src/utils/entryRefs.js` exports `entryJob(entry, liveJob)` and `entryLabor(entry, liveLabor)`. Each returns `{job/laborType, frozen: bool}`. When `frozen` is true, the caller renders the ref as inert "unlinked" plaintext (a dashed chip with a broken-link icon) instead of a live, interactive record. Timesheets, Timer, Invoice, Analytics, and EditEntry all resolve refs through these helpers so deleted items display consistently.
+**Frozen-ref rendering:** `src/utils/entryRefs.js` exports `entryJob(entry, liveJob)` and `entryLabor(entry, liveLabor)`. Each returns `{job/laborType, frozen: bool}`. When `frozen` is true, the caller renders the ref's frozen `name`/`color`/`glyph` as inert plaintext — the job name is italicised as the "unlinked" cue (the labor tag keeps its colour+glyph) — instead of a live, interactive record. In EditEntry the deleted ref shows as a `"<name> (deleted)"` option you can leave as-is or re-link. Timesheets, Timer, Invoice, Analytics, and EditEntry all resolve refs through these helpers so deleted items display consistently.
 
 ### Settings Keys
 
