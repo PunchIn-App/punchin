@@ -1214,3 +1214,59 @@ describe('runSync — job color sync', () => {
     expect(jobs[0].uuid).toBe(['remote-job-zzz', local.uuid].sort()[0])
   })
 })
+
+// ---------------------------------------------------------------------------
+// runSync — frozen entry references (permanent delete / frozenRefs)
+// ---------------------------------------------------------------------------
+
+describe('runSync — frozen entry references', () => {
+  it('carries frozenRefs through the merge for a uuid-matched entry', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({ name: 'Design', color: '#6366F1', isArchived: false })
+    const jobId = await db.jobs.add({ name: 'Client', isActive: true, laborRates: {} })
+    const [lt, job] = await Promise.all([db.laborTypes.get(ltId), db.jobs.get(jobId)])
+    const localId = await db.entries.add({ jobId, laborTypeId: ltId, punchIn: new Date('2025-01-01T09:00:00Z'), punchOut: new Date('2025-01-01T10:00:00Z'), updatedAt: 1000 })
+    const entry = await db.entries.get(localId)
+
+    const remoteSnapshot = {
+      version: 1,
+      laborTypes: [{ id: 100, uuid: lt.uuid, name: 'Design', color: '#6366F1' }],
+      jobs: [{ id: 200, uuid: job.uuid, name: 'Client', laborTypeId: 100, isActive: true }],
+      entries: [{ uuid: entry.uuid, jobId: 200, laborTypeId: 100, punchIn: '2025-01-01T09:00:00.000Z', punchOut: '2025-01-01T10:00:00.000Z', notes: null, frozenRefs: { laborType: { name: 'Old Design', color: '#abc', glyph: 'palette' } }, updatedAt: 5000 }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [out] = await db.entries.toArray()
+    expect(out.frozenRefs.laborType.name).toBe('Old Design')
+  })
+
+  it('imports an entry whose job is gone but carries a frozen job ref (jobId nulled)', async () => {
+    await seedSyncSettings()
+    const remoteSnapshot = {
+      version: 1, laborTypes: [], jobs: [],
+      entries: [{ uuid: 'frozen-e1', jobId: 777, laborTypeId: null, punchIn: '2025-02-01T09:00:00.000Z', punchOut: '2025-02-01T10:00:00.000Z', notes: null, frozenRefs: { job: { name: 'Deleted Job', color: '#f00' } } }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const entries = await db.entries.toArray()
+    expect(entries).toHaveLength(1)
+    expect(entries[0].jobId).toBeNull()
+    expect(entries[0].frozenRefs.job.name).toBe('Deleted Job')
+  })
+
+  it('still skips an entry whose job is unmapped AND has no frozen ref (transient)', async () => {
+    await seedSyncSettings()
+    const remoteSnapshot = {
+      version: 1, laborTypes: [], jobs: [],
+      entries: [{ uuid: 'orphan-e1', jobId: 888, laborTypeId: null, punchIn: '2025-02-01T09:00:00.000Z', punchOut: '2025-02-01T10:00:00.000Z', notes: null }],
+    }
+    github.fetchAllDeviceData.mockResolvedValueOnce([remoteSnapshot])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+    expect(await db.entries.toArray()).toHaveLength(0)
+  })
+})

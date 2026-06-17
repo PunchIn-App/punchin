@@ -182,18 +182,22 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
     for (const entry of remote.entries ?? []) {
       const newJobId = jobMap[entry.jobId]
       const newLtId = entry.laborTypeId ? ltMap[entry.laborTypeId] : null
-      if (!newJobId) continue
+      // Keep an entry whose job can't be remapped only when it carries a frozen
+      // job snapshot (the job was permanently deleted) — those entries are
+      // self-describing. A plain unmapped entry (job not yet synced) is still skipped.
+      if (!newJobId && !entry.frozenRefs?.job) continue
       // Don't resurrect an entry covered by a tombstone (unless it's a newer edit).
       if (entry.uuid) {
         const deletedAt = tomb.get(entry.uuid)
         if (deletedAt != null && deletedAt >= (entry.updatedAt ?? 0)) continue
       }
       const fields = {
-        jobId: newJobId,
+        jobId: newJobId ?? null,
         laborTypeId: newLtId,
         punchIn: new Date(entry.punchIn),
         punchOut: entry.punchOut ? new Date(entry.punchOut) : null,
         notes: entry.notes ?? null,
+        frozenRefs: entry.frozenRefs ?? null,
       }
       const local = entry.uuid
         ? liveEntries.find(e => e.uuid === entry.uuid)
