@@ -175,6 +175,16 @@ describe('TimerCard — frozen-ref rendering', () => {
     render(<TimerCard entry={ENTRY} job={JOB} laborType={frozenLabor} />)
     expect(screen.getByText('OldDev')).toBeInTheDocument()
   })
+
+  it('italicises the job name when jobFrozen is set (inert "unlinked" cue)', () => {
+    render(<TimerCard entry={ENTRY} job={{ name: 'FrozenJob', color: '#f00' }} laborType={LABOR_TYPE} jobFrozen />)
+    expect(screen.getByText('FrozenJob')).toHaveClass('italic')
+  })
+
+  it('does not italicise a live job name', () => {
+    render(<TimerCard entry={ENTRY} job={JOB} laborType={LABOR_TYPE} />)
+    expect(screen.getByText('Acme Corp')).not.toHaveClass('italic')
+  })
 })
 
 describe('TimerCard — edit modal', () => {

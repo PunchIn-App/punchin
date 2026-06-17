@@ -180,14 +180,19 @@ export default function TimerView() {
           <p className="ds-overline text-appTextMuted mb-2">Active · {active.length}</p>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {active?.map(entry => (
-            <TimerCard
-              key={entry.id}
-              entry={entry}
-              job={entryJob(entry, getJob(entry.jobId)).job}
-              laborType={entryLabor(entry, getLT(entry.laborTypeId)).laborType}
-            />
-          ))}
+          {active?.map(entry => {
+            const { job, frozen: jobFrozen } = entryJob(entry, getJob(entry.jobId))
+            const { laborType } = entryLabor(entry, getLT(entry.laborTypeId))
+            return (
+              <TimerCard
+                key={entry.id}
+                entry={entry}
+                job={job}
+                laborType={laborType}
+                jobFrozen={jobFrozen}
+              />
+            )
+          })}
         </div>
 
         {/* Last completed session (phone/tablet; the xl rail shows it on desktop) */}
