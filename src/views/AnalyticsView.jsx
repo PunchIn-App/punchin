@@ -279,7 +279,7 @@ export default function AnalyticsView() {
                     <span className="font-mono text-[11px] font-semibold text-appText mt-1 leading-none">{formatDurationHM(ltData.reduce((a, d) => a + d.value, 0))}</span>
                   </div>
                 </figure>
-                <div className="flex-1 space-y-2.5" aria-hidden="true">
+                <div className="flex-1 min-w-0 space-y-2.5" aria-hidden="true">
                   {ltData.map(lt => (
                     <div key={lt.name} className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">

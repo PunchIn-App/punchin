@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.32.1] — 2026-06-24
+
+### Fixed
+- **Analytics — labor-type breakdown no longer clips its durations.** In the "By labor type" panel, a long labor-type name could push the right-aligned duration past the card's edge, cutting off the trailing "m" of the minutes (e.g. "16h 11m" showing as "16h 11"). The legend column now shrinks correctly, so long names truncate with an ellipsis and every duration stays fully visible.
+
+---
+
 ## [0.32.0] — 2026-06-17
 
 ### Added
