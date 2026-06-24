@@ -103,6 +103,30 @@ describe('AnalyticsView — summary cards', () => {
   })
 })
 
+describe('AnalyticsView — labor-type legend layout (#287)', () => {
+  it('legend column has min-w-0 so long names truncate instead of clipping the value', () => {
+    setupMocks({
+      laborTypes: [
+        { id: 1, name: 'Professional Services', color: '#6366F1' },
+        { id: 2, name: 'Admin', color: '#0EA66B' },
+      ],
+      entries: [
+        { id: 1, jobId: 1, laborTypeId: 1, punchIn: new Date(Date.now() - 3 * 3600000), punchOut: new Date() },
+        { id: 2, jobId: 1, laborTypeId: 2, punchIn: new Date(Date.now() - 1 * 3600000), punchOut: new Date() },
+      ],
+    })
+    render(<AnalyticsView />)
+    // The "By labor type" legend column must allow itself to shrink (min-w-0) or
+    // the right-aligned duration value overflows the card and clips its trailing
+    // "m". Without min-w-0 the flex child keeps its intrinsic width and the value
+    // is pushed past the card edge (issue #287).
+    const panel = screen.getByText('By labor type').closest('div')
+    const legend = panel.querySelector('.flex-1')
+    expect(legend).toBeTruthy()
+    expect(legend.className).toContain('min-w-0')
+  })
+})
+
 describe('AnalyticsView — empty state', () => {
   it('shows empty-state message when no entries exist', () => {
     setupMocks({ entries: [] })
