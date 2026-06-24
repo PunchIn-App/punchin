@@ -25,6 +25,13 @@ export default function AnalyticsView() {
   const days = period === '7d' ? 7 : 30
   const { settings } = useSettings()
 
+  // Avg / day options (issue #293). Read as primitives so the chart memo below
+  // keeps a stable dependency — the weekdays array would change identity every
+  // render. With the defaults (exclude empty days, all weekdays) the figure is an
+  // average over the days actually worked, labelled "Avg / active day".
+  const avgExcludeZeroDays = settings.avgExcludeZeroDays === true
+  const avgWeekdaysKey = (Array.isArray(settings.avgWeekdays) ? settings.avgWeekdays : [0, 1, 2, 3, 4, 5, 6]).join(',')
+
   // Anchor the window to the start of the earliest day shown rather than a
   // rolling `days`×24h instant. That way the chart's `days` calendar buckets
   // exactly cover the queried span, so total = sum of the buckets and the
@@ -46,8 +53,8 @@ export default function AnalyticsView() {
   // Derive every chart dataset in one memo so the O(days×entries) bucketing and
   // the per-job / per-labor-type filter passes only re-run when the data or the
   // period changes, not on unrelated re-renders (issue #138).
-  const { total, dailyData, jobData, ltData, earnings, ratedCount } = useMemo(() => {
-    if (!entries || !jobs || !laborTypes) return { total: 0, dailyData: [], jobData: [], ltData: [], earnings: 0, ratedCount: 0 }
+  const { total, dailyData, jobData, ltData, earnings, ratedCount, avgMs } = useMemo(() => {
+    if (!entries || !jobs || !laborTypes) return { total: 0, dailyData: [], jobData: [], ltData: [], earnings: 0, ratedCount: 0, avgMs: 0 }
 
     const total = sumDurations(entries)
 
@@ -67,15 +74,26 @@ export default function AnalyticsView() {
     // use. Durations are local-time elapsed ms, so a fixed 9–5 shift reads 7h or
     // 9h on the two DST changeover days each year: that's the real elapsed time
     // worked, surfaced intentionally rather than normalised away.
-    const dailyData = Array.from({ length: days }, (_, i) => {
+    const dayBuckets = Array.from({ length: days }, (_, i) => {
       const day  = subDays(new Date(), days - 1 - i)
       const ds   = startOfDay(day)
       const de   = endOfDay(day)
-      const hrs  = entries
+      const ms   = entries
         .filter(e => entryOverlapsRange(e, ds, de))
-        .reduce((a, e) => a + getEntryDurationInRange(e, ds, de, now), 0) / 3600000
-      return { date: format(day, days === 7 ? 'EEE' : 'M/d'), hours: parseFloat(hrs.toFixed(2)) }
+        .reduce((a, e) => a + getEntryDurationInRange(e, ds, de, now), 0)
+      return { dow: day.getDay(), ms, label: format(day, days === 7 ? 'EEE' : 'M/d') }
     })
+    const dailyData = dayBuckets.map(b => ({ date: b.label, hours: parseFloat((b.ms / 3600000).toFixed(2)) }))
+
+    // Avg / day (issue #293): the denominator drops weekdays outside avgWeekdays
+    // and — when avgExcludeZeroDays is on — days with nothing logged, so a day off
+    // doesn't drag the figure down. The numerator is the time on the counted days,
+    // so it's a true average over the days that count (defaults → "Avg / active
+    // day"). An empty weekday set or no counted days yields 0 rather than dividing
+    // by zero.
+    const avgWeekdaysSet = new Set(avgWeekdaysKey ? avgWeekdaysKey.split(',').map(Number) : [])
+    const counted = dayBuckets.filter(b => avgWeekdaysSet.has(b.dow) && (!avgExcludeZeroDays || b.ms > 0))
+    const avgMs = counted.length ? counted.reduce((a, b) => a + b.ms, 0) / counted.length : 0
 
     // Job breakdown — each bar carries the job's OWN colour (its set colour, else
     // its labor type's, matching the job card's left-rail resolution).
@@ -123,8 +141,8 @@ export default function AnalyticsView() {
     }
     const ltDataAll = [...ltData, ...[...frozenLtAgg.values()]].filter(d => d.value > 0)
 
-    return { total, dailyData, jobData: jobDataAll, ltData: ltDataAll, earnings, ratedCount }
-  }, [entries, jobs, laborTypes, days, now])
+    return { total, dailyData, jobData: jobDataAll, ltData: ltDataAll, earnings, ratedCount, avgMs }
+  }, [entries, jobs, laborTypes, days, now, avgExcludeZeroDays, avgWeekdaysKey])
 
   if (!entries || !jobs || !laborTypes) {
     return (
@@ -165,9 +183,9 @@ export default function AnalyticsView() {
           <p className="font-mono text-2xl font-semibold text-appText">{formatDurationHM(total)}</p>
         </div>
         <div className="rounded-xl bg-appCard border border-appBorder p-4 shadow-sm">
-          <p className="ds-overline text-appTextMuted mb-1">Avg / day</p>
+          <p className="ds-overline text-appTextMuted mb-1">{avgExcludeZeroDays ? 'Avg / active day' : 'Avg / day'}</p>
           <p className="font-mono text-2xl font-semibold text-appText">
-            {formatDurationHM((total / days) || 0)}
+            {formatDurationHM(avgMs)}
           </p>
         </div>
       </div>

@@ -71,3 +71,35 @@ describe('GeneralPanel — time display & billing (#208)', () => {
     expect(screen.getByRole('button', { name: /^round billed time,/i })).toHaveTextContent('Off')
   })
 })
+
+describe('GeneralPanel — average options (#293)', () => {
+  it('"ignore empty days" defaults on and turns off when toggled', () => {
+    render(<GeneralPanel onBack={() => {}} />)
+    const sw = screen.getByRole('switch', { name: /ignore empty days in averages/i })
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(sw)
+    expect(mockUpdateSetting).toHaveBeenCalledWith('avgExcludeZeroDays', false)
+  })
+
+  it('reflects avgExcludeZeroDays already off and turns it back on', () => {
+    mockSettings = { avgExcludeZeroDays: false }
+    render(<GeneralPanel onBack={() => {}} />)
+    const sw = screen.getByRole('switch', { name: /ignore empty days in averages/i })
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(sw)
+    expect(mockUpdateSetting).toHaveBeenCalledWith('avgExcludeZeroDays', true)
+  })
+
+  it('removing a weekday writes the reduced average mask', () => {
+    render(<GeneralPanel onBack={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sunday' }))
+    expect(mockUpdateSetting).toHaveBeenCalledWith('avgWeekdays', [1, 2, 3, 4, 5, 6])
+  })
+
+  it('clearing the last counted weekday restores all seven', () => {
+    mockSettings = { avgWeekdays: [0] }
+    render(<GeneralPanel onBack={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sunday' }))
+    expect(mockUpdateSetting).toHaveBeenCalledWith('avgWeekdays', [0, 1, 2, 3, 4, 5, 6])
+  })
+})
