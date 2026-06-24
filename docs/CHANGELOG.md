@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.33.0] — 2026-06-24
+
+### Added
+- **Analytics — smarter "Avg / day".** Days with nothing logged no longer drag the average down: the per-day average now skips empty days by default (the card reads "Avg / active day"), and a new General setting lets you choose which weekdays count at all — clear the days you never work, like weekends, so they don't dilute the figure. Both controls live in Settings → General, under "Ignore empty days in averages" and "Days counted in averages". (#293)
+
+### Changed
+- **Analytics — the "Avg / day" card honours the new averaging options.** With the defaults it now reflects an average over the days you actually worked rather than every calendar day in the range. Turn "Ignore empty days in averages" off to restore the old whole-range average.
+
+---
+
 ## [0.32.1] — 2026-06-24
 
 ### Fixed

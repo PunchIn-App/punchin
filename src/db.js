@@ -252,6 +252,13 @@ export const DEFAULT_SETTINGS = {
   decimalHours: false,
   roundingMinutes: 0,
   roundingMode: 'nearest',
+  // Analytics averages (issue #293). The "Avg / day" stat divides logged time by
+  // the days in the window. avgExcludeZeroDays drops days with no logged time from
+  // that denominator (on by default, so a day off doesn't drag the figure down —
+  // the card then reads "Avg / active day"). avgWeekdays restricts which weekdays
+  // count at all (e.g. drop weekends), a 0=Sun…6=Sat mask like the reminder days.
+  avgExcludeZeroDays: true,
+  avgWeekdays: [0, 1, 2, 3, 4, 5, 6],
   // Time display + invoice formatting. timeFormat drives clock-time rendering
   // (in-app default is 12h); defaultCurrency is an ISO 4217 code formatted via
   // Intl.NumberFormat in invoices/CSV.

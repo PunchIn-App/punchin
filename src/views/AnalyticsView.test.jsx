@@ -1,12 +1,14 @@
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import AnalyticsView from './AnalyticsView'
+import { useSettings } from '../hooks/useSettings'
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: vi.fn() }))
 vi.mock('../db', () => ({ db: {} }))
 // useSettings calls useLiveQuery internally; mock it so the 3-call queue below
-// stays aligned with AnalyticsView's own entries/jobs/laborTypes queries.
-vi.mock('../hooks/useSettings', () => ({ useSettings: () => ({ settings: {} }) }))
+// stays aligned with AnalyticsView's own entries/jobs/laborTypes queries. It's a
+// vi.fn so #293's averaging tests can vary the avg* settings per test.
+vi.mock('../hooks/useSettings', () => ({ useSettings: vi.fn(() => ({ settings: {} })) }))
 vi.mock('recharts', () => ({
   BarChart: ({ children }) => <div data-testid="bar-chart">{children}</div>,
   Bar: () => null,
@@ -100,6 +102,59 @@ describe('AnalyticsView — summary cards', () => {
     setupMocks()
     render(<AnalyticsView />)
     expect(screen.getByText(/hours per day/i)).toBeInTheDocument()
+  })
+})
+
+describe('AnalyticsView — Avg / day options (#293)', () => {
+  const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
+  // Two clean 2h sessions on two distinct recent days (noon–2pm, no midnight cross).
+  const twoActiveDays = () => {
+    const todayIn = new Date(); todayIn.setHours(12, 0, 0, 0)
+    const todayOut = new Date(); todayOut.setHours(14, 0, 0, 0)
+    const yIn = new Date(); yIn.setDate(yIn.getDate() - 1); yIn.setHours(12, 0, 0, 0)
+    const yOut = new Date(); yOut.setDate(yOut.getDate() - 1); yOut.setHours(14, 0, 0, 0)
+    return [
+      { id: 1, jobId: 1, laborTypeId: 1, punchIn: todayIn, punchOut: todayOut },
+      { id: 2, jobId: 1, laborTypeId: 1, punchIn: yIn, punchOut: yOut },
+    ]
+  }
+  // The value sits in the <p> right after the "Avg / …" label <p>.
+  const avgValue = () => screen.getByText(/^Avg \/ (active )?day$/).nextElementSibling.textContent.trim()
+
+  afterEach(() => { useSettings.mockReturnValue({ settings: {} }) })
+
+  it('excludes empty days and labels it "Avg / active day" by default', () => {
+    setupMocks({ entries: twoActiveDays() })
+    useSettings.mockReturnValue({ settings: { avgExcludeZeroDays: true, avgWeekdays: ALL_DAYS } })
+    render(<AnalyticsView />)
+    expect(screen.getByText('Avg / active day')).toBeInTheDocument()
+    // 4h over 2 worked days = 2h, not 4h spread over 7 calendar days (~34m).
+    expect(avgValue()).toBe('2h')
+  })
+
+  it('divides by every calendar day when the toggle is off ("Avg / day")', () => {
+    setupMocks({ entries: twoActiveDays() })
+    useSettings.mockReturnValue({ settings: { avgExcludeZeroDays: false, avgWeekdays: ALL_DAYS } })
+    render(<AnalyticsView />)
+    expect(screen.getByText('Avg / day')).toBeInTheDocument()
+    // 4h / 7 calendar days ≈ 34m.
+    expect(avgValue()).toBe('34m')
+  })
+
+  it('drops weekdays outside the avgWeekdays mask from the average', () => {
+    const yesterdayDow = new Date(Date.now() - 86400000).getDay()
+    const todayIn = new Date(); todayIn.setHours(12, 0, 0, 0)
+    const todayOut = new Date(); todayOut.setHours(14, 0, 0, 0)                    // today 2h
+    const yIn = new Date(); yIn.setDate(yIn.getDate() - 1); yIn.setHours(10, 0, 0, 0)
+    const yOut = new Date(); yOut.setDate(yOut.getDate() - 1); yOut.setHours(14, 0, 0, 0)  // yesterday 4h
+    setupMocks({ entries: [
+      { id: 1, jobId: 1, laborTypeId: 1, punchIn: todayIn, punchOut: todayOut },
+      { id: 2, jobId: 1, laborTypeId: 1, punchIn: yIn, punchOut: yOut },
+    ] })
+    useSettings.mockReturnValue({ settings: { avgExcludeZeroDays: true, avgWeekdays: ALL_DAYS.filter(d => d !== yesterdayDow) } })
+    render(<AnalyticsView />)
+    // Yesterday's weekday is excluded, so only today's 2h counts → 2h, not 3h.
+    expect(avgValue()).toBe('2h')
   })
 })
 

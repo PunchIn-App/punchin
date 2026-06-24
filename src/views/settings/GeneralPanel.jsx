@@ -1,8 +1,9 @@
-import { Layers, Calendar, Vibrate, Clock, Hourglass, Watch } from 'lucide-react'
+import { Layers, Calendar, Vibrate, Clock, Hourglass, Watch, CalendarOff, CalendarRange } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { usePlatformContext } from '../../hooks/usePlatformContext'
 import EntitySelect from '../../components/EntitySelect'
-import { Panel, SettingsRow, Toggle } from './components'
+import InfoButton from '../../components/InfoButton'
+import { Panel, SettingsRow, Toggle, WeekdayPicker, ALL_DAYS } from './components'
 
 const TIME_FORMAT_OPTIONS = [
   { value: 'auto', label: 'Auto (match region)' },
@@ -54,6 +55,39 @@ export default function GeneralPanel({ onBack }) {
             />
           }
         />
+        <SettingsRow
+          icon={CalendarOff}
+          title="Ignore empty days in averages"
+          subtitle="Days with nothing logged don't count"
+          info="Analytics' average per day skips days you logged no time, so a day off doesn't pull the number down — the card then reads 'Avg / active day'. Turn this off to divide by every day in the range."
+          right={
+            <Toggle
+              ariaLabel="Ignore empty days in averages"
+              value={settings.avgExcludeZeroDays !== false}
+              onChange={v => updateSetting('avgExcludeZeroDays', v)}
+            />
+          }
+        />
+        <div className="px-4 py-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <CalendarRange className="w-4 h-4 text-appTextMuted flex-shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm text-appText font-medium">
+                Days counted in averages
+                <InfoButton label="About days counted in averages" className="ml-1.5">Only the selected weekdays count toward the Analytics average. Clear the days you never work — weekends, say — so they don't dilute it. Clearing every day restores all seven.</InfoButton>
+              </p>
+              <p className="text-xs text-appTextMuted mt-0.5">Which weekdays the average includes</p>
+            </div>
+          </div>
+          <div className="mt-3 pl-7">
+            <WeekdayPicker
+              value={settings.avgWeekdays}
+              onChange={days => updateSetting('avgWeekdays', days.length ? days : ALL_DAYS)}
+              label="Weekdays counted in the average"
+              weekStartsMonday={settings.weekStartsMonday !== false}
+            />
+          </div>
+        </div>
         <SettingsRow
           icon={Watch}
           title="Time format"
