@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.34.1] — 2026-07-24
+
+### Fixed
+- **Printing and invoices on Android now produce the document, not a screenshot of the app (#294, #316).** On an installed Android app, Print and Invoice were printing the whole app screen — the navigation bar, buttons, and the open dialog — instead of the clean invoice or timesheet. Android's print system can only ever print the top-level page, so the isolated print frame the app uses everywhere else was ignored there. On Android the app now lays the document out on the page itself (scoped so the app's own styling can't leak into it) and hides everything else while printing, so you get the same brand-font invoice and timesheet as on desktop and iPhone. Printing on iPhone, iPad, and desktop is unchanged.
+
+---
+
 ## [0.34.0] — 2026-07-22
 
 ### Added

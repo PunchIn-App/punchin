@@ -302,7 +302,7 @@ ${totalAmount != null ? `<div class="paperfoot">
     // returns false when the popup is blocked (window.open → null); without this
     // guard the throw inside the onClick is uncatchable and the button silently
     // dies, so we alert and leave CSV as the fallback (issue #150).
-    if (openPrintWindow(html)) {
+    if (openPrintWindow(html, os)) {
       // The invoice was generated — advance the counter so the next invoice gets
       // the next number. Only on a successful open (a blocked popup won't burn a
       // number); re-generating the same invoice intentionally takes a new number.

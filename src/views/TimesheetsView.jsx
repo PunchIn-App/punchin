@@ -5,6 +5,7 @@ import { format, addDays, subDays, addWeeks, subWeeks } from 'date-fns'
 import { db, deleteEntry } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { useNowTicker } from '../hooks/useNowTicker'
+import { usePlatformContext } from '../hooks/usePlatformContext'
 import {
   formatDuration, formatTime,
   getDayRange, getWeekRange, getWeekDays,
@@ -391,6 +392,7 @@ export default function TimesheetsView() {
   const wsMon                  = settings.weekStartsMonday // DEFAULT_SETTINGS merge (issue #134)
   const rm                     = settings.roundingMinutes  // billable rounding for exports (issues #208/#274)
   const mode                   = settings.roundingMode     // 'nearest' | 'up'
+  const { os }                 = usePlatformContext()      // Android takes the main-document print path (#294/#316)
 
   // Modals state
   const [editingEntry, setEditingEntry]   = useState(null)
@@ -572,7 +574,7 @@ ${PRINT_FONT_HEAD}
     // openPrintWindow writes the doc and prints once the Noto webfonts load; it
     // returns false when the popup is blocked (window.open → null), same hardening
     // as InvoiceModal print so the button doesn't throw in its onClick (issue #150).
-    if (!openPrintWindow(html)) {
+    if (!openPrintWindow(html, os)) {
       alert('Couldn’t open the print window — your browser may be blocking pop-ups. Allow pop-ups for this site, or use the CSV export instead.')
     }
   }

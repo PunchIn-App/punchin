@@ -31,6 +31,11 @@ vi.mock('../db', () => ({
 vi.mock('../hooks/useSettings', () => ({
   useSettings: () => ({ settings: { weekStartsMonday: true }, updateSetting: vi.fn() }),
 }))
+// The view reads the platform os to pick the Android main-document print path;
+// keep it deterministic ('web' → the hidden-iframe path) for these assertions.
+vi.mock('../hooks/usePlatformContext', () => ({
+  usePlatformContext: () => ({ isStandalone: false, os: 'web' }),
+}))
 vi.mock('../components/EditEntryModal', () => ({
   default: ({ onClose }) => (
     <div data-testid="edit-entry-modal">
@@ -410,6 +415,13 @@ describe('TimesheetsView — print timesheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'weekly' }))
     fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
     await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+  })
+
+  it('passes the platform os to openPrintWindow so Android takes the main-document print path', async () => {
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+    expect(openPrintWindow.mock.calls[0][1]).toBe('web')
   })
 
   it('prints the timesheet in the Noto brand font, loading the webfont (not the system-UI fallback)', async () => {
