@@ -18,6 +18,8 @@ describe('worker security headers (issue #129)', () => {
     expect(csp).toMatch(/frame-ancestors 'none'/)
     expect(csp).toContain('https://api.github.com')
     expect(csp).toContain('https://www.googleapis.com')
+    expect(csp).toContain('https://api.dropboxapi.com')
+    expect(csp).toContain('https://content.dropboxapi.com')
     expect(csp).toContain('https://graph.microsoft.com')
     // Fonts are self-hosted (no Google Fonts CDN) — they load from same origin.
     expect(csp).toMatch(/font-src 'self'/)
@@ -237,6 +239,7 @@ describe('worker Google/OneDrive OAuth callbacks — confidential-client code ex
     APP_URL: 'https://app.example',
     GOOGLE_CLIENT_ID: 'g-id', GOOGLE_CLIENT_SECRET: 'g-secret',
     ONEDRIVE_CLIENT_ID: 'od-id', ONEDRIVE_CLIENT_SECRET: 'od-secret',
+    DROPBOX_APP_KEY: 'db-key', DROPBOX_APP_SECRET: 'db-secret',
   }
   const callback = (provider, qs) =>
     worker.fetch({ url: `https://app.example/oauth/${provider}/callback?${qs}` }, env)
@@ -273,6 +276,23 @@ describe('worker Google/OneDrive OAuth callbacks — confidential-client code ex
     expect(body.get('redirect_uri')).toBe('https://app.example/oauth/onedrive/callback')
     expect(body.get('scope')).toContain('offline_access')
     expect(body.get('client_secret')).toBe('od-secret')
+  })
+
+  it('Dropbox: exchanges at the Dropbox token endpoint with a matching redirect_uri + secret', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ access_token: 'dbtok', refresh_token: 'dbrefresh', expires_in: 14400 }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const loc = (await callback('dropbox', 'code=AUTH&state=NONCE')).headers.get('location')
+    expect(loc).toContain('sync_token=dbtok')
+    expect(loc).toContain('sync_provider=dropbox')
+    expect(loc).toContain('sync_refresh=dbrefresh')
+    expect(loc).toContain('state=NONCE')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://api.dropboxapi.com/oauth2/token')
+    const body = new URLSearchParams(opts.body)
+    expect(body.get('grant_type')).toBe('authorization_code')
+    expect(body.get('client_id')).toBe('db-key')
+    expect(body.get('client_secret')).toBe('db-secret')
+    expect(body.get('redirect_uri')).toBe('https://app.example/oauth/dropbox/callback')
   })
 
   it('redirects with missing_code when no code is present', async () => {
