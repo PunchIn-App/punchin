@@ -9,6 +9,7 @@ import {
 } from './providers/github'
 import { pushToDrive, pullFromDrive } from './providers/google'
 import { pushToOneDrive, pullFromOneDrive } from './providers/onedrive'
+import { pushToDropbox, pullFromDropbox } from './providers/dropbox'
 import { getSyncToken, getRefreshToken, getFreshAccessToken, clearSyncToken } from './tokenStore'
 
 async function getSettings() {
@@ -317,6 +318,12 @@ export async function runSync() {
     if (wasEmpty && remote?.settings) await applyPortableSettings(remote.settings)
     const snapshot = await exportSnapshot()
     await syncStep('upload', () => pushToOneDrive(token, snapshot))
+  } else if (s.syncProvider === 'dropbox') {
+    const remote = await syncStep('download', () => pullFromDropbox(token))
+    if (remote) await mergeSnapshot(remote)
+    if (wasEmpty && remote?.settings) await applyPortableSettings(remote.settings)
+    const snapshot = await exportSnapshot()
+    await syncStep('upload', () => pushToDropbox(token, snapshot))
   }
 
   const now = Date.now()
