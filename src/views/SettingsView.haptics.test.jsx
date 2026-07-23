@@ -34,11 +34,12 @@ vi.mock('../components/ColorPicker', () => ({ default: () => <div data-testid="c
 vi.mock('../components/ChangelogModal', () => ({ default: () => <div data-testid="changelog-modal" /> }))
 vi.mock('../sync/syncManager', () => ({ runSync: vi.fn(), disconnectSync: vi.fn() }))
 vi.mock('../sync/config', () => ({
-  SYNC_CONFIG: { github: { clientId: '', callbackBase: '' }, google: { clientId: '' }, onedrive: { clientId: '' } },
+  SYNC_CONFIG: { github: { clientId: '', callbackBase: '' }, google: { clientId: '' }, onedrive: { clientId: '' }, dropbox: { clientId: '' } },
 }))
 vi.mock('../sync/providers/github',   () => ({ buildGitHubOAuthUrl:   () => '' }))
 vi.mock('../sync/providers/google',   () => ({ buildGoogleOAuthUrl:   () => '' }))
 vi.mock('../sync/providers/onedrive', () => ({ buildOneDriveOAuthUrl: () => '' }))
+vi.mock('../sync/providers/dropbox', () => ({ buildDropboxOAuthUrl: () => '' }))
 
 beforeEach(() => {
   vi.clearAllMocks()
