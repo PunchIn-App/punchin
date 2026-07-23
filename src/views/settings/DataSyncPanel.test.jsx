@@ -26,12 +26,14 @@ vi.mock('../../sync/config', () => ({
     github:   { clientId: '', callbackBase: 'https://example.com' },
     google:   { clientId: '' },
     onedrive: { clientId: '' },
+    dropbox:  { clientId: 'db-key', callbackBase: 'https://example.com' },
   },
 }))
 
 vi.mock('../../sync/providers/github',   () => ({ buildGitHubOAuthUrl:   () => '' }))
 vi.mock('../../sync/providers/google',   () => ({ buildGoogleOAuthUrl:   () => '' }))
 vi.mock('../../sync/providers/onedrive', () => ({ buildOneDriveOAuthUrl: () => '' }))
+vi.mock('../../sync/providers/dropbox',  () => ({ buildDropboxOAuthUrl:  () => '' }))
 vi.mock('../../sync/oauthState', () => ({ createOAuthState: () => 'state' }))
 
 vi.mock('../../utils/backup', () => ({ exportBackup: vi.fn(), exportCsv: vi.fn() }))
@@ -39,6 +41,14 @@ vi.mock('../../components/DataTransfer', () => ({ default: () => <div data-testi
 
 beforeEach(() => {
   mockSettings = {}
+})
+
+describe('DataSyncPanel — provider connect list', () => {
+  it('offers Dropbox as a connect option when its client id is configured', () => {
+    mockSettings = {}   // not connected → the connect list renders
+    render(<DataSyncPanel onBack={() => {}} />)
+    expect(screen.getByText('Dropbox')).toBeInTheDocument()
+  })
 })
 
 describe('DataSyncPanel — sync status live region (WCAG 4.1.3)', () => {

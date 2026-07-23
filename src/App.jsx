@@ -27,6 +27,7 @@ import { importSnapshot } from './sync/syncManager'
 import { fetchGitHubUser } from './sync/providers/github'
 import { fetchGoogleUser } from './sync/providers/google'
 import { fetchOneDriveUser } from './sync/providers/onedrive'
+import { fetchDropboxUser } from './sync/providers/dropbox'
 import { consumeOAuthState } from './sync/oauthState'
 import { setSyncToken, setRefreshToken } from './sync/tokenStore'
 import { db } from './db'
@@ -84,6 +85,12 @@ const PROVIDER_CONNECT = {
     prefix: '',
     storage: 'an app folder in your OneDrive',
     note: 'PunchIn only ever accesses its own app folder — never the rest of your OneDrive. You can revoke access anytime in your Microsoft account settings.',
+  },
+  dropbox: {
+    label: 'Dropbox',
+    prefix: '',
+    storage: 'an app folder in your Dropbox',
+    note: 'PunchIn only ever accesses its own app folder — never the rest of your Dropbox. You can revoke access anytime in your Dropbox account settings.',
   },
 }
 
@@ -388,15 +395,17 @@ export default function App() {
         // refresh token / expiry travels along.
         fetchGitHubUser(token)
           .then(user => { if (!cancelled) setPendingAuth({ provider, token, username: user?.login ?? null }) })
-      } else if (provider === 'google' || provider === 'onedrive') {
-        // Google/OneDrive: the worker already did the confidential-client
+      } else if (provider === 'google' || provider === 'onedrive' || provider === 'dropbox') {
+        // Google/OneDrive/Dropbox: the worker already did the confidential-client
         // code→token exchange and returned a refresh token + expiry. Same as
         // GitHub, hold them in memory and confirm the account first (issue #243
         // follow-up) — nothing is persisted until the user taps Connect, so the
         // refresh token (encrypted at rest, issue #126) is only saved on confirm.
         const refresh = params.get('sync_refresh')
         const expiresIn = parseInt(params.get('sync_expires') || '3600', 10) * 1000
-        const fetchUser = provider === 'google' ? fetchGoogleUser : fetchOneDriveUser
+        const fetchUser = provider === 'google' ? fetchGoogleUser
+                        : provider === 'onedrive' ? fetchOneDriveUser
+                        : fetchDropboxUser
         fetchUser(token)
           .then(username => { if (!cancelled) setPendingAuth({ provider, token, username: username ?? null, refresh, expiresIn }) })
       }

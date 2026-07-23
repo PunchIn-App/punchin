@@ -6,6 +6,7 @@ import { runSync, disconnectSync, importSnapshot } from '../../sync/syncManager'
 import { buildGitHubOAuthUrl } from '../../sync/providers/github'
 import { buildGoogleOAuthUrl } from '../../sync/providers/google'
 import { buildOneDriveOAuthUrl } from '../../sync/providers/onedrive'
+import { buildDropboxOAuthUrl } from '../../sync/providers/dropbox'
 import { createOAuthState } from '../../sync/oauthState'
 import { SYNC_CONFIG } from '../../sync/config'
 import { exportBackup, exportCsv } from '../../utils/backup'
@@ -13,7 +14,7 @@ import ConfirmModal from '../../components/ConfirmModal'
 import DataTransfer from '../../components/DataTransfer'
 import { Panel, PanelGroup, DangerZone, Toggle } from './components'
 
-const PROVIDER_LABEL = { github: 'GitHub Gist', google: 'Google Drive', onedrive: 'OneDrive' }
+const PROVIDER_LABEL = { github: 'GitHub Gist', google: 'Google Drive', onedrive: 'OneDrive', dropbox: 'Dropbox' }
 
 function formatLastSync(ts) {
   if (!ts) return 'Never synced'
@@ -273,7 +274,19 @@ export default function DataSyncPanel({ onBack }) {
                   </div>
                 </button>
               )}
-              {!SYNC_CONFIG.github.clientId && !SYNC_CONFIG.google.clientId && !SYNC_CONFIG.onedrive.clientId && (
+              {SYNC_CONFIG.dropbox.clientId && (
+                <button
+                  onClick={() => { window.location.href = buildDropboxOAuthUrl(SYNC_CONFIG.dropbox.clientId, SYNC_CONFIG.dropbox.callbackBase, createOAuthState()) }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-appInput hover:bg-appBg border border-appBorder transition-colors text-left"
+                >
+                  <Cloud className="w-4 h-4 text-appTextMuted flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-appText font-medium">Dropbox</p>
+                    <p className="text-xs text-appTextMuted">Stored in your Dropbox app folder</p>
+                  </div>
+                </button>
+              )}
+              {!SYNC_CONFIG.github.clientId && !SYNC_CONFIG.google.clientId && !SYNC_CONFIG.onedrive.clientId && !SYNC_CONFIG.dropbox.clientId && (
                 <div className="px-1 space-y-1">
                   <p className="text-sm text-appText font-medium">Sync isn’t set up on this version</p>
                   <p className="text-xs text-appTextMuted">
