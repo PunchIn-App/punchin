@@ -9,6 +9,7 @@
   //   GitHub   — GITHUB_CLIENT_ID (var) + GITHUB_CLIENT_SECRET (secret)
   //   Google   — GOOGLE_CLIENT_ID (var) + GOOGLE_CLIENT_SECRET (secret)   [issue #243]
   //   OneDrive — ONEDRIVE_CLIENT_ID (var) + ONEDRIVE_CLIENT_SECRET (secret) [issue #243]
+  //   Dropbox  — DROPBOX_APP_KEY (var) + DROPBOX_APP_SECRET (secret)       [issue #295]
   // plus APP_URL (var) — the deployed origin, which must equal the build's
   // VITE_APP_URL and the providers' registered redirect URIs (byte-identical).
   "keep_vars": true,
