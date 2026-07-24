@@ -131,6 +131,7 @@ vi.mock('../sync/config', () => ({
     github:   { clientId: 'gh-test-id', callbackBase: 'https://example.com' },
     google:   { clientId: 'google-test-id' },
     onedrive: { clientId: 'od-test-id' },
+    dropbox:  { clientId: 'db-test-id' },
   },
 }))
 
@@ -139,6 +140,9 @@ vi.mock('../sync/providers/github', () => ({
 }))
 vi.mock('../sync/providers/google', () => ({
   buildGoogleOAuthUrl: () => 'https://accounts.google.com/oauth',
+}))
+vi.mock('../sync/providers/dropbox', () => ({
+  buildDropboxOAuthUrl: () => 'https://www.dropbox.com/oauth2/authorize',
 }))
 vi.mock('../sync/providers/onedrive', () => ({
   buildOneDriveOAuthUrl: () => 'https://login.microsoftonline.com/oauth',

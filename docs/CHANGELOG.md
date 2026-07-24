@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.34.0] — 2026-07-22
+
+### Added
+- **Sync to Dropbox.** Dropbox joins GitHub, Google Drive, and OneDrive as a cloud-sync option — connect it in Settings → Data & sync and your jobs, entries, and labor types sync across devices through a private app folder in your Dropbox (PunchIn only ever sees its own folder, never the rest of your Dropbox). Sign-in uses the same secure flow as the other providers, with silent background token refresh.
+
+---
+
 ## [0.33.0] — 2026-06-24
 
 ### Added

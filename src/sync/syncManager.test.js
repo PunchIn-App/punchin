@@ -5,6 +5,7 @@ import { getSyncToken, getRefreshToken, setRefreshToken } from './tokenStore'
 import * as github from './providers/github'
 import * as google from './providers/google'
 import * as onedrive from './providers/onedrive'
+import * as dropbox from './providers/dropbox'
 
 vi.mock('../utils/deviceId', () => ({
   getDeviceId: vi.fn(() => 'testdevice'),
@@ -28,6 +29,10 @@ vi.mock('./providers/google', () => ({
 vi.mock('./providers/onedrive', () => ({
   pushToOneDrive: vi.fn(),
   pullFromOneDrive: vi.fn(),
+}))
+vi.mock('./providers/dropbox', () => ({
+  pushToDropbox: vi.fn(),
+  pullFromDropbox: vi.fn(),
 }))
 
 // Seed sync-related settings into the DB
@@ -187,6 +192,17 @@ describe('runSync — seeds preferences on a fresh install only', () => {
 // ---------------------------------------------------------------------------
 // disconnectSync
 // ---------------------------------------------------------------------------
+
+describe('runSync — dropbox provider', () => {
+  it('pulls then pushes via the dropbox provider when syncProvider is dropbox', async () => {
+    await seedSyncSettings({ syncProvider: 'dropbox', syncToken: 'db-token', syncFileId: null })
+    dropbox.pullFromDropbox.mockResolvedValue(null)   // first sync: no remote file yet
+    dropbox.pushToDropbox.mockResolvedValue('id:x')
+    await runSync()
+    expect(dropbox.pullFromDropbox).toHaveBeenCalledWith('db-token')
+    expect(dropbox.pushToDropbox).toHaveBeenCalledWith('db-token', expect.objectContaining({ version: 1 }))
+  })
+})
 
 describe('disconnectSync', () => {
   // disconnectSync now POSTs a best-effort grant-revoke to the worker (/oauth/revoke),

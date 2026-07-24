@@ -14,4 +14,9 @@ export const SYNC_CONFIG = {
     // Auth Code flow via the worker at /oauth/onedrive/callback (issue #243)
     callbackBase: import.meta.env.VITE_APP_URL || window.location.origin,
   },
+  dropbox: {
+    clientId: import.meta.env.VITE_DROPBOX_APP_KEY || '',
+    // Auth Code flow via the worker at /oauth/dropbox/callback (issue #295)
+    callbackBase: import.meta.env.VITE_APP_URL || window.location.origin,
+  },
 }

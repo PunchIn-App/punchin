@@ -6,7 +6,7 @@ PunchIn is a mobile-first, offline-capable time tracking PWA for freelancers. Us
 
 **Stack:** React 19 + Vite + Tailwind CSS + Dexie (IndexedDB) + Recharts  
 **Deploy:** Cloudflare Workers (static asset serving via `wrangler`)  
-**Version:** 0.33.0
+**Version:** 0.34.0
 
 ---
 
@@ -394,7 +394,7 @@ Screenshots live in `docs/screenshots/{phone,tablet,desktop}-{dark,light}/` and 
 
 ## What NOT to Do
 
-- Do not introduce a backend or server-side authentication without explicit scope agreement. Cloud sync via OAuth + provider-hosted storage (GitHub Gist, Google Drive, OneDrive) is in scope as of v0.10.0 — but adding a new sync provider requires a separate Cloudflare Worker secret and explicit agreement on the OAuth flow. Account-free, client-only device-to-device transfer via a compressed `#import=` link + QR code is in scope as of v0.15.0 (no backend involved)
+- Do not introduce a backend or server-side authentication without explicit scope agreement. Cloud sync via OAuth + provider-hosted storage (GitHub Gist, Google Drive, OneDrive, Dropbox) is in scope as of v0.10.0 — but adding a new sync provider requires a separate Cloudflare Worker secret and explicit agreement on the OAuth flow. Account-free, client-only device-to-device transfer via a compressed `#import=` link + QR code is in scope as of v0.15.0 (no backend involved)
 - Do not add a URL router — the tab-state approach is intentional for PWA standalone mode
 - Do not import new heavy libraries without checking bundle size impact (current bundle is intentionally small)
 - Do not store sensitive data in Dexie (it is plaintext in browser storage)

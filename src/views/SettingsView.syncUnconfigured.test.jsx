@@ -44,12 +44,14 @@ vi.mock('../sync/config', () => ({
     github:   { clientId: '', callbackBase: 'https://example.com' },
     google:   { clientId: '' },
     onedrive: { clientId: '' },
+    dropbox:  { clientId: '' },
   },
 }))
 
 vi.mock('../sync/providers/github',   () => ({ buildGitHubOAuthUrl:   () => '' }))
 vi.mock('../sync/providers/google',   () => ({ buildGoogleOAuthUrl:   () => '' }))
 vi.mock('../sync/providers/onedrive', () => ({ buildOneDriveOAuthUrl: () => '' }))
+vi.mock('../sync/providers/dropbox',  () => ({ buildDropboxOAuthUrl:  () => '' }))
 
 describe('SettingsView — Sync section with no providers configured', () => {
   it('shows the friendly "not set up" message instead of env-var instructions', () => {

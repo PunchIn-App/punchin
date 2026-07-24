@@ -14,7 +14,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "img-src 'self' data: blob:",
-  "connect-src 'self' https://api.github.com https://gist.githubusercontent.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com",
+  "connect-src 'self' https://api.github.com https://gist.githubusercontent.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com https://api.dropboxapi.com https://content.dropboxapi.com",
   "manifest-src 'self'",
   "worker-src 'self'",
   "frame-ancestors 'none'",
@@ -200,6 +200,16 @@ const OAUTH_PROVIDERS = {
     secretVar: 'ONEDRIVE_CLIENT_SECRET',
     scope: 'Files.ReadWrite.AppFolder User.Read offline_access',
   },
+  // Dropbox confidential-client code exchange (issue #295). token_access_type=
+  // offline (set on the authorize URL by buildDropboxOAuthUrl) yields the refresh
+  // token; the code→token and refresh exchanges POST client_id/client_secret as
+  // form fields, so the generic handler works unchanged.
+  dropbox: {
+    tokenEndpoint: 'https://api.dropboxapi.com/oauth2/token',
+    idVar: 'DROPBOX_APP_KEY',
+    secretVar: 'DROPBOX_APP_SECRET',
+    scope: null,
+  },
 }
 
 // Exchange a provider's authorization `code` for tokens, then hand the app back
@@ -307,6 +317,7 @@ export default {
     if (url.pathname === '/oauth/refresh') return handleRefresh(request, env)
     if (url.pathname === '/oauth/google/callback')   return handleProviderCallback(url, env, 'google')
     if (url.pathname === '/oauth/onedrive/callback') return handleProviderCallback(url, env, 'onedrive')
+    if (url.pathname === '/oauth/dropbox/callback')  return handleProviderCallback(url, env, 'dropbox')
     if (url.pathname === '/oauth/github/callback')   return handleGitHubCallback(url, env)
 
     return withSecurityHeaders(await env.ASSETS.fetch(request))
