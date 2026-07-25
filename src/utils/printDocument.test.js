@@ -143,11 +143,39 @@ describe('openPrintWindow — Android main-document print (#294/#316)', () => {
     }
   })
 
-  it('removes the injected document AND the print stylesheet when the app regains focus', () => {
+  // The app shell pins `html, body, #root { height: var(--app-h); overflow: hidden;
+  // background: <dark> }` (src/index.css). Left alone, that CLIPS the print root to
+  // one screen-height — a multi-page invoice silently loses every row past page 1 —
+  // and paints the page navy. Verified by real headless-Chrome print-to-PDF: 60 rows
+  // truncated to 13 on one page before this rule, 3 full pages after.
+  it('releases the app-shell height/overflow lock and whitens html so multi-page documents are not clipped', () => {
     openPrintWindow(ANDROID_HTML, 'android')
+    const css = printStyle().textContent
+    const printBlock = css.slice(css.search(/@media\s+print/))
+    expect(printBlock).toMatch(/html\s*,\s*body/)         // BOTH elements — the lock is on html too
+    expect(printBlock).toContain('height:auto!important')
+    expect(printBlock).toContain('overflow:visible!important')
+    expect(printBlock).toContain('background:#fff!important')
+  })
+
+  // Android rasterizes the page LAZILY — the print framework can re-render after
+  // window.print() returns and after the app regains focus. Tearing the document
+  // down on `focus` (as the iframe path safely does) strips it before rasterization
+  // and prints the bare app UI instead. The root is display:none on screen, so
+  // leaving it in place costs nothing.
+  it('does NOT tear the document down when the app regains focus (Android rasterizes late)', () => {
+    openPrintWindow(ANDROID_HTML, 'android')
+    window.dispatchEvent(new Event('focus'))
     expect(printRoot()).toBeTruthy()
     expect(printStyle()).toBeTruthy()
-    window.dispatchEvent(new Event('focus'))
+  })
+
+  it('cleans up a short while after afterprint', () => {
+    vi.useFakeTimers()
+    openPrintWindow(ANDROID_HTML, 'android')
+    window.dispatchEvent(new Event('afterprint'))
+    expect(printRoot()).toBeTruthy()                      // not immediately — rasterization may still be running
+    vi.advanceTimersByTime(2000)
     expect(printRoot()).toBeNull()
     expect(printStyle()).toBeNull()
   })
