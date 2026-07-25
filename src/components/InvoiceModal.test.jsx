@@ -282,6 +282,14 @@ describe('InvoiceModal — export and print', () => {
     expect(openPrintWindow).toHaveBeenCalled()
   })
 
+  it('passes the platform os to openPrintWindow so Android takes the main-document print path', async () => {
+    renderModal()
+    pickJob()
+    await waitFor(() => expect(screen.getByRole('button', { name: /print/i })).not.toBeDisabled())
+    fireEvent.click(screen.getByRole('button', { name: /print/i }))
+    expect(openPrintWindow.mock.calls[0][1]).toBe('web')
+  })
+
   it('alerts instead of throwing when printing fails (openPrintWindow → false) (#150)', async () => {
     openPrintWindow.mockReturnValue(false)
     global.alert = vi.fn()
