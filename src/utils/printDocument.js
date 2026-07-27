@@ -267,9 +267,16 @@ function openPrintAndroid(html) {
     '#pi-print-root{display:none}',                         // never shown on screen — only when printing
     scoped,                                                 // the scoped print layout
     '@media print{',
+    // The app shell pins `html, body, #root { height: var(--app-h); overflow:
+    // hidden; background: <dark> }` (index.css) to keep the nav fixed on device.
+    // Under print that CLIPS the print root to one screen-height — a multi-page
+    // invoice silently loses every row past page 1 — and inks the page navy. Both
+    // elements must be released, and `html` carries the background that propagates
+    // to the page box. (Verified via headless-Chrome print-to-PDF: a 60-row doc
+    // truncated to 13 rows on 1 page without this, 3 full pages with it.)
+    'html,body{height:auto!important;overflow:visible!important;background:#fff!important}',
     'body>*:not(#pi-print-root){display:none!important}',   // hide the app UI
     '#pi-print-root{display:block!important}',              // reveal the document
-    'body{background:#fff!important}',                      // no dark app background on paper
     '}',
   ].join('\n')
   document.head.appendChild(style)
@@ -292,8 +299,16 @@ function openPrintAndroid(html) {
     if (root.parentNode) root.parentNode.removeChild(root)
     if (style.parentNode) style.parentNode.removeChild(style)
   }
-  try { window.addEventListener('afterprint', cleanup, { once: true }) } catch { /* ignore */ }
-  window.addEventListener('focus', cleanup, { once: true })
+  // Cleanup timing is load-bearing here, unlike the iframe path. Android rasterizes
+  // the page LAZILY — its print framework can re-render after window.print() has
+  // returned and after the app has regained focus — so tearing the document down on
+  // `focus` (what the iframe path safely does) strips it mid-flight and the bare app
+  // UI is what reaches the printer (#294/#316). So: never clean up on focus, and give
+  // `afterprint` a grace period. The root is display:none on screen, so leaving it in
+  // place is invisible; a stale-node guard above clears it on the next print anyway.
+  const cleanupSoon = () => setTimeout(cleanup, 1000)
+  try { window.addEventListener('afterprint', cleanupSoon, { once: true }) } catch { /* ignore */ }
+  setTimeout(cleanup, 120000)   // backstop if afterprint never fires (common on mobile)
 
   // Force-load the brand faces then print — the print root is display:none until
   // @media print, so we can't rely on lazy loading + document.fonts.ready (it'd

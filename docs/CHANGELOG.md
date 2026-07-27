@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.34.2] — 2026-07-25
+
+### Fixed
+- **Android printing — follow-up to the v0.34.1 fix (#294, #316).** The v0.34.1 change laid the invoice/timesheet out on the page correctly but two things still spoiled the result on Android: the app pins the page to exactly one screen-height (so the nav bar can stay put on a phone), which **clipped the printout to a single page** and silently dropped every row past it; and the app's dark background carried through onto the paper. Printing now releases that height lock and forces a white page, so a multi-page invoice prints every page in full. The printed document is also no longer torn down while Android is still rendering it — the cause of the whole app screen printing instead of the document.
+
+---
+
 ## [0.34.1] — 2026-07-24
 
 ### Fixed
