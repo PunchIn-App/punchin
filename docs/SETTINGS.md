@@ -51,3 +51,4 @@
 | `lastSyncedAt` | number (ms epoch) \| `null` | `null` |
 | `syncError` | string \| `null` | `null` — set when the OAuth callback returns a `sync_error` fragment |
 | `syncUsername` | string \| `null` | `null` — GitHub login name fetched after OAuth; shown in the connected status UI; null for Google/OneDrive |
+| `printDiagnostics` | boolean | `false` — troubleshooting aid (#294). Adds a version + rasterization-timing footer to the Android printed page so a device print attests which build produced it. Off by default because invoices go to clients; toggle lives in Settings → About |
