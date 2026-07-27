@@ -1,17 +1,17 @@
 import { useState } from 'react'
-import { Info, ExternalLink, ScrollText, ChevronDown, Bug, Lightbulb, Scale, RefreshCw, Heart } from 'lucide-react'
+import { Info, ExternalLink, ScrollText, ChevronDown, Bug, Lightbulb, Scale, RefreshCw, Heart, Stethoscope } from 'lucide-react'
 import { usePlatformContext } from '../../hooks/usePlatformContext'
 import { useSettings } from '../../hooks/useSettings'
 import { buildFeedbackBugUrl, buildFeedbackFeatureUrl } from '../../utils/issueUrl'
 import ChangelogModal from '../../components/ChangelogModal'
 import LicenseModal from '../../components/LicenseModal'
-import { Panel } from './components'
+import { Panel, SettingsRow, Toggle } from './components'
 
 // PWA update state is owned once by SettingsView (a single usePwaUpdate, shared
 // with the root-list "update available" badge) and passed in (issue #149).
 export default function AboutPanel({ onBack, updateAvailable, updateStatus, checkForUpdates }) {
   const { isStandalone, os } = usePlatformContext()
-  const { settings } = useSettings()
+  const { settings, updateSetting } = useSettings()
   const [showChangelog, setShowChangelog] = useState(false)
   const [showLicense, setShowLicense] = useState(false)
 
@@ -113,6 +113,28 @@ export default function AboutPanel({ onBack, updateAvailable, updateStatus, chec
             </p>
           </div>
         </button>
+      </div>
+
+      {/* Troubleshooting (#294). Adds a version + timing footer to the printed
+          page so a device print proves which build produced it — a printout
+          otherwise carries no evidence of its own provenance, which is what made
+          two rounds of Android print reports unreadable. Off by default and kept
+          out of the main list: invoices go to clients and must never carry debug
+          text unless the user deliberately turns this on. */}
+      <div className="rounded-xl border border-appBorder bg-appCard">
+        <SettingsRow
+          icon={Stethoscope}
+          title="Print diagnostics"
+          subtitle="Adds a version + timing line to printed pages"
+          info="For troubleshooting printing problems. When on, printed timesheets and invoices carry a small footer with the app version and how long the page took to render — useful when reporting a printing bug. Leave it off for anything you send to a client."
+          right={
+            <Toggle
+              ariaLabel="Print diagnostics"
+              value={!!settings.printDiagnostics}
+              onChange={v => updateSetting('printDiagnostics', v)}
+            />
+          }
+        />
       </div>
 
       {/* Support — links out to Buy Me a Coffee (no third-party script: a plain

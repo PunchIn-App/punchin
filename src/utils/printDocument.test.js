@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, scopePrintCss } from './printDocument'
 
 describe('printDocument', () => {
@@ -89,6 +91,7 @@ describe('openPrintWindow — Android main-document print (#294/#316)', () => {
   afterEach(() => {
     printRoot()?.remove()
     printStyle()?.remove()
+    document.documentElement.classList.remove('pi-print-armed')   // armed for the life of the page in real use
     vi.restoreAllMocks()
     vi.useRealTimers()
   })
@@ -101,15 +104,23 @@ describe('openPrintWindow — Android main-document print (#294/#316)', () => {
     expect(printRoot().textContent).toContain('android-doc-marker')
   })
 
-  it('injects a print stylesheet that lifts the fonts + @page, scopes layout, and masks the app', () => {
+  it('injects a print stylesheet that lifts the fonts + @page and scopes the layout', () => {
     openPrintWindow(ANDROID_HTML, 'android')
     const css = printStyle().textContent
     expect(css).toContain('@font-face')                          // brand fonts kept (document-level)
     expect(css).toContain('@page')                               // page margins lifted to document level
     expect(css).toContain('24mm 20mm')
     expect(css).toContain('#pi-print-root')                      // layout scoped to the print root
-    expect(css).toContain('body>*:not(#pi-print-root)')          // the app is hidden while printing
-    expect(css).toMatch(/@media\s+print/)
+  })
+
+  // The mask deliberately does NOT ship in this removable node — see the sticky
+  // mask tests below. Injecting a duplicate here would resurrect the failure mode
+  // it exists to prevent, by making a removable copy authoritative again.
+  it('does NOT carry the app mask in the removable injected stylesheet', () => {
+    openPrintWindow(ANDROID_HTML, 'android')
+    const css = printStyle().textContent
+    expect(css).not.toContain('body>*:not(#pi-print-root)')
+    expect(css).not.toContain('height:auto!important')
   })
 
   it('prints the TOP window (never an iframe) after the font fallback delay', () => {
@@ -143,41 +154,134 @@ describe('openPrintWindow — Android main-document print (#294/#316)', () => {
     }
   })
 
-  // The app shell pins `html, body, #root { height: var(--app-h); overflow: hidden;
-  // background: <dark> }` (src/index.css). Left alone, that CLIPS the print root to
-  // one screen-height — a multi-page invoice silently loses every row past page 1 —
-  // and paints the page navy. Verified by real headless-Chrome print-to-PDF: 60 rows
-  // truncated to 13 on one page before this rule, 3 full pages after.
-  it('releases the app-shell height/overflow lock and whitens html so multi-page documents are not clipped', () => {
+  it('arms the shipped mask by adding pi-print-armed to <html>', () => {
+    expect(document.documentElement.classList.contains('pi-print-armed')).toBe(false)
     openPrintWindow(ANDROID_HTML, 'android')
-    const css = printStyle().textContent
-    const printBlock = css.slice(css.search(/@media\s+print/))
-    expect(printBlock).toMatch(/html\s*,\s*body/)         // BOTH elements — the lock is on html too
-    expect(printBlock).toContain('height:auto!important')
-    expect(printBlock).toContain('overflow:visible!important')
-    expect(printBlock).toContain('background:#fff!important')
+    expect(document.documentElement.classList.contains('pi-print-armed')).toBe(true)
   })
 
-  // Android rasterizes the page LAZILY — the print framework can re-render after
-  // window.print() returns and after the app regains focus. Tearing the document
-  // down on `focus` (as the iframe path safely does) strips it before rasterization
-  // and prints the bare app UI instead. The root is display:none on screen, so
-  // leaving it in place costs nothing.
-  it('does NOT tear the document down when the app regains focus (Android rasterizes late)', () => {
-    openPrintWindow(ANDROID_HTML, 'android')
-    window.dispatchEvent(new Event('focus'))
-    expect(printRoot()).toBeTruthy()
-    expect(printStyle()).toBeTruthy()
-  })
-
-  it('cleans up a short while after afterprint', () => {
+  // Android rasterizes LAZILY and REPEATEDLY — PrintDocumentAdapter.onLayout /
+  // onWrite fire long after print() returns, and again whenever the user changes a
+  // print setting. So no print-lifecycle event marks a safe teardown point. Both
+  // shipped fixes tore the document down on such an event (v0.34.1 on `focus`,
+  // v0.34.2 on `afterprint`+1s) and both printed the bare app UI (#294/#316).
+  // Nothing may remove the document, the stylesheet, or the armed class during a
+  // print — the stale-node guard on the NEXT print is the only cleanup.
+  it('never tears the document down on focus, afterprint, or any timer', () => {
     vi.useFakeTimers()
     openPrintWindow(ANDROID_HTML, 'android')
+
+    window.dispatchEvent(new Event('focus'))
     window.dispatchEvent(new Event('afterprint'))
-    expect(printRoot()).toBeTruthy()                      // not immediately — rasterization may still be running
-    vi.advanceTimersByTime(2000)
-    expect(printRoot()).toBeNull()
-    expect(printStyle()).toBeNull()
+    vi.advanceTimersByTime(600000)                        // 10 minutes — well past any old backstop
+
+    expect(printRoot()).toBeTruthy()
+    expect(printStyle()).toBeTruthy()
+    expect(document.documentElement.classList.contains('pi-print-armed')).toBe(true)
+  })
+
+  // Leaving the nodes in place makes the NEXT print responsible for clearing them,
+  // so a second print must not end up with two #pi-print-root nodes (a duplicate id
+  // would leave the mask revealing a stale document alongside the new one).
+  it('replaces the previous document on a second print rather than duplicating it', () => {
+    openPrintWindow(ANDROID_HTML, 'android')
+    openPrintWindow(ANDROID_HTML.replace('android-doc-marker', 'second-doc-marker'), 'android')
+    expect(document.querySelectorAll('#pi-print-root')).toHaveLength(1)
+    expect(document.querySelectorAll('style[data-pi-print]')).toHaveLength(1)
+    expect(printRoot().textContent).toContain('second-doc-marker')
+    expect(printRoot().textContent).not.toContain('android-doc-marker')
+  })
+})
+
+// The mask must ship in the app's own stylesheet, not in the runtime-injected
+// <style>, because the injected node is removable and this one is not. These
+// assertions are the regression guard for the twice-shipped failure: if someone
+// moves these rules back into printDocument.js, the bug returns.
+describe('sticky print mask in src/index.css (#294/#316)', () => {
+  // jsdom's http base URL breaks `new URL(..., import.meta.url)`, so resolve
+  // on-disk paths from import.meta.dirname instead.
+  const css = readFileSync(join(import.meta.dirname, '../index.css'), 'utf8')
+
+  it('keeps the print root hidden on screen independently of the injected style', () => {
+    expect(css).toMatch(/#pi-print-root\s*\{\s*display:\s*none/)
+  })
+
+  it('hides the app and reveals the document under @media print, gated on the armed class', () => {
+    const printBlock = css.slice(css.indexOf('@media print'))
+    expect(printBlock).toMatch(/html\.pi-print-armed body\s*>\s*\*:not\(#pi-print-root\)\s*\{\s*display:\s*none\s*!important/)
+    expect(printBlock).toMatch(/html\.pi-print-armed #pi-print-root\s*\{\s*display:\s*block\s*!important/)
+  })
+
+  // The app shell pins html/body/#root to `height: var(--app-h); overflow: hidden`.
+  // Left alone that clips the document to one screen-height (a 60-row invoice
+  // truncated to 13 rows on one page, verified by headless-Chrome print-to-PDF)
+  // and paints the sheet navy. html carries the background that reaches the page box.
+  it('releases the app-shell height/overflow lock on BOTH html and body', () => {
+    const printBlock = css.slice(css.indexOf('@media print'))
+    expect(printBlock).toMatch(/html\.pi-print-armed,\s*\n?\s*html\.pi-print-armed body/)
+    expect(printBlock).toMatch(/height:\s*auto\s*!important/)
+    expect(printBlock).toMatch(/overflow:\s*visible\s*!important/)
+    expect(printBlock).toMatch(/background:\s*#fff\s*!important/)
+  })
+
+  // Gating on the class is what keeps iOS/desktop — which print correctly through
+  // the hidden iframe — completely untouched by the Android workaround.
+  it('gates every mask rule on the armed class so non-Android printing is unaffected', () => {
+    const printBlock = css.slice(css.indexOf('@media print'))
+    const rules = printBlock.split('\n').filter(l => l.includes('!important'))
+    expect(rules.length).toBeGreaterThan(0)
+    for (const line of printBlock.split('\n')) {
+      if (line.includes('#pi-print-root') || line.includes('!important')) continue
+      expect(line).not.toMatch(/^\s*(html|body)\s*[,{]/)   // no ungated html/body rule
+    }
+  })
+})
+
+// Provenance footer (opt-in). Two device tests came back unreadable because a
+// printout carries no evidence of which build produced it.
+describe('print diagnostics footer', () => {
+  const HTML = '<html><body><div>doc</div></body></html>'
+  const diag = () => document.querySelector('[data-pi-print-diagnostics]')
+
+  afterEach(() => {
+    document.querySelector('#pi-print-root')?.remove()
+    document.querySelector('style[data-pi-print]')?.remove()
+    document.documentElement.classList.remove('pi-print-armed')
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('is absent by default, so nothing leaks onto a client invoice', () => {
+    openPrintWindow(HTML, 'android')
+    expect(diag()).toBeNull()
+    openPrintWindow(HTML, 'android', { diagnostics: false })
+    expect(diag()).toBeNull()
+  })
+
+  it('stamps the app version into the printed page when enabled', () => {
+    openPrintWindow(HTML, 'android', { diagnostics: true })
+    expect(diag()).toBeTruthy()
+    expect(diag().textContent).toContain(`v${__APP_VERSION__}`)
+    expect(document.querySelector('#pi-print-root').contains(diag())).toBe(true)
+  })
+
+  // The value frozen on the paper is the moment Android actually sampled the DOM —
+  // the number that would have settled the lazy-rasterization question outright.
+  it('carries a rasterization clock that keeps ticking after print() returns', () => {
+    vi.useFakeTimers()
+    openPrintWindow(HTML, 'android', { diagnostics: true })
+    expect(diag().textContent).toMatch(/rasterized T\+\d+ms/)
+    vi.advanceTimersByTime(5000)
+    expect(diag().textContent).toMatch(/rasterized T\+[1-9]\d{2,}ms/)   // advanced, not stuck at 0
+  })
+
+  it('records the print events that fired, and when', () => {
+    vi.useFakeTimers()
+    openPrintWindow(HTML, 'android', { diagnostics: true })
+    window.dispatchEvent(new Event('beforeprint'))
+    window.dispatchEvent(new Event('afterprint'))
+    expect(diag().textContent).toMatch(/beforeprint T\+\d+ms/)
+    expect(diag().textContent).toMatch(/afterprint T\+\d+ms/)
   })
 })
 

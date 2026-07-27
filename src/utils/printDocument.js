@@ -193,8 +193,8 @@ export function scopePrintCss(css, scope) {
 // once the user is done — on `afterprint`, or when the app regains focus after the
 // print sheet closes. Returns false (without throwing) only if the frame can't
 // initialise, so callers can still alert + offer CSV.
-export function openPrintWindow(html, os) {
-  if (os === 'android') return openPrintAndroid(html)
+export function openPrintWindow(html, os, opts) {
+  if (os === 'android') return openPrintAndroid(html, opts)
 
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
@@ -233,13 +233,23 @@ export function openPrintWindow(html, os) {
 // Android print path. The document can't be isolated in an iframe (Android prints
 // the top document, not the frame — see openPrintWindow), so we inject it into the
 // MAIN page instead: the template's @font-face + @page are lifted to a document-
-// level <style>, the layout CSS is scoped to #pi-print-root so the app's Tailwind
-// Preflight can't bleed in, and an @media-print rule hides the app (every other
-// body child) and reveals only the print root while printing. Same-origin, no
-// popup — nothing to strand a PWA (and this path is Android-only regardless).
-// Returns false (without throwing) if the document can't be parsed, so callers
-// keep their CSV fallback. The injected nodes are removed on afterprint / focus.
-function openPrintAndroid(html) {
+// level <style>, and the layout CSS is scoped to #pi-print-root so the app's
+// Tailwind Preflight can't bleed in. Same-origin, no popup — nothing to strand a
+// PWA (and this path is Android-only regardless). Returns false (without throwing)
+// if the document can't be parsed, so callers keep their CSV fallback.
+//
+// The mask that hides the app and reveals the document does NOT live here — it
+// ships in src/index.css, armed by the `pi-print-armed` class added below. That
+// separation is the whole fix: this function's <style> is removable, and both
+// previous attempts removed it (with the document) before Android had rasterized,
+// leaving the bare app UI to reach the paper. Nothing is torn down on any print
+// event any more; the stale-node guard below is the only cleanup, and it runs at
+// the START of the next print, when tearing down is unambiguously safe.
+//
+// `opts.diagnostics` appends a provenance/timing footer to the printed page — see
+// appendPrintDiagnostics. Off unless the user enables Settings → About → Print
+// diagnostics, so nothing leaks onto an invoice sent to a client.
+function openPrintAndroid(html, opts) {
   let doc
   try { doc = new DOMParser().parseFromString(html, 'text/html') } catch { return false }
   if (!doc || !doc.body) return false
@@ -261,23 +271,13 @@ function openPrintAndroid(html) {
 
   const style = document.createElement('style')
   style.setAttribute('data-pi-print', '')
+  // Only the per-document CSS lives here. The app mask and the screen-side
+  // `#pi-print-root{display:none}` ship in src/index.css so they survive this
+  // node being removed (see the note above openPrintAndroid).
   style.textContent = [
     fontCss,
     page,                                                   // @page margins (document-level)
-    '#pi-print-root{display:none}',                         // never shown on screen — only when printing
     scoped,                                                 // the scoped print layout
-    '@media print{',
-    // The app shell pins `html, body, #root { height: var(--app-h); overflow:
-    // hidden; background: <dark> }` (index.css) to keep the nav fixed on device.
-    // Under print that CLIPS the print root to one screen-height — a multi-page
-    // invoice silently loses every row past page 1 — and inks the page navy. Both
-    // elements must be released, and `html` carries the background that propagates
-    // to the page box. (Verified via headless-Chrome print-to-PDF: a 60-row doc
-    // truncated to 13 rows on 1 page without this, 3 full pages with it.)
-    'html,body{height:auto!important;overflow:visible!important;background:#fff!important}',
-    'body>*:not(#pi-print-root){display:none!important}',   // hide the app UI
-    '#pi-print-root{display:block!important}',              // reveal the document
-    '}',
   ].join('\n')
   document.head.appendChild(style)
 
@@ -289,26 +289,28 @@ function openPrintAndroid(html) {
   for (const node of doc.body.childNodes) root.appendChild(document.importNode(node, true))
   document.body.appendChild(root)
 
+  // Arm the shipped mask (src/index.css). Added before printing and never removed:
+  // Android re-serializes the DOM on every print-setting change, so there is no
+  // moment at which disarming is provably safe. Leaving it armed is inert — the
+  // rules only apply under @media print, and only on this Android path.
+  document.documentElement.classList.add('pi-print-armed')
+
   let printed = false
+  const stopDiagnostics = opts?.diagnostics ? appendPrintDiagnostics(root) : null
   const doPrint = () => {
     if (printed) return
     printed = true
     try { window.print() } catch { /* printing unsupported here — no-op */ }
   }
-  const cleanup = () => {
-    if (root.parentNode) root.parentNode.removeChild(root)
-    if (style.parentNode) style.parentNode.removeChild(style)
-  }
-  // Cleanup timing is load-bearing here, unlike the iframe path. Android rasterizes
-  // the page LAZILY — its print framework can re-render after window.print() has
-  // returned and after the app has regained focus — so tearing the document down on
-  // `focus` (what the iframe path safely does) strips it mid-flight and the bare app
-  // UI is what reaches the printer (#294/#316). So: never clean up on focus, and give
-  // `afterprint` a grace period. The root is display:none on screen, so leaving it in
-  // place is invisible; a stale-node guard above clears it on the next print anyway.
-  const cleanupSoon = () => setTimeout(cleanup, 1000)
-  try { window.addEventListener('afterprint', cleanupSoon, { once: true }) } catch { /* ignore */ }
-  setTimeout(cleanup, 120000)   // backstop if afterprint never fires (common on mobile)
+
+  // Deliberately NO teardown on afterprint, focus, or a timer. Android rasterizes
+  // lazily and repeatedly (PrintDocumentAdapter.onLayout/onWrite), so every such
+  // signal has already proved unsound in production — removing these nodes mid-
+  // flight is exactly how the bare app UI reached the paper twice (#294/#316). The
+  // stale-node guard at the top of this function is the cleanup: it clears the
+  // previous document at the start of the next print. Leaving the nodes in place
+  // is invisible (index.css keeps #pi-print-root display:none on screen) and costs
+  // one document's worth of detached-but-hidden DOM.
 
   // Force-load the brand faces then print — the print root is display:none until
   // @media print, so we can't rely on lazy loading + document.fonts.ready (it'd
@@ -321,5 +323,56 @@ function openPrintAndroid(html) {
   } else {
     setTimeout(doPrint, 250)
   }
+  // Stops a clock, never touches the document — safe to run on a timer.
+  if (stopDiagnostics) setTimeout(stopDiagnostics, DIAGNOSTIC_WINDOW_MS)
   return true
+}
+
+// How long the diagnostics clock keeps ticking after a print starts. Generous:
+// Android can rasterize many seconds later, and the whole point is to capture
+// WHEN it did.
+const DIAGNOSTIC_WINDOW_MS = 180000
+
+// Opt-in provenance + timing footer (Settings → About → Print diagnostics).
+//
+// Two device tests came back unreadable because a printout carries no evidence of
+// which build produced it — a correct document and a stale one are byte-identical
+// on paper. This footer answers that in one photograph:
+//
+//   • the app version, so "which code ran" is never inferred again. Sound because
+//     __APP_VERSION__ and this module compile into the same JS chunk, so a version
+//     on the page attests the print code beside it.
+//   • a live rasterization clock. The value FROZEN on the paper is the moment
+//     Android actually sampled the DOM — the one number that would have settled
+//     the lazy-rasterization question outright. Print twice, changing paper size
+//     the second time: two different values proves Android re-serializes.
+//   • the print events that did fire, and when.
+//
+// Returns a stop function for the clock.
+function appendPrintDiagnostics(root) {
+  const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+  const since = () => Math.round(((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0)
+  const version = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'unknown'
+
+  const el = document.createElement('div')
+  el.setAttribute('data-pi-print-diagnostics', '')
+  // Inline styles: the footer must render identically whatever the template's
+  // scoped CSS says, and must not depend on a class the templates don't define.
+  el.style.cssText = 'margin-top:24px;padding-top:8px;border-top:1px solid #ccc;font-family:monospace;font-size:9px;line-height:1.5;color:#666'
+
+  const events = []
+  const render = () => {
+    el.textContent = `PunchIn v${version} · print diagnostics · rasterized T+${since()}ms${events.length ? ` · ${events.join(' · ')}` : ''}`
+  }
+  const note = (name) => { events.push(`${name} T+${since()}ms`); render() }
+  try {
+    window.addEventListener('beforeprint', () => note('beforeprint'))
+    window.addEventListener('afterprint', () => note('afterprint'))
+  } catch { /* ignore — the footer still carries the version and the clock */ }
+
+  render()
+  root.appendChild(el)
+
+  const timer = setInterval(render, 50)
+  return () => clearInterval(timer)
 }

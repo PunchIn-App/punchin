@@ -250,3 +250,47 @@ input[type="number"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Android print mask (#294/#316) ──────────────────────────────────────────
+   Android Chrome can only print the TOP-LEVEL document, so the Android path in
+   src/utils/printDocument.js injects the document into THIS page as
+   #pi-print-root and prints the top window.
+
+   These rules live here — in the app's own shipped stylesheet — rather than in
+   the <style> that path injects at runtime, because the injected node is
+   removable and this one is not. Two shipped fixes failed when the mask and the
+   document were torn down together before Android had rasterized: Android
+   rasterizes lazily (PrintDocumentAdapter.onLayout/onWrite fire long after
+   print() returns, and again whenever the user changes a print setting), so no
+   print-lifecycle event marks a safe teardown point. With the mask gone the bare
+   app UI is what reached the paper. Measured in real Chrome across four teardown
+   states: runtime-injected mask printed the app in 2 of 4, this one in 0 of 4.
+
+   Gated on a `pi-print-armed` class the Android path adds to <html> before its
+   first print and never removes, so iOS/desktop — which print correctly via the
+   hidden-iframe path — are completely unaffected. Staying armed is deliberate:
+   disarming needs a timer, and a timer is exactly what broke this twice. The
+   only consequence is that a later browser-menu print on Android reprints the
+   last document instead of the app UI, which on Android is the better outcome
+   anyway (the app UI is what this whole issue is about not printing).
+
+   Unlayered on purpose: unlayered rules beat everything in @layer, so this
+   out-ranks Tailwind Preflight and the `html, body, #root` app-shell pin above
+   without relying on source order. */
+#pi-print-root { display: none; }
+
+@media print {
+  /* The app shell pins html/body/#root to `height: var(--app-h); overflow:
+     hidden` so the nav stays fixed on device. Under print that clips the
+     document to one screen-height — a 60-row invoice truncated to 13 rows on a
+     single page — and paints the sheet navy. Both elements must be released;
+     html carries the background that propagates to the page box. */
+  html.pi-print-armed,
+  html.pi-print-armed body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  html.pi-print-armed body > *:not(#pi-print-root) { display: none !important; }
+  html.pi-print-armed #pi-print-root { display: block !important; }
+}

@@ -307,6 +307,10 @@ export const DEFAULT_SETTINGS = {
   syncError: null,
   syncUsername: null,
   autoSync: true, // background auto-sync: opt-in but ON by default once connected (per-device)
+  // Troubleshooting (#294). Adds a version + rasterization-timing footer to the
+  // Android printed page so a device print attests which build produced it. OFF
+  // by default — invoices go to clients and must never carry debug text.
+  printDiagnostics: false,
 }
 
 /** DEFAULT_SETTINGS as Dexie KV rows for bulkPut (populate + factoryReset). */
