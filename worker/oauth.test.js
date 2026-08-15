@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import worker, { withSecurityHeaders, nearestSwatchPath } from './oauth.js'
 import { renderIconPng } from './iconRender.js'
 
@@ -383,5 +385,36 @@ describe('worker /oauth/refresh — silent token refresh (issue #243)', () => {
   it('returns 502 when the upstream fetch throws', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')))
     expect((await refresh({ provider: 'google', refresh_token: 'r' })).status).toBe(502)
+  })
+})
+
+// The Worker only sees requests the asset router does not answer first. With an
+// [assets] block and no run_worker_first, Cloudflare serves /index.html (and every
+// hashed bundle) directly — so withSecurityHeaders never runs on the app shell,
+// and these headers, though unit-tested above, were absent in production. The
+// deployed surface is fixed by app/public/_headers, which Workers with static
+// assets honours natively. This test ties the two definitions together so they
+// cannot drift back apart.
+describe('app-shell security headers are actually deployed (_headers parity)', () => {
+  const headersFile = readFileSync(join(import.meta.dirname, '../app/public/_headers'), 'utf8')
+
+  it('applies to every path', () => {
+    expect(headersFile).toMatch(/^\/\*$/m)
+  })
+
+  it.each([
+    ['X-Content-Type-Options', 'nosniff'],
+    ['Referrer-Policy', 'no-referrer'],
+    ['Strict-Transport-Security', 'max-age=31536000; includeSubDomains'],
+    ['X-Frame-Options', 'DENY'],
+  ])('serves %s', (name, value) => {
+    expect(headersFile).toContain(`${name}: ${value}`)
+  })
+
+  it('serves the same CSP the worker would have', () => {
+    const worker = withSecurityHeaders(new Response('')).headers.get('Content-Security-Policy')
+    const line = headersFile.split('\n').find(l => l.includes('Content-Security-Policy'))
+    expect(line).toBeDefined()
+    expect(line.replace(/^\s*Content-Security-Policy:\s*/, '').trim()).toBe(worker)
   })
 })

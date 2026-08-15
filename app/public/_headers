@@ -1,0 +1,20 @@
+# Security headers for the app shell.
+#
+# worker/oauth.js defines the same set and applies it via withSecurityHeaders(),
+# but the Worker never sees these requests: wrangler.jsonc declares an [assets]
+# block without run_worker_first, so Cloudflare's asset router answers /index.html
+# and every hashed bundle directly. The headers were therefore unit-tested and
+# never served — verified against production on 2026-08-14, where / returned no
+# CSP while a Worker-routed 404 returned the full set.
+#
+# Workers with static assets honours _headers natively (same format as Pages).
+# Vite copies app/public/ into dist/, which is the [assets] directory.
+#
+# KEEP IN SYNC with SECURITY_HEADERS in worker/oauth.js — worker/oauth.test.js
+# asserts the two match, including the CSP byte-for-byte.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://gist.githubusercontent.com https://www.googleapis.com https://graph.microsoft.com https://login.microsoftonline.com https://api.dropboxapi.com https://content.dropboxapi.com; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: DENY
