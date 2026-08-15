@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { db, deleteEntry, startTimer, DEFAULT_SETTINGS, deleteJob, deleteLaborType, jobsUsingLaborType } from './db'
+import { db, deleteEntry, clearAllEntries, startTimer, DEFAULT_SETTINGS, deleteJob, deleteLaborType, jobsUsingLaborType } from './db'
 
 afterAll(async () => {
   await db.close()
@@ -213,6 +213,46 @@ describe('db — deleteEntry tombstones (issue #118)', () => {
 
   it('is a no-op for a missing entry (no tombstone written)', async () => {
     await expect(deleteEntry(99999)).resolves.toBeUndefined()
+    expect(await db.deletions.toArray()).toHaveLength(0)
+  })
+})
+
+// The Danger Zone "Clear time entries" action is documented as permanent, but a
+// bare entries.clear() writes no tombstones — so the very next sync pulls every
+// cleared entry back from the remote snapshot (issue: audit 2026-08-14). Even a
+// single-device user resurrects, because the GitHub provider re-reads the
+// device's own file. Clearing must tombstone exactly like deleteEntry does.
+describe('db — clearAllEntries tombstones', () => {
+  afterEach(async () => {
+    await db.entries.clear()
+    await db.deletions.clear()
+  })
+
+  it('clears every entry and records a tombstone for each', async () => {
+    const a = await db.entries.add({ jobId: 1, laborTypeId: 1, punchIn: new Date(), punchOut: new Date() })
+    const b = await db.entries.add({ jobId: 2, laborTypeId: 1, punchIn: new Date(), punchOut: new Date() })
+    const uuidA = (await db.entries.get(a)).uuid
+    const uuidB = (await db.entries.get(b)).uuid
+
+    await clearAllEntries()
+
+    expect(await db.entries.toArray()).toHaveLength(0)
+    expect(await db.deletions.get(uuidA)).toBeTruthy()
+    expect(await db.deletions.get(uuidB)).toBeTruthy()
+  })
+
+  it('leaves jobs and labor types untouched', async () => {
+    const jobId = await db.jobs.add({ name: 'Keeper', isActive: true, laborRates: {} })
+    await db.entries.add({ jobId, laborTypeId: 1, punchIn: new Date(), punchOut: new Date() })
+
+    await clearAllEntries()
+
+    expect(await db.jobs.get(jobId)).toBeTruthy()
+    await db.jobs.clear()
+  })
+
+  it('is a no-op on an empty table', async () => {
+    await expect(clearAllEntries()).resolves.toBeUndefined()
     expect(await db.deletions.toArray()).toHaveLength(0)
   })
 })

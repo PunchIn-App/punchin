@@ -142,6 +142,22 @@ export async function deleteEntry(id) {
   })
 }
 
+// Clear every time entry, tombstoning each one first so the deletion propagates
+// instead of the entries resurrecting from a peer's snapshot on the next sync.
+// The rule lives here, beside the schema, rather than in the Danger Zone panel:
+// a bare `db.entries.clear()` in a view silently undoes itself, and the UI that
+// calls it promises "Permanent — this cannot be undone".
+export async function clearAllEntries() {
+  return db.transaction('rw', [db.entries, db.deletions], async () => {
+    const entries = await db.entries.toArray()
+    if (entries.length === 0) return
+    const deletedAt = Date.now()
+    const tombstones = entries.filter(e => e.uuid).map(e => ({ uuid: e.uuid, deletedAt }))
+    if (tombstones.length) await db.deletions.bulkPut(tombstones)
+    await db.entries.clear()
+  })
+}
+
 // Jobs that reference a labor type — by their default `laborTypeId` or by a
 // per-type rate keyed under it (laborRates keys are strings, so `in` matches).
 // `liveOnly` restricts to non-archived jobs — used to BLOCK deleting a labor
@@ -153,22 +169,51 @@ export async function jobsUsingLaborType(laborTypeId, { liveOnly = false } = {})
     (j.laborTypeId === laborTypeId || (j.laborRates && laborTypeId in j.laborRates)))
 }
 
+// Freeze a job's display identity onto every referencing entry, so those entries
+// stay self-describing once the job is gone. Extracted from deleteJob because the
+// cloud-sync merge must apply the SAME freeze when a remote tombstone deletes a
+// job: without it the entry keeps a jobId pointing at nothing and carries no
+// frozenRefs.job, which is the exact shape syncManager's remap drops — the entry
+// then dies on every peer and on backup restore.
+//
+// Deliberately does not open its own transaction: both callers already hold one
+// covering [jobs, laborTypes, entries, deletions], and the freeze must be atomic
+// with the delete that follows it. The frozen colour resolves the job's own colour
+// or, when unset, its labor type's, mirroring how the job renders today.
+export async function freezeRefsForJob(id) {
+  const job = await db.jobs.get(id)
+  if (!job) return
+  const ltColor = job.laborTypeId ? (await db.laborTypes.get(job.laborTypeId))?.color ?? null : null
+  const frozen = { name: job.name, color: job.color || ltColor || null }
+  const refEntries = await db.entries.where('jobId').equals(id).toArray()
+  for (const e of refEntries) {
+    await db.entries.update(e.id, { frozenRefs: { ...(e.frozenRefs ?? {}), job: frozen } })
+  }
+}
+
+// Freeze a labor type's display identity onto every referencing entry. Sibling of
+// freezeRefsForJob — same rationale, same transaction contract. Note this carries
+// no LABOR_TYPE_IN_USE check: that block rule guards the user-initiated delete in
+// deleteLaborType, whereas a remote tombstone is authoritative and must apply.
+export async function freezeRefsForLaborType(id) {
+  const lt = await db.laborTypes.get(id)
+  if (!lt) return
+  const frozen = { name: lt.name, color: lt.color, glyph: lt.glyph ?? null }
+  const refEntries = await db.entries.where('laborTypeId').equals(id).toArray()
+  for (const e of refEntries) {
+    await db.entries.update(e.id, { frozenRefs: { ...(e.frozenRefs ?? {}), laborType: frozen } })
+  }
+}
+
 // Permanently delete a job: freeze its display identity onto every referencing
 // entry (so those entries stay self-describing once the job is gone), record a
 // tombstone (so the deletion propagates via sync instead of the job resurrecting
-// from a peer), and hard-delete the job — all in one transaction. The frozen
-// colour resolves the job's own colour or, when unset, its labor type's, mirroring
-// how the job renders today.
+// from a peer), and hard-delete the job — all in one transaction.
 export async function deleteJob(id) {
   return db.transaction('rw', [db.jobs, db.laborTypes, db.entries, db.deletions], async () => {
     const job = await db.jobs.get(id)
     if (!job) return
-    const ltColor = job.laborTypeId ? (await db.laborTypes.get(job.laborTypeId))?.color ?? null : null
-    const frozen = { name: job.name, color: job.color || ltColor || null }
-    const refEntries = await db.entries.where('jobId').equals(id).toArray()
-    for (const e of refEntries) {
-      await db.entries.update(e.id, { frozenRefs: { ...(e.frozenRefs ?? {}), job: frozen } })
-    }
+    await freezeRefsForJob(id)
     if (job.uuid) await db.deletions.put({ uuid: job.uuid, deletedAt: Date.now() })
     await db.jobs.delete(id)
   })
@@ -186,11 +231,7 @@ export async function deleteLaborType(id) {
     const blocked = (await db.jobs.toArray()).some(j =>
       j.isActive !== false && (j.laborTypeId === id || (j.laborRates && id in j.laborRates)))
     if (blocked) throw new Error('LABOR_TYPE_IN_USE')
-    const frozen = { name: lt.name, color: lt.color, glyph: lt.glyph ?? null }
-    const refEntries = await db.entries.where('laborTypeId').equals(id).toArray()
-    for (const e of refEntries) {
-      await db.entries.update(e.id, { frozenRefs: { ...(e.frozenRefs ?? {}), laborType: frozen } })
-    }
+    await freezeRefsForLaborType(id)
     if (lt.uuid) await db.deletions.put({ uuid: lt.uuid, deletedAt: Date.now() })
     await db.laborTypes.delete(id)
   })

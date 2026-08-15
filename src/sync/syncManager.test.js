@@ -1324,6 +1324,71 @@ describe('runSync — job/labor-type tombstones', () => {
     expect(await db.deletions.get(job.uuid)).toBeTruthy()
   })
 
+  // A remote tombstone must leave referencing entries self-describing, exactly as
+  // deleteJob() does locally. Without the freeze the entry keeps a jobId pointing at
+  // a job that no longer exists and carries no frozenRefs.job — the one shape the
+  // remap at syncManager.js:206 drops on sight, so the entry dies on every peer.
+  it('freezes job refs onto referencing entries when applying a remote job tombstone', async () => {
+    await seedSyncSettings()
+    const jobId = await db.jobs.add({ name: 'DeleteMe', color: '#abc123', isActive: false, laborRates: {}, updatedAt: 1000 })
+    const job = await db.jobs.get(jobId)
+    await db.entries.add({ jobId, laborTypeId: null, punchIn: new Date('2026-01-01T09:00:00Z'), punchOut: new Date('2026-01-01T10:00:00Z'), updatedAt: 1000 })
+
+    github.fetchAllDeviceData.mockResolvedValueOnce([{
+      version: 1, laborTypes: [], jobs: [], entries: [],
+      deletions: [{ uuid: job.uuid, deletedAt: 2000 }],
+    }])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [entry] = await db.entries.toArray()
+    expect(entry).toBeTruthy()
+    expect(entry.frozenRefs?.job).toEqual({ name: 'DeleteMe', color: '#abc123' })
+  })
+
+  it('freezes labor-type refs onto referencing entries when applying a remote labor-type tombstone', async () => {
+    await seedSyncSettings()
+    const ltId = await db.laborTypes.add({ name: 'GoneLabor', color: '#111', glyph: 'wrench', isArchived: true, updatedAt: 1000 })
+    const lt = await db.laborTypes.get(ltId)
+    const jobId = await db.jobs.add({ name: 'Keeper', isActive: false, laborRates: {}, updatedAt: 1000 })
+    await db.entries.add({ jobId, laborTypeId: ltId, punchIn: new Date('2026-01-01T09:00:00Z'), punchOut: new Date('2026-01-01T10:00:00Z'), updatedAt: 1000 })
+
+    github.fetchAllDeviceData.mockResolvedValueOnce([{
+      version: 1, laborTypes: [], jobs: [], entries: [],
+      deletions: [{ uuid: lt.uuid, deletedAt: 2000 }],
+    }])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    const [entry] = await db.entries.toArray()
+    expect(entry.frozenRefs?.laborType).toEqual({ name: 'GoneLabor', color: '#111', glyph: 'wrench' })
+  })
+
+  // The end-to-end consequence: an entry whose job was permanently deleted must
+  // still import on a peer. This is the assertion that would have caught the bug.
+  it('keeps an entry importable on a peer after its job is tombstoned via sync', async () => {
+    await seedSyncSettings()
+    const jobId = await db.jobs.add({ name: 'DeleteMe', color: '#abc123', isActive: false, laborRates: {}, updatedAt: 1000 })
+    const job = await db.jobs.get(jobId)
+    await db.entries.add({ jobId, laborTypeId: null, punchIn: new Date('2026-01-01T09:00:00Z'), punchOut: new Date('2026-01-01T10:00:00Z'), updatedAt: 1000 })
+
+    github.fetchAllDeviceData.mockResolvedValueOnce([{
+      version: 1, laborTypes: [], jobs: [], entries: [],
+      deletions: [{ uuid: job.uuid, deletedAt: 2000 }],
+    }])
+    github.pushDeviceData.mockResolvedValueOnce(undefined)
+    await runSync()
+
+    // Simulate the peer: wipe local state, then merge the snapshot this device exports.
+    const snapshot = await exportSnapshot()
+    await db.entries.clear()
+    await db.jobs.clear()
+    await db.deletions.clear()
+
+    const imported = await importSnapshot(snapshot)
+    expect(imported).toBe(1)
+  })
+
   it('applies a remote labor-type tombstone, deleting the matching local labor type', async () => {
     await seedSyncSettings()
     const ltId = await db.laborTypes.add({ name: 'DeleteMe', color: '#111', isArchived: true, updatedAt: 1000 })

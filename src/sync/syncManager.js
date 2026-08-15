@@ -1,4 +1,4 @@
-import { db, getPortableSettings, applyPortableSettings } from '../db'
+import { db, getPortableSettings, applyPortableSettings, freezeRefsForJob, freezeRefsForLaborType } from '../db'
 import { getDeviceId } from '../utils/deviceId'
 import {
   createGist,
@@ -113,12 +113,22 @@ async function mergeSnapshot(remote, { applySettings = false } = {}) {
       const at = rec.uuid ? tomb.get(rec.uuid) : undefined
       return at != null && at >= (rec.updatedAt ?? 0)
     }
-    // Delete local jobs / labor types covered by a (local or remote) tombstone.
+    // Delete local jobs / labor types covered by a (local or remote) tombstone,
+    // freezing their display identity onto referencing entries first — exactly as
+    // deleteJob()/deleteLaborType() do for a local delete. Skipping the freeze here
+    // strands those entries with a dangling id and no frozenRefs, which the remap
+    // below drops on sight, silently losing them on every peer and on restore.
     for (const lt of await db.laborTypes.toArray()) {
-      if (tombstoned(lt)) await db.laborTypes.delete(lt.id)
+      if (tombstoned(lt)) {
+        await freezeRefsForLaborType(lt.id)
+        await db.laborTypes.delete(lt.id)
+      }
     }
     for (const j of await db.jobs.toArray()) {
-      if (tombstoned(j)) await db.jobs.delete(j.id)
+      if (tombstoned(j)) {
+        await freezeRefsForJob(j.id)
+        await db.jobs.delete(j.id)
+      }
     }
 
     const ltMap = {}

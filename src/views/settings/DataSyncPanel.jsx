@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { Download, Upload, Trash2, AlertTriangle, Cloud, CloudOff, RefreshCw, LogOut, Check, ChevronRight } from 'lucide-react'
-import { db, defaultSettingsRows } from '../../db'
+import { db, defaultSettingsRows, clearAllEntries } from '../../db'
 import { useSettings } from '../../hooks/useSettings'
 import { runSync, disconnectSync, importSnapshot } from '../../sync/syncManager'
 import { buildGitHubOAuthUrl } from '../../sync/providers/github'
@@ -72,8 +72,13 @@ export default function DataSyncPanel({ onBack }) {
     }
   }
 
+  // Tombstones as it clears (see db.clearAllEntries). A bare db.entries.clear()
+  // here writes no deletions, so runSync's merge pulls every cleared entry back
+  // from the remote snapshot — including for single-device users, since the
+  // provider re-reads this device's own file. The confirm copy promises the
+  // clear is permanent, so it has to actually be.
   const clearEntries = async () => {
-    await db.entries.clear()
+    await clearAllEntries()
     setShowClearConfirm(false)
   }
 
