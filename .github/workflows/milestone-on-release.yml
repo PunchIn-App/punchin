@@ -29,9 +29,19 @@ on:
 
 permissions: {}
 
+# Serialize per release tag, and NEVER cancel: this workflow creates a milestone
+# and then writes it onto N pull requests. A cancelled run leaves that sweep
+# half-applied, which the next run cannot detect (the PRs it already touched no
+# longer match `no:milestone`). Queue instead.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
 jobs:
   milestone:
     runs-on: ubuntu-latest
+    # Paginating releases + search and updating each PR; minutes at worst.
+    timeout-minutes: 15
     steps:
       - uses: actions/github-script@v9
         with:

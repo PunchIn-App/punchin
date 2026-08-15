@@ -11,10 +11,21 @@ on:
 permissions:
   contents: read
 
+# One run per PR (or per branch on push): a rapid series of pushes to the same PR
+# cancels its own superseded runs instead of queueing them all. Only the newest
+# commit's result is meaningful for a merge decision, and nothing here deploys or
+# publishes, so cancelling mid-run is safe.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     name: Build & Test
     runs-on: ubuntu-latest
+    # Install + build + instrumented suite is a few minutes; 30 is a backstop
+    # against a hung run burning the full 6-hour default.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v7
@@ -33,10 +44,17 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test
-        run: npm run test:run
+      # `wrangler deploy --dry-run` resolves wrangler.jsonc and bundles the Worker
+      # without touching Cloudflare, so a broken worker entry point or config fails
+      # here rather than at deploy time. Runs after Build because the config's
+      # assets directory is ./dist. Both sibling Workers gate on the same check.
+      - name: Bundle check (wrangler dry-run)
+        run: npm run check
 
-      - name: Coverage (enforce thresholds)
+      # This runs the WHOLE suite under v8 instrumentation and enforces the
+      # coverage thresholds, so a separate `npm run test:run` step would just run
+      # every test a second time for the same signal.
+      - name: Test & coverage (enforce thresholds)
         run: npm run coverage
 
       - name: Upload coverage report
