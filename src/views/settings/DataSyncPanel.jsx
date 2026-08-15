@@ -295,7 +295,7 @@ export default function DataSyncPanel({ onBack }) {
                 <div className="px-1 space-y-1">
                   <p className="text-sm text-appText font-medium">Sync isn’t set up on this version</p>
                   <p className="text-xs text-appTextMuted">
-                    Cloud sync hasn’t been configured for this deployment. Your data stays safe on this
+                    Cloud sync hasn’t been configured for this deployment. Your data stays on this
                     device — use <span className="text-appText">Export data</span> above to back it up or move
                     it to another device.
                   </p>
