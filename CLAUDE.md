@@ -188,6 +188,10 @@ Archived jobs and labor types can be permanently deleted. The delete flow:
 
 Use `deleteJob(id)` / `deleteLaborType(id)` (in `db.js`) — never call `db.jobs.delete()` / `db.laborTypes.delete()` directly, as that skips the freeze-and-tombstone logic. Both are the hard-delete siblings of `deleteEntry(id)`.
 
+**The freeze step is also required when sync applies a *remote* tombstone.** `db.js` exports `freezeRefsForJob(id)` / `freezeRefsForLaborType(id)` — the freeze half of the delete, without the transaction (the caller supplies one covering `[jobs, laborTypes, entries, deletions]`) and, for labor types, without the `LABOR_TYPE_IN_USE` block (a remote tombstone is authoritative). `syncManager.js`'s `mergeSnapshot` calls them before its deletes. Skipping the freeze there strands referencing entries with a dangling id and no `frozenRefs`, which is the exact shape the entry remap drops — losing those entries on every peer and on backup restore.
+
+**Clearing all entries:** use `clearAllEntries()` (in `db.js`), never a bare `db.entries.clear()`. It tombstones every entry in the same transaction as the clear, so the deletion propagates instead of the entries resurrecting from a peer's snapshot on the next sync (this bites single-device users too, since the provider re-reads the device's own file).
+
 **Frozen-ref rendering:** `src/utils/entryRefs.js` exports `entryJob(entry, liveJob)` and `entryLabor(entry, liveLabor)`. Each returns `{job/laborType, frozen: bool}`. When `frozen` is true, the caller renders the ref's frozen `name`/`color`/`glyph` as inert plaintext — the job name is italicised as the "unlinked" cue (the labor tag keeps its colour+glyph) — instead of a live, interactive record. In EditEntry the deleted ref shows as a `"<name> (deleted)"` option you can leave as-is or re-link. Timesheets, Timer, Invoice, Analytics, and EditEntry all resolve refs through these helpers so deleted items display consistently.
 
 ### Settings Keys
@@ -364,6 +368,7 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - `wrangler.jsonc` stays at the project root — Cloudflare's Git integration auto-detects it there and cannot be redirected without a Dashboard build-command override
 - The `compatibility_date` in `wrangler.jsonc` is pinned; update it intentionally, not automatically
 - `worker/oauth.js` wraps every static-asset response with a **Content-Security-Policy** and hardening headers (`X-Content-Type-Options`, `Referrer-Policy: no-referrer`, HSTS, `X-Frame-Options`). `script-src` is `'self'` (the built `index.html` has no inline scripts). **If you add a `fetch()` to a new external origin** (e.g. a new sync provider's API), add that origin to the CSP `connect-src` list in `worker/oauth.js`, or the request will be blocked in production. Likewise add new style/font/image origins to the matching directive.
+- **`worker/oauth.js` is not what serves those headers on the app shell.** `wrangler.jsonc` declares an `[assets]` block with no `run_worker_first`, so Cloudflare's asset router answers `/` and every hashed bundle *before* the Worker runs — the Worker only sees paths the assets don't claim. The deployed headers come from **`app/public/_headers`** (Workers with static assets honours `_headers` natively; Vite copies `app/public/` into `dist/`). **Both definitions must be updated together** — `worker/oauth.test.js` asserts they match, including the CSP byte-for-byte. Verify a header change actually landed with `curl -o /dev/null -D - https://trackmytime.today/`, not just by a passing unit test: the two disagreed silently from issue #129 until 2026-08-14, with production serving no CSP at all.
 
 ---
 
