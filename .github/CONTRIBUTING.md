@@ -228,7 +228,7 @@ Rules:
 
 ## Code Conventions
 
-The full conventions are in [`CLAUDE.md`](../CLAUDE.md). Key rules:
+The full conventions are in [`CLAUDE.md`](../CLAUDE.md). The main rules:
 
 - **No router** — navigation is tab-based state in `App.jsx`; this is intentional for PWA standalone mode
 - **No custom backend** — keep all data local. Optional cloud sync exists via OAuth + provider-hosted storage (GitHub Gist / Google Drive / OneDrive); adding a **new** sync provider requires explicit agreement on the OAuth flow and its own Cloudflare Worker secret (see [`CLAUDE.md`](../CLAUDE.md) → "What NOT to Do" and the Configuring Sync section above)
