@@ -7,8 +7,9 @@ import { setAutoSyncEnabled, trigger, PERIODIC_MS } from '../sync/autoSync'
 // false` means users who connected before this shipped (no stored value) get it
 // ON by default, matching "default ON at connect".
 //
-// Seamless on every provider now (issue #243): GitHub's token never expires, and
-// an expired Google/OneDrive access token is refreshed silently inside runSync.
+// Auto-sync survives an access-token expiry on every provider (issue #243):
+// GitHub's token never expires, and an expired Google/OneDrive access token is
+// refreshed silently inside runSync.
 // So a merely-lapsed access-token expiry is NOT a stop signal — gating on it would
 // disable the very open-trigger that performs the refresh. The only stop is
 // syncError === 'TOKEN_EXPIRED', set when a refresh actually failed (a dead or
