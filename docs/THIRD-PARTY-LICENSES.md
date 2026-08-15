@@ -24,10 +24,11 @@ and is also available with a FAQ at <https://openfontlicense.org>.
   committed under [`app/public/fonts/`](../app/public/fonts/) and served from the
   app's own origin (`/fonts/*.woff2`), declared via `@font-face` in
   [`src/index.css`](../src/index.css). No third-party font CDN is used. Because
-  the font binaries are now redistributed in this repository, the OFL's bundling
+  the font binaries are redistributed in this repository, the OFL's bundling
   condition applies — and is met: this license file and the full
-  [`OFL-1.1.txt`](licenses/OFL-1.1.txt) ship alongside them, and no reserved name
-  is used. (Noto Sans JP from the design system is **not** shipped.)
+  [`OFL-1.1.txt`](licenses/OFL-1.1.txt) ship alongside them, and the fonts are
+  neither sold on their own nor distributed under any OFL Reserved Font Name.
+  (Noto Sans JP from the design system is **not** shipped.)
 
 - **At build time** the social-preview cards
   ([`docs/social-preview.svg`](social-preview.svg),
@@ -37,8 +38,3 @@ and is also available with a FAQ at <https://openfontlicense.org>.
   [`scripts/social-preview.py`](../scripts/social-preview.py)). Per the OFL FAQ,
   artwork/documents created with a font — including text converted to outlines —
   are **not** bound by the OFL, and no font binary is committed to this repo.
-
-Because the Noto font binaries are now redistributed in this repository, the
-OFL's bundling condition applies and is satisfied: the full license text ships at
-[`OFL-1.1.txt`](licenses/OFL-1.1.txt), this file provides attribution, and the
-fonts are not sold on their own nor distributed under any OFL Reserved Font Name.
