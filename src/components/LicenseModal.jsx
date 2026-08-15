@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useFocusTrap } from '../hooks/useFocusTrap'
+import { useAndroidBackDismiss } from '../hooks/useBottomSheet'
 import licenseRaw from '../../LICENSE?raw'
 import thirdPartyRaw from '../../docs/THIRD-PARTY-LICENSES.md?raw'
 
@@ -117,19 +118,15 @@ export default function LicenseModal({ onClose }) {
   const dialogRef = useRef(null)
   const [tab, setTab] = useState('app')
 
-  // Hardware/gesture Back closes the modal instead of navigating away. Push a
-  // history entry on open and unwind it on close so it composes with the app's
+  // Hardware/gesture Back closes the modal instead of navigating away: push a
+  // history entry on open and unwind it on close, composing with the app's
   // tab/panel history (states without `piView`/`settingsPanel` are ignored
-  // there). Mirrors the bottom-sheet modals' back-dismiss behaviour.
-  useEffect(() => {
-    history.pushState({ modal: true }, '')
-    const onPop = () => onClose()
-    window.addEventListener('popstate', onPop)
-    return () => {
-      window.removeEventListener('popstate', onPop)
-      if (history.state?.modal) history.back()
-    }
-  }, [onClose])
+  // there). Shared with the bottom-sheet modals — this must NOT be re-inlined
+  // here keyed on [onClose]: AboutPanel passes an inline arrow, so the effect
+  // would re-run on every parent re-render, leaking a history entry each time
+  // and letting the cleanup's asynchronous `history.back()` land on the
+  // re-attached listener and dismiss the modal by itself (issue #276).
+  useAndroidBackDismiss(onClose)
 
   // Focus the scrollable dialog container, trap Tab, restore focus on close,
   // close on Escape (issues #151/#152/#154).

@@ -33,7 +33,7 @@ beforeEach(() => {
   h.entries = []
   h.jobs = []
   h.perm = 'granted'
-  if (typeof localStorage !== 'undefined') localStorage.clear()
+  localStorage.clear()
 })
 
 describe('useReminders', () => {
