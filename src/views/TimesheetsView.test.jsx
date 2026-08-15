@@ -437,6 +437,48 @@ describe('TimesheetsView — print timesheet', () => {
     expect(html).not.toContain('SF Mono')
   })
 
+  // Job names, client names and notes are user-controlled and reach this device
+  // from untrusted places — a shared #import= link and the cloud-sync merge both
+  // copy them verbatim. The print HTML is written into a same-origin document, so
+  // an unescaped value executes against the origin holding the whole Dexie DB.
+  // laborBadgeHTML already escapes lt.name; these three drifted.
+  describe('escapes user-controlled strings (XSS)', () => {
+    const XSS_JOBS = [{
+      id: 1,
+      name: '<script>window.__pwn = 1</script>',
+      clientName: '<img src=x onerror="window.__pwn = 2">',
+      isActive: true,
+    }]
+
+    async function printWith(entries, jobs) {
+      useLiveQuery.mockImplementation((fn) => routeQuery(fn, entries, jobs, LABOR_TYPES))
+      mockDbEntries = entries
+      render(<TimesheetsView />)
+      fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
+      await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+      return openPrintWindow.mock.calls[0][0]
+    }
+
+    it('escapes the job name', async () => {
+      const html = await printWith([AN_ENTRY], XSS_JOBS)
+      expect(html).not.toContain('<script>window.__pwn = 1</script>')
+      expect(html).toContain('&lt;script&gt;window.__pwn = 1&lt;/script&gt;')
+    })
+
+    it('escapes the client name', async () => {
+      const html = await printWith([AN_ENTRY], XSS_JOBS)
+      expect(html).not.toContain('<img src=x onerror="window.__pwn = 2">')
+      expect(html).toContain('&lt;img src=x onerror=&quot;window.__pwn = 2&quot;&gt;')
+    })
+
+    it('escapes entry notes', async () => {
+      const entry = { ...AN_ENTRY, notes: '<img src=x onerror="window.__pwn = 3">' }
+      const html = await printWith([entry], JOBS)
+      expect(html).not.toContain('<img src=x onerror="window.__pwn = 3">')
+      expect(html).toContain('&lt;img src=x onerror=&quot;window.__pwn = 3&quot;&gt;')
+    })
+  })
+
   it('printed timesheet badge shows the labor glyph (svg) and labor name, not colour-only', async () => {
     // The print function queries db directly (not via useLiveQuery), so populate
     // both: useLiveQuery for the on-screen sheet, mockDbEntries for the print path.
@@ -762,5 +804,79 @@ describe('TimesheetsView — WeeklySheet frozen-job breakdown', () => {
     // Both frozen job names must appear as separate rows.
     expect(screen.getByText('Ghost Job A')).toBeInTheDocument()
     expect(screen.getByText('Ghost Job B')).toBeInTheDocument()
+  })
+})
+
+// ─── Exports honour the active filters ───────────────────────────────────────
+// Both exports re-query the date range from db directly and, before this was
+// fixed, applied none of the search/job/labor filters — so the CSV button, whose
+// accessible name is "Export current view as CSV", exported the whole window,
+// and Print rendered a grand total that disagreed with the screen.
+
+describe('TimesheetsView — exports honour active filters', () => {
+  const SECOND_ENTRY = { ...AN_ENTRY, id: 9, jobId: 2, laborTypeId: 2 }
+
+  function setupBothJobs() {
+    setupWithTwoOptions([AN_ENTRY, SECOND_ENTRY])
+    mockDbEntries = [AN_ENTRY, SECOND_ENTRY]
+  }
+
+  async function csvText() {
+    await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled())
+    return await global.URL.createObjectURL.mock.calls[0][0].text()
+  }
+
+  it('CSV includes both jobs when no filter is set', async () => {
+    setupBothJobs()
+    render(<TimesheetsView />)
+    fireEvent.click(screen.getByRole('button', { name: /export current view as csv/i }))
+    const csv = await csvText()
+    expect(csv).toContain('Acme Corp')
+    expect(csv).toContain('Beta LLC')
+  })
+
+  it('CSV excludes the job filtered out', async () => {
+    setupBothJobs()
+    render(<TimesheetsView />)
+    pickFilter('all jobs', 'Acme Corp')
+    fireEvent.click(screen.getByRole('button', { name: /export current view as csv/i }))
+    const csv = await csvText()
+    expect(csv).toContain('Acme Corp')
+    expect(csv).not.toContain('Beta LLC')
+  })
+
+  it('CSV excludes rows the search query filtered out', async () => {
+    setupBothJobs()
+    render(<TimesheetsView />)
+    fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'Beta' } })
+    fireEvent.click(screen.getByRole('button', { name: /export current view as csv/i }))
+    const csv = await csvText()
+    expect(csv).toContain('Beta LLC')
+    expect(csv).not.toContain('Acme Corp')
+  })
+
+  it('Print excludes the job filtered out', async () => {
+    setupBothJobs()
+    render(<TimesheetsView />)
+    pickFilter('all jobs', 'Acme Corp')
+    fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+    const html = openPrintWindow.mock.calls[0][0]
+    expect(html).toContain('Acme Corp')
+    expect(html).not.toContain('Beta LLC')
+  })
+
+  it('Print total reflects only the filtered rows', async () => {
+    setupBothJobs()
+    render(<TimesheetsView />)
+    pickFilter('all jobs', 'Acme Corp')
+    fireEvent.click(screen.getByRole('button', { name: /print timesheet/i }))
+    await waitFor(() => expect(openPrintWindow).toHaveBeenCalled())
+    const html = openPrintWindow.mock.calls[0][0]
+    // One 1-hour entry survives the filter, so the printed grand total is 1.00,
+    // not the 2.00 of the unfiltered window.
+    const tfoot = html.slice(html.indexOf('<tfoot>'))
+    expect(tfoot).toContain('1.00')
+    expect(tfoot).not.toContain('2.00')
   })
 })
