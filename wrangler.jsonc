@@ -13,6 +13,15 @@
   // plus APP_URL (var) — the deployed origin, which must equal the build's
   // VITE_APP_URL and the providers' registered redirect URIs (byte-identical).
   "keep_vars": true,
+  // Workers Logs. worker/oauth.js runs the OAuth code→token exchange for all
+  // four sync providers and wraps the CSP/security headers onto every asset
+  // response — the two places a production failure is invisible from the client
+  // (a user just sees "sign-in failed"). Without retention, request logs and any
+  // thrown error exist only while a `wrangler tail` is attached, i.e. never at
+  // the moment something actually breaks. Both sibling Workers already enable
+  // this. Note the exchange handles client secrets: keep logging free of token
+  // and secret values, as the Workers do.
+  "observability": { "enabled": true },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
