@@ -5,3 +5,27 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 20
+    # Two groups, split by dependency-type, rather than one catch-all "*" group.
+    # A grouped PR is reviewed as one unit, so a RUNTIME bump (something that
+    # ships to users and can break the app at boot) must never be able to ride
+    # along inside a batch of dev-only tooling updates — that is how js-yaml 4->5
+    # nearly landed unnoticed in a sibling repo. Production updates get their own
+    # PR, which is the one that needs a hand-verified boot check.
+    groups:
+      npm-production:
+        dependency-type: production
+        patterns:
+          - "*"
+      npm-development:
+        dependency-type: development
+        patterns:
+          - "*"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"

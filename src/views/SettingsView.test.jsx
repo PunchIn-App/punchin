@@ -20,6 +20,7 @@ const mockDbJobsToArray       = vi.fn().mockResolvedValue([])
 const mockDbEntriesToArray    = vi.fn().mockResolvedValue([])
 const mockDbLaborTypesToArray = vi.fn().mockResolvedValue([])
 const mockDbEntriesClear      = vi.fn().mockResolvedValue(undefined)
+const mockClearAllEntries     = vi.fn().mockResolvedValue(undefined)
 const mockDbJobsClear         = vi.fn().mockResolvedValue(undefined)
 const mockDbLaborTypesClear   = vi.fn().mockResolvedValue(undefined)
 const mockDbSettingsClear     = vi.fn().mockResolvedValue(undefined)
@@ -53,6 +54,10 @@ vi.mock('../db', () => ({
   // exportBackup pulls portable preferences through this (real impl tested in
   // syncManager.test.js / db.test.js); the export test only needs it to resolve.
   getPortableSettings: async () => ({}),
+  // Danger Zone "Clear time entries" must route through this (it tombstones as
+  // it clears) rather than db.entries.clear(), or the entries resurrect on the
+  // next sync. Real implementation is covered in db.test.js.
+  get clearAllEntries() { return mockClearAllEntries },
   db: {
     jobs: {
       get toArray() { return mockDbJobsToArray },
@@ -466,12 +471,15 @@ describe('SettingsView — Danger Zone', () => {
     expect(screen.getByText('Clear all time entries?')).toBeInTheDocument()
   })
 
-  it('calls db.entries.clear() when ConfirmModal is confirmed', async () => {
+  // Must be clearAllEntries, not a bare db.entries.clear(): the latter writes no
+  // tombstones, so the next sync pulls every "permanently" cleared entry back.
+  it('clears entries through the tombstoning helper when ConfirmModal is confirmed', async () => {
     render(<SettingsView />)
     expand('Data & Sync')
     fireEvent.click(screen.getByText('Clear time entries'))
     fireEvent.click(screen.getByRole('button', { name: /clear entries/i }))
-    await waitFor(() => expect(mockDbEntriesClear).toHaveBeenCalled())
+    await waitFor(() => expect(mockClearAllEntries).toHaveBeenCalled())
+    expect(mockDbEntriesClear).not.toHaveBeenCalled()
   })
 
   it('closes ConfirmModal when Cancel is clicked', () => {
@@ -530,18 +538,10 @@ describe('SettingsView — Danger Zone', () => {
   })
 
   it('disconnects sync and clears app-local storage on factory reset, keeping pi.deviceId (#143)', async () => {
-    const store = new Map([
-      ['pi.reminderState', '{}'],
-      ['pi.opens', '5'],
-      ['pi.installNudgeDismissed', '1'],
-      ['pi.deviceId', 'device-xyz'],
-    ])
-    vi.stubGlobal('localStorage', {
-      getItem: k => (store.has(k) ? store.get(k) : null),
-      setItem: (k, v) => store.set(k, String(v)),
-      removeItem: k => store.delete(k),
-      clear: () => store.clear(),
-    })
+    localStorage.setItem('pi.reminderState', '{}')
+    localStorage.setItem('pi.opens', '5')
+    localStorage.setItem('pi.installNudgeDismissed', '1')
+    localStorage.setItem('pi.deviceId', 'device-xyz')
     try {
       render(<SettingsView />)
       expand('Data & Sync')
@@ -551,12 +551,12 @@ describe('SettingsView — Danger Zone', () => {
       // disconnectSync runs first so the remote device file is deleted before creds are wiped
       await waitFor(() => expect(mockDisconnectSync).toHaveBeenCalled())
       await waitFor(() => expect(mockDbSettingsBulkPut).toHaveBeenCalled())
-      expect(store.has('pi.reminderState')).toBe(false)
-      expect(store.has('pi.opens')).toBe(false)
-      expect(store.has('pi.installNudgeDismissed')).toBe(false)
-      expect(store.get('pi.deviceId')).toBe('device-xyz') // device identity preserved by design
+      expect(localStorage.getItem('pi.reminderState')).toBeNull()
+      expect(localStorage.getItem('pi.opens')).toBeNull()
+      expect(localStorage.getItem('pi.installNudgeDismissed')).toBeNull()
+      expect(localStorage.getItem('pi.deviceId')).toBe('device-xyz') // device identity preserved by design
     } finally {
-      vi.unstubAllGlobals()
+      localStorage.clear()
     }
   })
 

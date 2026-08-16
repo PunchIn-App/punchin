@@ -5,16 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.35.0] — 2026-07-27
+## [0.35.1] — 2026-08-16
 
 ### Fixed
-- **Android printing — the third and structural fix (#294, #316).** The previous two attempts hid the app behind a stylesheet that the app created at print time and deleted again once printing "finished". Android doesn't work that way: it draws the pages lazily, long after printing reports itself done, and draws them again whenever you change a print setting. So the rule that hid the app was being deleted while Android was still working, and the bare app screen is what reached the paper. The hiding rule now ships as part of the app itself, where nothing can remove it, and the printed document is no longer torn down on any timer or print event — it's simply replaced the next time you print. Printing on iPhone, iPad and desktop is untouched.
+- **CSV and Print now export what you're actually looking at.** With a search term or a job/labor-type filter active, the "Export current view as CSV" button and the Print button both ignored the filter and produced the whole day or week instead. Print also showed a grand total for entries that weren't on the page. Both now export exactly the rows the screen is showing, and the printed total matches. The hours themselves are unchanged: billing is still worked out across the whole period, so a filtered export always agrees with the unfiltered one.
+- **Clearing your time entries now stays cleared.** With cloud sync switched on, Settings → Data & sync → Clear time entries removed everything and then quietly restored it all on the next sync, despite the confirmation saying the action was permanent. This happened even with only one device connected. Cleared entries now stay gone, on every device.
+- **Deleting a job or labor type no longer costs you entries on your other devices.** When a permanently deleted job or labor type reached another device through sync, the time entries that referenced it were dropped there with no warning, and were lost again when restoring from a backup file. Those entries now keep the job's name and colour and stay in your timesheets, exactly as they already did on the device where you deleted it.
+- **Names and notes containing symbols print correctly.** A job name, client name, or note containing characters such as `<`, `>`, or `&` could break the layout of a printed timesheet. They now print as written.
+
+### Security
+- **The app now sends its security headers to your browser.** PunchIn has defined a content-security policy and related protections for some time, but a configuration gap meant they were never actually applied to the app itself, only to a handful of background requests. They now apply everywhere, so the browser enforces that the app can only load code and contact services from the small, fixed list PunchIn actually uses, and can't be embedded in another site's page.
+
+---
+
+## [0.35.0] — 2026-07-27
 
 ### Added
 - **Print diagnostics (Settings → About).** Off by default. When switched on, printed timesheets and invoices carry a small footer with the app version and how long the page took to render, so a printing problem can be reported with evidence of which build produced it. Leave it off for anything you send to a client.
 
 ### Fixed
-- **Android printing — follow-up to the v0.34.1 fix (#294, #316).** The v0.34.1 change laid the invoice/timesheet out on the page correctly but two things still spoiled the result on Android: the app pins the page to exactly one screen-height (so the nav bar can stay put on a phone), which **clipped the printout to a single page** and silently dropped every row past it; and the app's dark background carried through onto the paper. Printing now releases that height lock and forces a white page, so a multi-page invoice prints every page in full. The printed document is also no longer torn down while Android is still rendering it — the cause of the whole app screen printing instead of the document.
+- **Android printing — the third and structural fix (#294, #316).** The previous two attempts hid the app behind a stylesheet that the app created at print time and deleted again once printing "finished". Android doesn't work that way: it draws the pages lazily, long after printing reports itself done, and draws them again whenever you change a print setting. So the rule that hid the app was being deleted while Android was still working, and the bare app screen is what reached the paper. The hiding rule now ships as part of the app itself, where nothing can remove it, and the printed document is no longer torn down on any timer or print event — it's simply replaced the next time you print. Printing on iPhone, iPad and desktop is untouched.
+
+---
+
+## [0.34.2] — 2026-07-25
+
+### Fixed
+- **Android printing — follow-up to the v0.34.1 fix (#294, #316).** The v0.34.1 change laid the invoice/timesheet out on the page correctly but two things still spoiled the result on Android: the app pins the page to exactly one screen-height (so the nav bar can stay put on a phone), which **clipped the printout to a single page** and silently dropped every row past it; and the app's dark background carried through onto the paper. Printing now releases that height lock and forces a white page, so a multi-page invoice prints every page in full. This release also stopped clearing the printed document away the moment you returned to the app, waiting instead until the system reported printing finished — an attempt at the other half of the bug (the whole app screen printing instead of the document) that turned out **not** to be enough, because Android carries on drawing the page long after it reports printing as finished. That half was fixed in v0.35.0, which removes the teardown entirely.
 
 ---
 

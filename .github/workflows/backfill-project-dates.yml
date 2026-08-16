@@ -36,11 +36,21 @@ on:
 
 permissions: {}
 
+# Only ever run one backfill at a time — two concurrent passes would walk the
+# same board items and race on the "only fill empty fields" check. A queued run
+# is fine; a cancelled one would stop half-way through the board.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   backfill:
     runs-on: ubuntu-latest
+    # Walks EVERY item on the board with paginated GraphQL, so it gets the
+    # longest budget of the automation workflows.
+    timeout-minutes: 30
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         env:
           PROJECT_OWNER: PunchIn-App
           PROJECT_NUMBER: "1"

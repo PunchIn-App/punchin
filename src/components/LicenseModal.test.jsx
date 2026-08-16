@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { useState } from 'react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import LicenseModal from './LicenseModal'
 
 describe('LicenseModal', () => {
@@ -48,5 +49,34 @@ describe('LicenseModal', () => {
     render(<LicenseModal onClose={onClose} />)
     fireEvent.popState(window)
     expect(onClose).toHaveBeenCalled()
+  })
+
+  // See ChangelogModal.test.jsx for the full explanation: AboutPanel renders
+  // this modal with an inline arrow for onClose, so a back-dismiss effect keyed
+  // on that callback re-runs on every parent re-render — pushing a history entry
+  // each time and letting the cleanup's deferred history.back() dismiss the
+  // modal on its own (issue #276).
+  it('re-rendering the parent neither leaks a history entry nor self-dismisses (#276)', () => {
+    const onClose = vi.fn()
+    const pushState = vi.spyOn(history, 'pushState')
+    try {
+      let rerender
+      function Parent() {
+        const [n, setN] = useState(0)
+        rerender = () => act(() => setN((v) => v + 1))
+        return <LicenseModal onClose={() => onClose(n)} />
+      }
+      render(<Parent />)
+      expect(pushState).toHaveBeenCalledTimes(1)
+
+      rerender()
+      rerender()
+      rerender()
+
+      expect(pushState).toHaveBeenCalledTimes(1)
+      expect(onClose).not.toHaveBeenCalled()
+    } finally {
+      pushState.mockRestore()
+    }
   })
 })

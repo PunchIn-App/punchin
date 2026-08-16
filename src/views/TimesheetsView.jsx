@@ -11,13 +11,38 @@ import {
   getDayRange, getWeekRange, getWeekDays,
   isEntryInRange, billedDurationMap,
 } from '../utils/time'
-import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML } from '../utils/printDocument'
+import { PRINT_FONT_HEAD, openPrintWindow, laborBadgeHTML, escHtml } from '../utils/printDocument'
 import { entryJob, entryLabor } from '../utils/entryRefs'
 import { LaborTag, LaborGlyphChip } from '../components/LaborGlyph'
 import EntitySelect from '../components/EntitySelect'
 import EditEntryModal from '../components/EditEntryModal'
 import InvoiceModal from '../components/InvoiceModal'
 import ConfirmModal from '../components/ConfirmModal'
+
+// The one search/job/labor-type predicate behind the toolbar, shared by the
+// on-screen sheets and by the CSV / Print exports. It used to be duplicated in
+// DailySheet and WeeklySheet only, so the two exports — which re-query the date
+// range straight from Dexie — silently ignored every filter: the CSV button
+// ("Export current view as CSV") emitted the whole window, and Print rendered a
+// grand total that disagreed with the screen. Callers pass the already-resolved
+// job/labor type so frozen refs on deleted records still match.
+function matchesFilters(entry, job, laborType, { searchQuery, filterJobId, filterLaborTypeId }) {
+  if (searchQuery?.trim()) {
+    const q = searchQuery.toLowerCase()
+    const hit = job?.name?.toLowerCase().includes(q)
+      || job?.clientName?.toLowerCase().includes(q)
+      || laborType?.name?.toLowerCase().includes(q)
+      || entry.notes?.toLowerCase().includes(q)
+    if (!hit) return false
+  }
+  if (filterJobId) {
+    if (filterJobId.startsWith('client:')) {
+      if (job?.clientName !== filterJobId.slice('client:'.length)) return false
+    } else if (entry.jobId !== Number(filterJobId)) return false
+  }
+  if (filterLaborTypeId && entry.laborTypeId !== Number(filterLaborTypeId)) return false
+  return true
+}
 
 // Billing attributes each entry to the day it punched IN — an entry bills once,
 // whole, on its start day, never split across the days it spans (issues #274/#136).
@@ -48,28 +73,8 @@ function DailySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterLa
   // change, not on every parent render (e.g. typing in an unrelated field) (#138).
   const filteredEntries = useMemo(() => {
     if (!entries) return null
-    return entries.filter(e => {
-      const job = getJob(e.jobId)
-      const lt = getLT(e.laborTypeId)
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase()
-        const matchesJob = job?.name?.toLowerCase().includes(q)
-        const matchesClient = job?.clientName?.toLowerCase().includes(q)
-        const matchesLt = lt?.name?.toLowerCase().includes(q)
-        const matchesNotes = e.notes?.toLowerCase().includes(q)
-        if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
-      }
-
-      if (filterJobId) {
-        if (filterJobId.startsWith('client:')) {
-          if (job?.clientName !== filterJobId.slice('client:'.length)) return false
-        } else if (e.jobId !== Number(filterJobId)) return false
-      }
-      if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
-
-      return true
-    })
+    return entries.filter(e =>
+      matchesFilters(e, getJob(e.jobId), getLT(e.laborTypeId), { searchQuery, filterJobId, filterLaborTypeId }))
     // start.getTime() keys the day; jobMap/ltMap back getJob/getLT.
   }, [entries, start.getTime(), searchQuery, filterJobId, filterLaborTypeId, jobMap, ltMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -183,28 +188,8 @@ function WeeklySheet({ date, jobs, laborTypes, searchQuery, filterJobId, filterL
   // Filter once per input change (#138).
   const filteredEntries = useMemo(() => {
     if (!allEntries) return null
-    return allEntries.filter(e => {
-      const job = getJob(e.jobId)
-      const lt = getLT(e.laborTypeId)
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase()
-        const matchesJob = job?.name?.toLowerCase().includes(q)
-        const matchesClient = job?.clientName?.toLowerCase().includes(q)
-        const matchesLt = lt?.name?.toLowerCase().includes(q)
-        const matchesNotes = e.notes?.toLowerCase().includes(q)
-        if (!matchesJob && !matchesClient && !matchesLt && !matchesNotes) return false
-      }
-
-      if (filterJobId) {
-        if (filterJobId.startsWith('client:')) {
-          if (job?.clientName !== filterJobId.slice('client:'.length)) return false
-        } else if (e.jobId !== Number(filterJobId)) return false
-      }
-      if (filterLaborTypeId && e.laborTypeId !== Number(filterLaborTypeId)) return false
-
-      return true
-    })
+    return allEntries.filter(e =>
+      matchesFilters(e, getJob(e.jobId), getLT(e.laborTypeId), { searchQuery, filterJobId, filterLaborTypeId }))
   }, [allEntries, start.getTime(), searchQuery, filterJobId, filterLaborTypeId, jobMap, ltMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tick while a timer overlaps this week so its live time grows in the totals
@@ -478,6 +463,11 @@ export default function TimesheetsView() {
       if (!e.punchOut) continue
       const { job } = entryJob(e, jobs?.find(j => j.id === e.jobId))
       const { laborType: lt } = entryLabor(e, laborTypes?.find(l => l.id === e.laborTypeId))
+      // Honour the toolbar filters — the button says "Export current view". The
+      // billing map above stays over the UNFILTERED window (billing is intrinsic
+      // to each entry; regrouping a filtered subset changes the sessions), so a
+      // filter only changes which rows are emitted, never what each one bills.
+      if (!matchesFilters(e, job, lt, { searchQuery, filterJobId, filterLaborTypeId })) continue
       // Billed duration from the session map; Start/End stay the actual times.
       const dur = (billed.get(e) ?? 0) / 3600000
       rows.push([
@@ -516,23 +506,36 @@ export default function TimesheetsView() {
     // the screen; the printed Start/End stay the actual times.
     const entries = await db.entries.where('punchIn').between(start, end, true, true).toArray()
     const completed = entries.filter(e => !!e.punchOut)
+    // Bill over the whole window, then print only what the toolbar filters leave
+    // — same contract as the on-screen sheets (billing is intrinsic to the entry;
+    // rounding a pre-filtered subset would regroup the sessions).
     const billed = billedDurationMap(completed, Date.now(), rm, mode)
-    const totalMs = completed.reduce((s, e) => s + (billed.get(e) ?? 0), 0)
+    const visible = completed.filter(e => matchesFilters(
+      e,
+      entryJob(e, jobs?.find(j => j.id === e.jobId)).job,
+      entryLabor(e, laborTypes?.find(l => l.id === e.laborTypeId)).laborType,
+      { searchQuery, filterJobId, filterLaborTypeId },
+    ))
+    const totalMs = visible.reduce((s, e) => s + (billed.get(e) ?? 0), 0)
     const totalHrs = (totalMs / 3600000).toFixed(2)
 
-    const rows = completed
+    const rows = visible
       .sort((a, b) => new Date(a.punchIn) - new Date(b.punchIn))
       .map(e => {
         const { job } = entryJob(e, jobs?.find(j => j.id === e.jobId))
         const { laborType: lt } = entryLabor(e, laborTypes?.find(l => l.id === e.laborTypeId))
         const hrs = ((billed.get(e) ?? 0) / 3600000).toFixed(2)
+        // escHtml every user-controlled string (job/client name, notes) — this
+        // HTML is written into a same-origin document, and these values arrive
+        // verbatim from #import= links and the sync merge. laborBadgeHTML escapes
+        // its own label; the dates and hours are machine-formatted.
         return `<tr>
           <td>${format(new Date(e.punchIn), 'EEE, MMM d')}</td>
-          <td>${job?.name || '—'}${job?.clientName ? `<br><span class="sub">${job.clientName}</span>` : ''}</td>
+          <td>${job?.name ? escHtml(job.name) : '—'}${job?.clientName ? `<br><span class="sub">${escHtml(job.clientName)}</span>` : ''}</td>
           <td>${laborBadgeHTML(lt)}</td>
           <td class="mono">${formatTime(e.punchIn, settings.timeFormat)} – ${formatTime(e.punchOut, settings.timeFormat)}</td>
           <td class="right mono">${hrs}</td>
-          ${e.notes ? `<td class="notes">${e.notes}</td>` : '<td></td>'}
+          ${e.notes ? `<td class="notes">${escHtml(e.notes)}</td>` : '<td></td>'}
         </tr>`
       }).join('')
 
