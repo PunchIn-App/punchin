@@ -59,9 +59,17 @@ npm run coverage   # Coverage report via @vitest/coverage-v8
 
 ### Deploy
 
+**Merging to `main` deploys to production.** Cloudflare Workers Builds is connected to this repo
+and builds + deploys every push to `main` automatically — there is no manual step in the normal
+flow, and no gate between a merge and users getting the code. Treat a merge as a release action.
+
 ```bash
-npm run deploy   # builds then deploys via `wrangler deploy` using the root wrangler.jsonc
+npm run deploy   # manual escape hatch: builds, then `wrangler deploy` from your machine
 ```
+
+Use `npm run deploy` only to recover from a Workers Builds failure or to push an out-of-band
+build; the normal path is a PR merge. The `Workers Builds: punchin` check on a PR builds the
+Worker but does **not** deploy it — only a merge to `main` does.
 
 The **base app** needs no `.env` files and has no backend secrets — it's local-first by default. **Optional, opt-in cloud sync** is the exception: the Cloudflare Worker (`worker/oauth.js`) needs a `GITHUB_CLIENT_SECRET` Cloudflare secret for the GitHub OAuth code→token exchange (see `wrangler.jsonc`'s keep-vars comment), and sync builds read the `VITE_*` client IDs from `.env.local` (copy `.env.example`). Cloudflare account credentials for deployment are managed via `wrangler login`.
 
@@ -364,7 +372,7 @@ Always use `src/utils/time.js` helpers rather than inline date math:
 - Service worker registration and update callbacks are wired in `main.jsx` via `virtual:pwa-register`; state is exposed app-wide through `src/utils/pwa.js` using window events (no React context needed)
 - `beforeinstallprompt` is captured in `src/utils/pwa.js` and surfaced as an "Add to Home Screen" row in Settings when the browser offers it (Android/desktop Chrome; iOS does not fire this event)
 - Manifest defines: name `"PunchIn"`, display `"standalone"`, `orientation: "any"` (follows device rotation), theme `#0F1117`, icons at 192×192 and 512×512
-- Build output goes to `dist/` — Cloudflare Workers serves it as static assets via `wrangler.jsonc`; deploy with `npm run deploy`
+- Build output goes to `dist/` — Cloudflare Workers serves it as static assets via `wrangler.jsonc`. Deployment is automatic on merge to `main` (Workers Builds); `npm run deploy` is the manual fallback
 - `wrangler.jsonc` stays at the project root — Cloudflare's Git integration auto-detects it there and cannot be redirected without a Dashboard build-command override
 - The `compatibility_date` in `wrangler.jsonc` is pinned; update it intentionally, not automatically
 - `worker/oauth.js` wraps every static-asset response with a **Content-Security-Policy** and hardening headers (`X-Content-Type-Options`, `Referrer-Policy: no-referrer`, HSTS, `X-Frame-Options`). `script-src` is `'self'` (the built `index.html` has no inline scripts). **If you add a `fetch()` to a new external origin** (e.g. a new sync provider's API), add that origin to the CSP `connect-src` list in `worker/oauth.js`, or the request will be blocked in production. Likewise add new style/font/image origins to the matching directive.

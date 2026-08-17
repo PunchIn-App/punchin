@@ -7,7 +7,7 @@
 ```
 punchin/
 ├── README.md               # Product intro, screenshots, getting started
-├── wrangler.jsonc          # Cloudflare Workers deployment; deploy via `npm run deploy`; routes OAuth requests to worker/oauth.js and static assets via ASSETS binding
+├── wrangler.jsonc          # Cloudflare Workers deployment; deployed automatically by Workers Builds on merge to main (`npm run deploy` is the manual fallback); routes OAuth requests to worker/oauth.js and static assets via ASSETS binding
 ├── .env.example            # Documents all VITE_* OAuth env vars with setup instructions for each provider
 ├── worker/
 │   ├── oauth.js            # Cloudflare Worker: confidential-client OAuth code→token exchange for all three providers (/oauth/github/callback, plus /oauth/google/callback + /oauth/onedrive/callback which also return a refresh token, issue #243 — the client secret never reaches the browser) and silent background refresh (POST /oauth/refresh → trades the refresh token for a fresh access token; 401 = dead token → reconnect, 502 = transient → retry); best-effort provider token-revoke on disconnect (POST /oauth/revoke — GitHub revokes this device's token via client-secret HTTP Basic, device-scoped via …/token not the account-wide …/grant; Google is proxied too, keeping oauth2.googleapis.com out of the browser CSP); renders on-demand exact-colour accent install icons at /icons/i/<hex>/* (issue #228, falls back to the nearest static palette swatch on render failure); falls through to static assets for all other routes. Wraps every asset response with CSP/hardening headers
