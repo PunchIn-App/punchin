@@ -21,12 +21,12 @@
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",
     "date-fns": "^4.4.0",
-    "dexie": "^4.4.4",
+    "dexie": "^4.4.5",
     "dexie-react-hooks": "^4.4.0",
-    "lucide-react": "^1.27.0",
+    "lucide-react": "^1.39.0",
     "qrcode-generator": "^2.0.4",
     "react": "^19.2.7",
-    "react-colorful": "^5.8.0",
+    "react-colorful": "^5.8.1",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1"
   },
